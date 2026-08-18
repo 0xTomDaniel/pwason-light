@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive specification for Pwason, a Poisson-driven eight-channel spectral light and audio simulator.">
+  <title>Pwason Light — Interactive Specification</title>
+  <script defer src="./.viz/runtime.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #f2efe6;
+      --muted: #9d9c91;
+      --paper: #070908;
+      --surface: #101311;
+      --surface-2: #161a17;
+      --line: #30372f;
+      --line-bright: #525e50;
+      --acid: #c7ee72;
+      --amber: #d9a14d;
+      --red: #ff6a5b;
+      --display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      --body: "Avenir Next", Avenir, "Gill Sans", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; background: var(--paper); }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 50% -20%, rgba(129, 158, 89, .15), transparent 40rem),
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+        var(--paper);
+      background-size: auto, 28px 28px, 28px 28px, auto;
+      font: 16px/1.6 var(--body);
+    }
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      content: "";
+      opacity: .22;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.13'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+    }
+    button, input { font: inherit; }
+    a { color: var(--acid); text-underline-offset: 4px; }
+    code { color: #e0e6cc; font: .88em var(--mono); }
+    main { width: min(1220px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 96px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1, h2 { font-family: var(--display); font-weight: 400; }
+    h1 { margin: 0; font-size: clamp(4.8rem, 14vw, 11rem); line-height: .72; letter-spacing: -.075em; }
+    h2 { margin-bottom: 14px; font-size: clamp(2.2rem, 5vw, 4rem); line-height: .96; letter-spacing: -.04em; }
+    h3 { margin-bottom: 7px; font-size: 1rem; letter-spacing: .02em; }
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 2px 0 24px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font: 700 .7rem/1.2 var(--mono);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .hero { display: grid; grid-template-columns: 1.4fr .6fr; gap: 40px; align-items: end; padding: 80px 0 62px; }
+    .hero-copy { max-width: 400px; justify-self: end; }
+    .kicker { color: var(--acid); font: 700 .73rem var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .hero-copy p:last-child { margin-bottom: 0; color: #b5b5a9; font-size: 1.08rem; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    nav a { padding: 7px 11px; border: 1px solid var(--line); color: var(--muted); font: 700 .68rem var(--mono); letter-spacing: .08em; text-decoration: none; text-transform: uppercase; }
+    nav a:hover, nav a:focus-visible { border-color: var(--acid); color: var(--ink); }
+
+    .instrument {
+      overflow: hidden;
+      border: 1px solid var(--line-bright);
+      border-radius: 4px;
+      background: linear-gradient(145deg, #171b18, #0c0f0d 65%);
+      box-shadow: 0 42px 100px rgba(0,0,0,.48), inset 0 1px rgba(255,255,255,.06);
+    }
+    .instrument-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: center;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--line);
+      color: #a8aa9e;
+      font: 700 .68rem var(--mono);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .status-light { display: inline-flex; align-items: center; gap: 8px; }
+    .status-light::before { width: 7px; height: 7px; border-radius: 50%; background: #50564e; content: ""; box-shadow: 0 0 0 3px #0c0f0d; }
+    [data-running="true"] .status-light::before { background: var(--acid); box-shadow: 0 0 12px var(--acid); }
+    .sim-body { display: grid; grid-template-columns: 1fr 320px; }
+    .light-stage { position: relative; min-width: 0; padding: clamp(28px, 5vw, 62px) clamp(18px, 4vw, 48px) 38px; }
+    .event-field { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+    .event-mark { position: absolute; left: var(--event-x); top: 18%; width: var(--event-size); height: var(--event-size); border-radius: 50%; background: var(--event-color); box-shadow: 0 0 16px var(--event-color); animation: event-drift 1.8s ease-out forwards; }
+    @keyframes event-drift { from { opacity: .95; transform: translateY(0) scale(.55); } to { opacity: 0; transform: translateY(190px) scale(1.4); } }
+    .led-bank { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(8, minmax(60px, 1fr)); gap: clamp(7px, 1.5vw, 16px); }
+    .channel { min-width: 0; text-align: center; }
+    .led-shell { position: relative; width: min(100%, 94px); aspect-ratio: 1; margin: 0 auto 17px; padding: 10%; border: 1px solid #343a33; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #303630, #090b09 64%); box-shadow: inset 0 2px 9px #000, 0 1px rgba(255,255,255,.06); }
+    .led {
+      --level: 0;
+      width: 100%;
+      height: 100%;
+      border: 1px solid color-mix(in srgb, var(--led-color) 38%, #2c302c);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 38% 30%, rgba(255,255,255,calc(.12 + var(--level) * .65)), transparent 22%),
+        radial-gradient(circle, color-mix(in srgb, var(--led-color) calc(18% + var(--level) * 72%), #070807), #060706 72%);
+      box-shadow:
+        0 0 calc(4px + var(--level) * 28px) color-mix(in srgb, var(--led-color) calc(var(--level) * 92%), transparent),
+        0 0 calc(var(--level) * 66px) color-mix(in srgb, var(--led-color) calc(var(--level) * 58%), transparent),
+        inset 0 0 calc(9px + var(--level) * 20px) rgba(255,255,255,calc(var(--level) * .34));
+    }
+    .channel strong { display: block; overflow: hidden; margin-bottom: 3px; font: 700 clamp(.59rem, 1vw, .72rem) var(--mono); letter-spacing: .06em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+    .channel span { color: #74796f; font: .64rem var(--mono); }
+    .scope-panel { position: relative; z-index: 1; margin-top: 34px; border: 1px solid #394237; background: #080b08; box-shadow: inset 0 0 28px rgba(126,168,76,.035); }
+    .scope-head { display: flex; justify-content: space-between; gap: 18px; align-items: end; padding: 12px 14px; border-bottom: 1px solid #293028; }
+    .scope-title { margin: 0; color: #c9d1c1; font: 700 .65rem var(--mono); letter-spacing: .11em; text-transform: uppercase; }
+    .scope-path { margin: 0; color: #687164; font: .58rem var(--mono); letter-spacing: .04em; }
+    .scope-screen { position: relative; height: 176px; overflow: hidden; background: radial-gradient(circle at 50% 50%, rgba(139,177,88,.055), transparent 70%); }
+    .scope-screen::before { position: absolute; inset: 0; pointer-events: none; content: ""; background: linear-gradient(rgba(255,255,255,.018) 50%, transparent 50%); background-size: 100% 4px; }
+    .scope-screen::after { position: absolute; inset: 0; pointer-events: none; content: ""; box-shadow: inset 0 0 34px #000; }
+    .scope-screen canvas { display: block; width: 100%; height: 100%; }
+    .scope-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; border-top: 1px solid #293028; background: #293028; }
+    .scope-metric { padding: 9px 12px; background: #0b0e0b; }
+    .scope-metric span { display: block; color: #5f685b; font: 700 .53rem var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .scope-metric output { display: block; margin-top: 3px; color: #b9d08f; font: .72rem var(--mono); }
+    .meter-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 38px; background: var(--line); border: 1px solid var(--line); }
+    .meter { padding: 12px 14px; background: #0b0e0c; }
+    .meter span { display: block; color: #6f756c; font: 700 .58rem var(--mono); letter-spacing: .11em; text-transform: uppercase; }
+    .meter output { display: block; margin-top: 5px; color: #dfe6d7; font: 1rem var(--mono); }
+    .controls { display: flex; flex-direction: column; gap: 25px; padding: 28px 24px; border-left: 1px solid var(--line); background: rgba(5,7,6,.46); }
+    .control label, .switch-label { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 10px; color: #bdc1b7; font: 700 .67rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .control output { color: var(--acid); }
+    input[type="range"] { width: 100%; height: 4px; appearance: none; border-radius: 0; background: #394038; accent-color: var(--acid); }
+    input[type="range"]::-webkit-slider-thumb { width: 15px; height: 23px; appearance: none; border: 1px solid #d8dfca; border-radius: 2px; background: #8f9b81; box-shadow: 0 2px 10px #000; }
+    .range-ends { display: flex; justify-content: space-between; margin-top: 8px; color: #666b63; font: .58rem var(--mono); text-transform: uppercase; }
+    .mix-scale { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 8px; color: #666b63; font: .58rem var(--mono); text-transform: uppercase; }
+    .mix-scale span:nth-child(2) { text-align: center; }
+    .mix-scale span:last-child { text-align: right; }
+    .log-scale { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 8px; color: #777d73; font: .58rem var(--mono); }
+    .log-scale span { position: relative; padding-top: 7px; text-align: center; }
+    .log-scale span::before { position: absolute; top: 0; left: 50%; width: 1px; height: 4px; background: #697064; content: ""; }
+    .log-scale span:first-child { text-align: left; }
+    .log-scale span:first-child::before { left: 0; }
+    .log-scale span:last-child { text-align: right; }
+    .log-scale span:last-child::before { right: 0; left: auto; }
+    .switches { display: grid; gap: 11px; }
+    .switch-label { align-items: center; margin: 0; cursor: pointer; }
+    .switch-label input { width: 34px; height: 18px; accent-color: var(--acid); }
+    .button-stack { display: grid; gap: 9px; margin-top: auto; }
+    button { min-height: 44px; border: 1px solid var(--line-bright); border-radius: 2px; color: var(--ink); background: #1b201b; cursor: pointer; font: 700 .7rem var(--mono); letter-spacing: .09em; text-transform: uppercase; }
+    button:hover, button:focus-visible { border-color: var(--acid); outline: 0; }
+    .primary { border-color: #9bb75e; color: #11150d; background: var(--acid); }
+    [data-running="true"] .primary { border-color: #9b4f46; color: #fff3ee; background: #71372f; }
+    .audio-note { margin: -10px 0 0; color: #6f756c; font: .62rem/1.45 var(--mono); }
+
+    .reference-lab { margin-top: 20px; padding: clamp(24px, 4vw, 46px); border: 1px solid var(--line-bright); background: linear-gradient(145deg, #101511, #090c0a 72%); }
+    .lab-head { display: grid; grid-template-columns: 1.2fr .8fr; gap: 40px; align-items: end; margin-bottom: 30px; }
+    .lab-head h2 { margin-bottom: 0; font-size: clamp(2rem, 4vw, 3.6rem); }
+    .lab-copy { margin: 0; color: #a9afa4; font-size: .96rem; }
+    .reference-upload { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; justify-content: space-between; margin-bottom: 18px; padding: 16px; border: 1px solid var(--line); background: #0b0e0c; }
+    .file-control { display: inline-flex; gap: 12px; align-items: center; min-height: 42px; padding: 9px 13px; border: 1px solid #73815f; color: #e3ead8; background: #171d16; cursor: pointer; font: 700 .65rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .file-control:hover, .file-control:focus-within { border-color: var(--acid); }
+    .file-control input { width: min(330px, 52vw); color: #8f978a; font: .64rem var(--mono); }
+    .reference-status { margin: 0; color: #7f8979; font: .65rem/1.5 var(--mono); }
+    .reference-status[data-state="ready"] { color: #a9bb91; }
+    .reference-status[data-state="error"] { color: #ff8b7f; }
+    .reference-provenance { flex: 1 0 100%; margin: 0; color: #687064; font: .58rem/1.6 var(--mono); }
+    .reference-provenance a { color: #9fb77a; }
+    .analysis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .analysis-card { min-width: 0; border: 1px solid var(--line); background: #080b09; }
+    .analysis-card-head { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; padding: 13px 14px; border-bottom: 1px solid var(--line); }
+    .analysis-card-head h3 { margin: 0; color: #d9dfd2; font: 700 .68rem var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .analysis-card-head span { overflow: hidden; color: #687064; font: .58rem var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+    .analysis-plot { position: relative; border-bottom: 1px solid #242a23; background: radial-gradient(circle at 50% 45%, rgba(146,180,93,.045), transparent 72%); }
+    .analysis-plot.waveform { height: 92px; }
+    .analysis-plot.spectrogram { height: 180px; }
+    .analysis-plot canvas { display: block; width: 100%; height: 100%; }
+    .plot-label { position: absolute; top: 7px; right: 9px; color: #596253; font: 700 .51rem var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .analysis-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); }
+    .analysis-metric { min-width: 0; padding: 10px 11px; background: #0c100d; }
+    .analysis-metric span { display: block; color: #626a5e; font: 700 .5rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .analysis-metric output { display: block; overflow: hidden; margin-top: 4px; color: #c7d3b8; font: .69rem var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+    .spectrum-panel { margin-top: 12px; border: 1px solid var(--line); background: #080b09; }
+    .spectrum-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+    .spectrum-head h3 { margin: 0; font: 700 .68rem var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .spectrum-legend { display: flex; gap: 16px; color: #7d8678; font: .58rem var(--mono); }
+    .spectrum-legend span::before { display: inline-block; width: 14px; height: 2px; margin: 0 6px 3px 0; background: var(--legend); content: ""; }
+    .spectrum-canvas { height: 170px; }
+    .spectrum-canvas canvas { display: block; width: 100%; height: 100%; }
+
+    .spec-section { scroll-margin-top: 18px; padding: clamp(58px, 9vw, 104px) 0; border-bottom: 1px solid var(--line); }
+    .section-head { display: grid; grid-template-columns: .68fr 1.32fr; gap: 40px; margin-bottom: 38px; }
+    .section-number { color: var(--acid); font: 700 .7rem var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+    .section-lede { max-width: 750px; margin: 0; color: #b7b8ae; font-size: 1.08rem; }
+    .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; border: 1px solid var(--line); background: var(--line); }
+    .flow article { position: relative; min-height: 150px; padding: 20px; background: var(--surface); }
+    .flow article:not(:last-child)::after { position: absolute; top: 50%; right: -8px; z-index: 2; color: var(--acid); content: "→"; transform: translateY(-50%); }
+    .flow b { display: block; margin-bottom: 24px; color: var(--acid); font: .65rem var(--mono); }
+    .flow p { margin: 0; color: var(--muted); font-size: .88rem; }
+    .story-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin: 0; padding: 1px; background: var(--line); list-style: none; counter-reset: story; }
+    .story-list li { min-height: 120px; padding: 21px 22px; background: var(--surface); counter-increment: story; }
+    .story-list li::before { display: block; margin-bottom: 16px; color: var(--acid); content: counter(story, decimal-leading-zero); font: .65rem var(--mono); }
+    .decision-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .decision { padding: 21px; border: 1px solid var(--line); background: var(--surface); }
+    .decision p { margin: 0; color: var(--muted); font-size: .9rem; }
+    .equation { margin: 30px 0; padding: 27px; border-left: 2px solid var(--acid); color: #e8eddc; background: #0d100e; font: clamp(.85rem, 2vw, 1.1rem)/1.7 var(--mono); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); }
+    table { width: 100%; min-width: 830px; border-collapse: collapse; background: var(--surface); font-size: .84rem; }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: #777e73; font: 700 .62rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    tbody tr:last-child td { border-bottom: 0; }
+    .swatch { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--swatch); box-shadow: 0 0 9px var(--swatch); }
+    .scope-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .scope-card { padding: 22px; border: 1px solid var(--line); background: var(--surface); }
+    .scope-card ul { margin-bottom: 0; padding-left: 1.15rem; color: var(--muted); }
+    .scope-card li + li { margin-top: 8px; }
+    footer { display: flex; justify-content: space-between; gap: 24px; padding: 34px 0 0; color: #6c7169; font: .66rem var(--mono); }
+
+    @media (max-width: 900px) {
+      .hero, .section-head, .lab-head { grid-template-columns: 1fr; }
+      .hero-copy { max-width: 620px; justify-self: start; }
+      .sim-body { grid-template-columns: 1fr; }
+      .controls { border-top: 1px solid var(--line); border-left: 0; }
+      .led-bank { grid-template-columns: repeat(4, 1fr); row-gap: 26px; }
+      .flow, .decision-grid { grid-template-columns: repeat(2, 1fr); }
+      .analysis-grid { grid-template-columns: 1fr; }
+      .flow article:nth-child(2)::after { display: none; }
+    }
+    @media (max-width: 580px) {
+      main { width: min(100% - 20px, 1220px); padding-top: 18px; }
+      .topline span:last-child { display: none; }
+      .hero { padding: 62px 0 44px; }
+      .led-bank { grid-template-columns: repeat(2, 1fr); }
+      .scope-head { align-items: start; flex-direction: column; gap: 4px; }
+      .scope-screen { height: 138px; }
+      .scope-metrics { grid-template-columns: repeat(2, 1fr); }
+      .reference-upload { align-items: stretch; flex-direction: column; }
+      .file-control { align-items: flex-start; flex-direction: column; }
+      .file-control input { width: 100%; }
+      .meter-strip, .flow, .story-list, .decision-grid, .scope-grid { grid-template-columns: 1fr; }
+      .flow article::after { display: none; }
+      .section-head { gap: 12px; }
+      footer { flex-direction: column; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .event-mark { animation-duration: .01ms; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="topline" data-anchor="topline">
+      <span>Interactive specification · Draft 0.1</span>
+      <span>Poisson-driven spectral light synthesizer</span>
+    </div>
+
+    <header class="hero" data-anchor="hero">
+      <div>
+        <p class="kicker">Eight channels · one stochastic ecology</p>
+        <h1>Pwason</h1>
+      </div>
+      <div class="hero-copy">
+        <p class="kicker">PWAH-son</p>
+        <p>A light instrument that turns the nonrepeating calm of steady rain into color and sound—without collapsing natural randomness into a digital flicker effect.</p>
+      </div>
+    </header>
+
+    <nav aria-label="Specification sections" data-anchor="navigation">
+      <a href="#prototype">Prototype</a>
+      <a href="#comparison">Reference lab</a>
+      <a href="#problem">Problem</a>
+      <a href="#solution">Solution</a>
+      <a href="#stories">User stories</a>
+      <a href="#decisions">Decisions</a>
+      <a href="#testing">Testing</a>
+      <a href="#scope">Scope</a>
+    </nav>
+
+    <section id="prototype" class="instrument" data-anchor="interactive-prototype" data-running="false">
+      <div class="instrument-head">
+        <span>PW–08 spectral process monitor</span>
+        <span class="status-light">Process live</span>
+      </div>
+      <div class="sim-body">
+        <div class="light-stage">
+          <div id="event-field" class="event-field" aria-hidden="true"></div>
+          <div class="led-bank" aria-label="Eight virtual spectral LEDs">
+            <div class="channel"><div class="led-shell"><div class="led" data-led style="--led-color:#936cff" role="meter" aria-label="Violet intensity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div><strong>Violet</strong><span>400–420</span></div>
+            <div class="channel"><div class="led-shell"><div class="led" data-led style="--led-color:#356dff" role="meter" aria-label="Royal Blue intensity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div><strong>Royal Blue</strong><span>~455 nm</span></div>
+            <div class="channel"><div class="led-shell"><div class="led" data-led style="--led-color:#35d9df" role="meter" aria-label="Cyan intensity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div><strong>Cyan</strong><span>~502 nm</span></div>
+            <div class="channel"><div class="led-shell"><div class="led" data-led style="--led-color:#4ee883" role="meter" aria-label="Green intensity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div><strong>Green</strong><span>~525 nm</span></div>
+            <div class="channel"><div class="led-shell"><div class="led" data-led style="--led-color:#c6ef67" role="meter" aria-label="PC Lime intensity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div><strong>PC Lime</strong><span>phosphor</span></div>
+            <div class="channel"><div class="led-shell"><div class="led" data-led style="--led-color:#ffb347" role="meter" aria-label="PC Amber intensity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div><strong>PC Amber</strong><span>phosphor</span></div>
+            <div class="channel"><div class="led-shell"><div class="led" data-led style="--led-color:#ff514c" role="meter" aria-label="Red intensity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div><strong>Red</strong><span>~625 nm</span></div>
+            <div class="channel"><div class="led-shell"><div class="led" data-led style="--led-color:#cf1735" role="meter" aria-label="Deep Red intensity" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div></div><strong>Deep Red</strong><span>~660 nm</span></div>
+          </div>
+          <section class="scope-panel" data-anchor="combined-output-oscilloscope" aria-labelledby="scope-title">
+            <header class="scope-head">
+              <h3 id="scope-title" class="scope-title">Combined output · live waveform</h3>
+              <p class="scope-path">Post-mix → post-compression → pre-speaker</p>
+            </header>
+            <div class="scope-screen">
+              <canvas id="output-waveform" role="img" aria-label="Live time-domain waveform of the combined synthesized audio output"></canvas>
+            </div>
+            <div class="scope-metrics" aria-live="polite">
+              <div class="scope-metric"><span>RMS</span><output id="rms-output">−∞ dBFS</output></div>
+              <div class="scope-metric"><span>Peak</span><output id="peak-output">−∞ dBFS</output></div>
+              <div class="scope-metric"><span>Sample rate</span><output id="sample-rate-output">— kHz</output></div>
+              <div class="scope-metric"><span>Window</span><output id="scope-window-output">— ms</output></div>
+            </div>
+          </section>
+          <div class="meter-strip" aria-live="polite">
+            <div class="meter"><span>Observed rate</span><output><b id="live-rate">0.00</b> Hz</output></div>
+            <div class="meter"><span>Events</span><output id="event-count">0000</output></div>
+            <div class="meter"><span>Seed</span><output id="seed-output">steady-rain-01</output></div>
+          </div>
+        </div>
+
+        <aside class="controls" aria-label="Simulation controls">
+          <div class="control">
+            <label for="rate"><span>Speed · Log</span><output id="rate-output" for="rate">3.20 events/s</output></label>
+            <input id="rate" type="range" min="0" max="3" step="0.001" value="0.505" aria-valuetext="3.20 events per second">
+            <div class="log-scale" aria-hidden="true"><span>1</span><span>10</span><span>100</span><span>1000</span></div>
+          </div>
+          <div class="control">
+            <label for="coupling"><span>Channel coupling</span><output id="coupling-output" for="coupling">38%</output></label>
+            <input id="coupling" type="range" min="0" max="1" step="0.01" value="0.38">
+            <div class="range-ends"><span>Private</span><span>Shared</span></div>
+          </div>
+          <div class="control">
+            <label for="output-level"><span>Output level</span><output id="output-level-output" for="output-level">160%</output></label>
+            <input id="output-level" type="range" min="0.25" max="2.5" step="0.05" value="1.6">
+            <div class="range-ends"><span>Quiet</span><span>Maximum</span></div>
+          </div>
+          <div class="control">
+            <label for="source-mix"><span>Source mix</span><output id="source-mix-output" for="source-mix">Generated only</output></label>
+            <input id="source-mix" type="range" min="0" max="1" step="0.01" value="0" aria-valuetext="Generated only" disabled>
+            <div class="mix-scale" aria-hidden="true"><span>Generated</span><span>Blend</span><span>Amazon</span></div>
+          </div>
+          <div class="switches">
+            <label class="switch-label" for="sound-enabled"><span>Audio response</span><input id="sound-enabled" type="checkbox" checked></label>
+          </div>
+          <p class="audio-note">Audio begins only after an explicit press of Start. Keep device volume low for the first listen.</p>
+          <div class="button-stack">
+            <button id="start-stop" class="primary" type="button" aria-pressed="false">Start process</button>
+            <button id="reseed" type="button">New weather seed</button>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="comparison" class="reference-lab" data-anchor="rain-reference-lab" aria-labelledby="reference-lab-title">
+      <div class="lab-head">
+        <div><p class="kicker">Rain reference lab · scientific baseline</p><h2 id="reference-lab-title">Inspect the hiss.</h2></div>
+        <p class="lab-copy">Compare one generated Rain Impact Waveform with the strongest 120 ms impact in a published Central Amazon forest recording. The bundled measurement can also be auditioned through Source Mix, but it never enters the Poisson process.</p>
+      </div>
+      <div class="reference-upload">
+        <label class="file-control" for="rain-reference"><span>Override reference</span><input id="rain-reference" type="file" accept="audio/*"></label>
+        <p id="reference-status" class="reference-status" role="status">Loading the bundled Amazon forest recording…</p>
+        <p class="reference-provenance">Default: Xavier et al., <a href="https://doi.org/10.23708/I0QYNM">Measuring Amazon rainfall intensity with sound recorders: data and code</a> · light rainfall · recorder fixed to a tree in Central Amazon forest · <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>. A local file can temporarily override the first-10-second visual analysis; Source Mix continues to use the documented Amazon recording.</p>
+      </div>
+      <div class="analysis-grid">
+        <article class="analysis-card">
+          <header class="analysis-card-head"><h3>Generated impact</h3><span>Current procedural model · seed 42</span></header>
+          <div class="analysis-plot waveform"><canvas id="generated-analysis-waveform" role="img" aria-label="Waveform of the generated rain impact"></canvas><span class="plot-label">Waveform · 120 ms</span></div>
+          <div class="analysis-plot spectrogram"><canvas id="generated-analysis-spectrogram" role="img" aria-label="Spectrogram of the generated rain impact"></canvas><span class="plot-label">Spectrogram · log Hz</span></div>
+          <div class="analysis-metrics">
+            <div class="analysis-metric"><span>Centroid</span><output id="generated-centroid">—</output></div>
+            <div class="analysis-metric"><span>Energy &gt; 8 kHz</span><output id="generated-high-band">—</output></div>
+            <div class="analysis-metric"><span>Flatness</span><output id="generated-flatness">—</output></div>
+          </div>
+        </article>
+        <article id="reference-analysis-card" class="analysis-card" aria-busy="false">
+          <header class="analysis-card-head"><h3>Rain Reference</h3><span id="reference-filename">Amazon forest · loading</span></header>
+          <div class="analysis-plot waveform"><canvas id="reference-analysis-waveform" role="img" aria-label="Waveform of the selected measured rain impact"></canvas><span class="plot-label">Waveform · 120 ms</span></div>
+          <div class="analysis-plot spectrogram"><canvas id="reference-analysis-spectrogram" role="img" aria-label="Spectrogram of the selected measured rain impact"></canvas><span class="plot-label">Spectrogram · log Hz</span></div>
+          <div class="analysis-metrics">
+            <div class="analysis-metric"><span>Centroid</span><output id="reference-centroid">—</output></div>
+            <div class="analysis-metric"><span>Energy &gt; 8 kHz</span><output id="reference-high-band">—</output></div>
+            <div class="analysis-metric"><span>Flatness</span><output id="reference-flatness">—</output></div>
+          </div>
+        </article>
+      </div>
+      <div class="spectrum-panel">
+        <header class="spectrum-head"><h3>Normalized spectral shape</h3><div class="spectrum-legend" aria-hidden="true"><span style="--legend:#d9ff86">Generated</span><span style="--legend:#54dce3">Reference</span></div></header>
+        <div class="spectrum-canvas"><canvas id="comparison-spectrum" role="img" aria-label="Normalized spectrum comparison between generated and measured rain impacts"></canvas></div>
+      </div>
+    </section>
+
+    <section id="problem" class="spec-section" data-anchor="problem-statement">
+      <div class="section-head">
+        <span class="section-number">01 · Problem statement</span>
+        <div><h2>Random light usually looks like software pretending to be alive.</h2><p class="section-lede">Conventional flicker effects repeat, quantize, or call attention to their algorithm. Pwason needs a perceptually calm, nonrepeating process whose timing and physical envelopes feel closer to steady rain than to a lighting preset. Its generated rain sound must be inspectable and directly auditionable against measurement rather than accepted by intuition alone, without making a stopped specification page consume continuous CPU.</p></div>
+      </div>
+    </section>
+
+    <section id="solution" class="spec-section" data-anchor="solution">
+      <div class="section-head">
+        <span class="section-number">02 · Solution</span>
+        <div><h2>Keep the clockwork simple. Put the richness in each event.</h2><p class="section-lede">The primary process uses fixed-rate homogeneous Poisson Arrivals. Speed is the total lamp rate. Channel Coupling routes each Arrival through the eight light Channels, while an independent Impact Position places it continuously around the listener. LED wavelength is output metadata and never shapes the generated rain sound. A documented scientific Rain Reference makes the generated event falsifiable through aligned signal views and an optional audible Source Mix.</p></div>
+      </div>
+      <div class="equation" aria-label="Pwason steady arrival and channel routing model">ΔT ~ Exponential(Λ) &nbsp; · &nbsp; Λshared = CΛ &nbsp; · &nbsp; Λprivate,ᵢ = (1 − C)Λ / 8 &nbsp; · &nbsp; Λdistinct = Λ</div>
+      <div class="equation" aria-label="Pwason spatial impact and acoustic propagation model">r = R√U &nbsp; · &nbsp; θ ~ Uniform(−π, π) &nbsp; · &nbsp; d = √(r² + h²) &nbsp; · &nbsp; relative pressure = h / d &nbsp; · &nbsp; pan = (2/π) asin(sin θ)</div>
+      <div class="flow" data-anchor="architecture-flow">
+        <article><b>01</b><h3>Controls</h3><p>Speed, Channel Coupling, Source Mix, and output level form the primary human Interface.</p></article>
+        <article><b>02</b><h3>Poisson Engine</h3><p>A seeded Module emits positive exponential gaps and marked events.</p></article>
+        <article><b>03</b><h3>Channel routing</h3><p>Every Arrival is either shared by all Channels or privately assigned to exactly one.</p></article>
+        <article><b>04</b><h3>Physical response</h3><p>The LED Adapter renders positive envelopes; the audio Adapter places signed band-limited impacts by distance and direction.</p></article>
+      </div>
+    </section>
+
+    <section id="stories" class="spec-section" data-anchor="user-stories">
+      <div class="section-head">
+        <span class="section-number">03 · User stories</span>
+        <div><h2>The first experience should explain itself through sensation.</h2><p class="section-lede">These stories define the browser prototype and preserve the larger hardware intent without pretending the browser is a calibrated luminaire.</p></div>
+      </div>
+      <ol class="story-list">
+        <li>As a listener, I want to start the process with one deliberate action, so that audio never surprises me.</li>
+        <li>As a listener, I want nonrepeating event timing, so that the texture remains alive during long sessions.</li>
+        <li>As a calm-space user, I want the default timing to resemble steady gentle rain, so that the result feels busy but peaceful.</li>
+        <li>As an explorer, I want a continuous logarithmic Speed control from 1 to 1000 events per second, so that sparse and extremely dense rates each receive useful control space.</li>
+        <li>As an explorer, I want Channel Coupling to divide a fixed total rate between shared and private Arrivals, so that correlation changes without making the lamp rainier.</li>
+        <li>As a viewer, I want eight clearly named virtual LEDs, so that every intended hardware spectrum channel is visible.</li>
+        <li>As a viewer, I want marked events to rise and decay smoothly, so that the LEDs do not behave like rigid digital pulses.</li>
+        <li>As a listener, I want every Channel to use the same generated band-limited Rain Impact Waveform, so that LED wavelength never creates musical notes.</li>
+        <li>As a listener, I want a continuous Source Mix from generated Arrivals to the Amazon recording, so that I can compare them by ear without changing screens or levels manually.</li>
+        <li>As a listener, I want the Source Mix midpoint to contain both sources with an equal-power fade, so that the center does not sound like a volume dip.</li>
+        <li>As a listener, I want Amazon-only mode to stop constructing muted generated audio nodes, so that comparison does not waste CPU at high Speed.</li>
+        <li>As a listener, I want direct output-level control, so that I can match the simulation to my device and listening environment.</li>
+        <li>As a listener, I want overlapping tails at higher rates, so that individual events fuse into a continuous texture.</li>
+        <li>As a listener, I want nearby impacts to arrive loudly over a field of quieter distant impacts, so that the sound has the depth of rainfall around a person.</li>
+        <li>As a headphone or stereo listener, I want impacts distributed evenly throughout the space between the speakers, so that rain sounds spatial rather than binary left-or-right.</li>
+        <li>As a listener, I want to see the combined post-mix waveform, so that I can connect the sound reaching the browser output with its instantaneous shape.</li>
+        <li>As a designer, I want a measured forest-rain recording loaded by default, so that evaluation does not depend on me finding or preparing source material.</li>
+        <li>As a researcher, I want the default recording’s study, dataset, intensity, and license visible, so that the comparison has traceable scientific provenance.</li>
+        <li>As a designer, I want to override the default with a local rain recording without playing or uploading it, so that I can evaluate a different impact environment when needed.</li>
+        <li>As a designer, I want the strongest measured impact isolated to the same 120 ms duration as the generated event, so that temporal and spectral differences are directly visible.</li>
+        <li>As a designer, I want aligned waveforms, spectrograms, normalized spectra, centroid, high-band energy, and flatness, so that a metallic or hi-hat-like failure has concrete evidence.</li>
+        <li>As a designer, I want a visible event count and current rate, so that I can connect perception with process behavior.</li>
+        <li>As a designer, I want to reseed the weather, so that I can compare different realizations without changing the controls.</li>
+        <li>As a developer, I want seeded runs to reproduce their observable event stream, so that regressions are testable.</li>
+        <li>As a developer, I want invalid control extremes bounded inside the engine, so that every emitted event remains renderable.</li>
+        <li>As a keyboard user, I want native controls and visible focus, so that the prototype remains operable without a pointer.</li>
+        <li>As a motion-sensitive user, I want nonessential event trails suppressed with reduced motion, so that the core light state remains usable.</li>
+        <li>As a reader, I want the stopped page to become computationally idle, so that leaving the specification open does not waste CPU or battery.</li>
+      </ol>
+    </section>
+
+    <section id="decisions" class="spec-section" data-anchor="implementation-decisions">
+      <div class="section-head">
+        <span class="section-number">04 · Implementation decisions</span>
+        <div><h2>A deep stochastic Module; thin sensory Adapters.</h2><p class="section-lede">The architecture concentrates steady Poisson timing, Channel routing, and independent Impact Position behind one small Arrival Interface. Light and audio Adapters consume the same Arrivals without allowing LED wavelength or audio propagation to leak back into the primary timing process.</p></div>
+      </div>
+      <div class="decision-grid">
+        <article class="decision"><h3>Temporal primitive</h3><p>Steady mode is homogeneous Poisson: inter-arrival gaps are sampled from an exponential distribution at fixed λ.</p></article>
+        <article class="decision"><h3>Logarithmic speed</h3><p>The Speed slider stores a continuous base-10 exponent from 0 through 3. Equal travel spans map to 1–10, 10–100, and 100–1000 events per second; the engine receives the resulting rate, not the exponent.</p></article>
+        <article class="decision"><h3>High-rate scheduling</h3><p>A short-interval scheduler prepares Arrivals through a 50 ms Web Audio lookahead, avoiding browser minimum-timeout distortion while preserving each Poisson timestamp. Event counting and LEDs activate on wall time. Decorative trails are capped at 30 per second to bound DOM animation and GPU work.</p></article>
+        <article class="decision"><h3>Total rate</h3><p>Speed is the total distinct Arrival rate Λ for the lamp. The number of hardware Channels never multiplies the underlying rain density.</p></article>
+        <article class="decision"><h3>Event marks</h3><p>Each Arrival owns amplitude, attack, decay, instantaneous rate, a routing kind, an energy-normalized eight-element Channel vector, and one continuous Impact Position. Position is independent of Channel routing.</p></article>
+        <article class="decision"><h3>Channel Coupling</h3><p>Shared Arrivals occur at CΛ. Eight private streams each occur at (1−C)Λ/8. Their superposition remains Λ; a shared Arrival still counts once.</p></article>
+        <article class="decision"><h3>Listening Field</h3><p>The prototype models a flat circular field with radius R = 20 m around a listener h = 1.5 m above the impact plane. Speed remains the total Arrival rate inside that field. These are explicit, replaceable scene settings rather than claims about every listening environment.</p></article>
+        <article class="decision"><h3>Spatial distribution</h3><p>Every Arrival samples r = R√U and an independent uniform azimuth. The square root distributes impacts uniformly by surface area, producing more distant than nearby events without discrete distance bands or additional Channels.</p></article>
+        <article class="decision"><h3>Acoustic Propagation</h3><p>Source distance is d = √(r²+h²), and relative pressure is h/d, normalized to 1 directly beneath the listener. Azimuth is folded into pan = (2/π) asin(sin θ), so equal angular steps from front to either side produce equal stereo-pan steps instead of clustering near hard left and right. The browser applies equal-power panning when supported. This first pass adds no propagation delay, atmospheric filtering, reflections, occlusion, reverberation, or binaural head model.</p></article>
+        <article class="decision"><h3>Generated rain impact</h3><p>Audio uses a generated signed pressure onset and a decaying, multiply low-passed stochastic surface reaction. The response remains seeded, nonperiodic, oscillator-free, and independent of Channel identity and LED wavelength. The measured recording constrains its spectral region but contributes no samples to the generated waveform.</p></article>
+        <article class="decision"><h3>Source Mix</h3><p>A continuous 0–100% control defaults to generated-only and crossfades toward Reference Playback. Gains follow cosine and sine of the half-quadrant: 0% is generated-only, 50% gives both sources √½ gain, and 100% is Amazon-only. Short Web Audio gain ramps prevent slider zipper noise.</p></article>
+        <article class="decision"><h3>Reference Playback</h3><p>The exact 60-second bundled Amazon recording loops only after the user presses Start, only while the process is running and audio is enabled, and only when Source Mix assigns it nonzero gain. Stop or disabling audio stops the loop. A user-selected local Rain Reference remains analysis-only and never replaces Reference Playback.</p></article>
+        <article class="decision"><h3>Output level</h3><p>A post-compression gain control ranges from 25% to 250% and defaults to 160%. The live oscilloscope taps the signal after this final gain stage.</p></article>
+        <article class="decision"><h3>Output oscilloscope</h3><p>An AnalyserNode taps the complete post-compression Source Mix immediately before the audio destination. The scope reports the browser’s combined digital output, not acoustic room or eardrum pressure.</p></article>
+        <article class="decision"><h3>Bounded Render Loop</h3><p>The visual Render Loop draws once while stopped, wakes on state changes, continues only while the process or visible tails are active, and caps drawing at 30 frames per second. The oscilloscope emits at most one plotted point per CSS pixel. Audio scheduling remains independent and preserves every Arrival timestamp.</p></article>
+        <article class="decision"><h3>Rain Reference</h3><p>The default is the exact 60-second light-rainfall WAV from Xavier et al.’s published Central Amazon forest rainfall study (dataset DOI 10.23708/I0QYNM; CC BY 4.0). The recorder was fixed to a tree, making this a real forest-rain measurement rather than a studio effect. Light rain is preferred over the dataset’s heavy-rain sample because discrete impacts are less masked. The original filename and MD5 checksum are preserved with the asset.</p></article>
+        <article class="decision"><h3>Reference preparation</h3><p>The browser loads the bundled reference automatically and may replace the visual comparison with a user-selected local file. Analysis itself remains silent and separate from synthesis. It considers at most the first 10 seconds, finds the largest absolute-pressure sample, and extracts a 120 ms window with 5 ms of pre-roll. No recording becomes a Poisson input.</p></article>
+        <article class="decision"><h3>Signal analysis</h3><p>A dependency-free 512-point Hann-windowed FFT produces time-frequency frames and an averaged power spectrum. The lab reports spectral centroid, the fraction of energy above 8 kHz, and spectral flatness. Generated and measured spectra are independently peak-normalized so the graph compares shape rather than recording level.</p></article>
+        <article class="decision"><h3>Measured baseline</h3><p>The original seed-42 generated impact measured 10.42 kHz centroid, 57.6% energy above 8 kHz, and 0.860 flatness, confirming the heard hi-hat failure. The filtered revision measures approximately 424 Hz, 0.15%, and 0.0073; the bundled forest-rain impact measures 624 Hz, 0.028%, and 0.0016. The revision enters the measured region without copying one impact or claiming every raindrop shares one spectrum.</p></article>
+        <article class="decision"><h3>Static comparison</h3><p>Waveform, log-frequency spectrogram, and spectrum canvases render only on initial load, Rain Reference selection, or a debounced resize. They do not join the live animation loop. The generated side uses a deterministic instance of the same Rain Impact Waveform Module used for playback.</p></article>
+        <article class="decision"><h3>Prototype technology</h3><p>Native HTML, CSS, JavaScript, and Web Audio keep the draft dependency-free and directly inspectable.</p></article>
+      </div>
+
+      <h3 style="margin-top:48px">Prototype spectral bill of materials</h3>
+      <p style="color:var(--muted)">Part numbers, spectra, prices, and verdicts below are the operator-supplied prototype snapshot; supplier pricing has not been independently refreshed in this draft.</p>
+      <div class="table-wrap" data-anchor="spectral-channel-table">
+        <table>
+          <thead><tr><th>Channel</th><th>Cheap prototype part</th><th>Spectrum</th><th>1-pc DigiKey</th><th>Prototype verdict</th></tr></thead>
+          <tbody>
+            <tr><td><span class="swatch" style="--swatch:#936cff" aria-hidden="true">&#8203;</span>Violet</td><td><code>JE2835AVT-N-0001A0000-N0000001</code></td><td>400–420 nm</td><td>$0.73</td><td>⚠ Not as tightly 405-targeted</td></tr>
+            <tr><td><span class="swatch" style="--swatch:#356dff" aria-hidden="true">&#8203;</span>Royal Blue</td><td><code>JE2835ARY-N-0002A0000-N0000001</code></td><td>450–460, ~455</td><td>$0.26</td><td>● Excellent</td></tr>
+            <tr><td><span class="swatch" style="--swatch:#35d9df" aria-hidden="true">&#8203;</span>Cyan</td><td><code>JE2835ACY-N-0003A0000-N0000001</code></td><td>495–510, ~502</td><td>$0.24</td><td>● Excellent</td></tr>
+            <tr><td><span class="swatch" style="--swatch:#4ee883" aria-hidden="true">&#8203;</span>Green</td><td><code>JE2835AGR-N-0002A0000-N0000001</code></td><td>520–530, ~525</td><td>$0.24</td><td>● Excellent</td></tr>
+            <tr><td><span class="swatch" style="--swatch:#c6ef67" aria-hidden="true">&#8203;</span>PC Lime</td><td><code>JE2835APL-N-0001A0000-N0000001</code></td><td>Phosphor converted</td><td>$0.27</td><td>● Excellent</td></tr>
+            <tr><td><span class="swatch" style="--swatch:#ffb347" aria-hidden="true">&#8203;</span>PC Amber</td><td><code>JE2835APA-N-0001A0000-N0000001</code></td><td>Phosphor converted</td><td>$0.25</td><td>● Excellent</td></tr>
+            <tr><td><span class="swatch" style="--swatch:#ff514c" aria-hidden="true">&#8203;</span>Red</td><td><code>JE2835ARD-N-0001A0000-N0000001</code></td><td>620–630, ~625</td><td>$0.27</td><td>● Exact target</td></tr>
+            <tr><td><span class="swatch" style="--swatch:#cf1735" aria-hidden="true">&#8203;</span>Deep / Photo Red</td><td><code>JE2835AHR-N-0001A0000-N0000001</code></td><td>650–670 nm</td><td>$0.35</td><td>● Essentially our 660</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="testing" class="spec-section" data-anchor="testing-decisions">
+      <div class="section-head">
+        <span class="section-number">05 · Testing decisions</span>
+        <div><h2>Verify what a caller can observe—not how randomness is assembled.</h2><p class="section-lede">The public Interface is a seeded engine that emits Arrivals. Tests use that seam to prove reproducibility, positive gaps, steady total rate, shared/private proportions, energy-normalized Channel routing, and area-uniform Impact Positions. The generated-waveform and Acoustic Propagation Interfaces prove audible event behavior without testing internal sample math.</p></div>
+      </div>
+      <div class="decision-grid">
+        <article class="decision"><h3>Good test</h3><p>A known seed and settings produce the same observable sequence after any internal refactor.</p></article>
+        <article class="decision"><h3>Statistical sanity</h3><p>A long fixed-rate run has positive gaps and a mean inter-arrival time close to 1/λ.</p></article>
+        <article class="decision"><h3>Browser evidence</h3><p>Inspect start/stop, sound consent, live meter updates, all eight LEDs, logarithmic decade markers and intermediate Speed values, reduced motion, and narrow layouts.</p></article>
+        <article class="decision"><h3>High-rate evidence</h3><p>At 1000 events per second, compare the event count against elapsed wall time to prove the scheduler does not collapse to the browser’s minimum timer frequency.</p></article>
+        <article class="decision"><h3>Signal-path evidence</h3><p>Verify that the analyser receives the post-compression Source Mix, displays silence before Start, shows both sources at the midpoint, and returns toward silence after Stop.</p></article>
+        <article class="decision"><h3>Rain-impact evidence</h3><p>Verify that generated impacts contain positive and negative pressure-like samples, concentrate their peak near onset, lose energy through the tail, and are invariant to Channel identity.</p></article>
+        <article class="decision"><h3>Spatial evidence</h3><p>Across a long seeded run, all Impact Positions remain inside the configured Listening Field and the mean squared radius approaches half the field’s squared radius, as required by uniform area sampling.</p></article>
+        <article class="decision"><h3>Propagation evidence</h3><p>Use a known 3–4–5 geometry to prove source distance and relative pressure. Verify that center, quarter-angle, and side positions map to 0, ±0.5, and ±1 through the public Acoustic Propagation Interface.</p></article>
+        <article class="decision"><h3>Render-loop evidence</h3><p>Prove through the Render Loop Interface that repeated wake requests schedule one frame, stopped state settles after one draw, and active state never draws above 30 frames per second. Browser profiling compares idle callbacks and canvas work before and after the change.</p></article>
+        <article class="decision"><h3>Analysis evidence</h3><p>A known 1 kHz signal must report a centroid near 1 kHz with negligible high-band energy and low flatness. A recording with a known dominant impulse must yield the expected 120 ms window and 5 ms pre-roll.</p></article>
+        <article class="decision"><h3>Reference-file evidence</h3><p>Verify the bundled file against the dataset’s exact byte count and MD5, then prove the default loader fetches and prepares that manifest entry through the Rain Reference Interface. In a real browser, verify automatic decoded metrics, populated static canvases, explicit Start consent, Source Mix endpoints and midpoint, looping Reference Playback, clean Stop, and no console error. A supported local file becomes a silent analysis override without upload.</p></article>
+        <article class="decision"><h3>Source-mix evidence</h3><p>Through the Source Mix Interface, prove exact generated-only and Amazon-only endpoints, √½ gains at 50%, continuous bounded values, and clamping outside the slider range.</p></article>
+      </div>
+    </section>
+
+    <section id="scope" class="spec-section" data-anchor="scope">
+      <div class="section-head">
+        <span class="section-number">06 · Out of scope</span>
+        <div><h2>This is a perceptual simulator, not yet a luminaire model.</h2><p class="section-lede">The browser prototype establishes the temporal and interaction language. It does not claim radiometric, colorimetric, electrical, thermal, or psychoacoustic fidelity.</p></div>
+      </div>
+      <div class="scope-grid">
+        <article class="scope-card"><h3>Included now</h3><ul><li>Fixed-rate Poisson timing</li><li>One total lamp Arrival rate</li><li>Eight virtual light Channels</li><li>Shared/private Channel routing</li><li>Continuous Impact Positions</li><li>Geometric pressure loss and stereo direction</li><li>Generated band-limited rain impacts</li><li>Bundled scientific forest-rain reference</li><li>Equal-power generated/Amazon Source Mix</li><li>Optional local, silent Rain Reference override</li><li>Static waveform, spectrogram, and spectrum comparison</li><li>Event-driven bounded visual rendering</li><li>Speed and coupling controls</li><li>Seeded test seams</li></ul></article>
+        <article class="scope-card"><h3>Deferred</h3><ul><li>Automatic synthesis calibration from a Rain Reference</li><li>Recorded-sample or granular Arrival synthesis</li><li>Manual impact selection inside a recording</li><li>Propagation delay and atmospheric absorption</li><li>Ground reflections, occlusion, and reverberation</li><li>Multiple impact surfaces or drop-size distributions</li><li>Calibrated spectral power distributions</li><li>Metameric or constant-chromaticity optimization</li><li>Closed-loop analog current drivers</li><li>PWM and driver topology decisions</li><li>Thermal, optical, and enclosure design</li><li>Claims about wellbeing or treatment</li></ul></article>
+      </div>
+    </section>
+
+    <section class="spec-section" data-anchor="further-notes">
+      <div class="section-head">
+        <span class="section-number">07 · Further notes</span>
+        <div><h2>Poisson is the clockwork underneath the organism.</h2><p class="section-lede">The project’s deeper ambition remains a continuous stochastic light process whose statistics resemble naturally occurring physical phenomena. This draft asks whether steady Poisson Arrivals, eight routed Channels, continuous Impact Positions, and generated band-limited impacts can form a coherent rain texture without musical or spectral encoding. Spatial position enriches each Arrival; it does not add timing processes or hardware Channels. Rain References provide evidence and Reference Playback provides an audible comparison, but neither replaces generation. Measurement direction: <a href="https://doi.org/10.1029/2024GL108210">Amazon rainfall intensity measured with sound recorders</a>, its <a href="https://doi.org/10.23708/I0QYNM">CC BY 4.0 research dataset</a>, <a href="https://www.sciencedirect.com/science/article/pii/S0894177719313937">measured airborne drop impacts on different surfaces</a>, and <a href="https://haonancheng.cn/attaches/2019%20SIGGRAPH.pdf">physically based statistical rain-sound synthesis</a>. Conversation direction: <a href="https://chatgpt.com/share/6a83b8e0-0754-83e8-8f96-d05e45e89e73">Poisson Light Evolution</a> and <a href="https://chatgpt.com/share/6a83c3a1-0854-83e8-9e40-1254966db861">Spectrographs of Rain Sound</a>.</p></div>
+      </div>
+    </section>
+
+    <footer><span>Pwason Light · Interactive specification</span><span>Draft 0.1 · 18 August 2026</span></footer>
+  </main>
+  <script type="module" src="../../src/app.js"></script>
+</body>
+</html>
