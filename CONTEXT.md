@@ -41,7 +41,7 @@ The quiet, sub-millisecond signed pressure response at the start of one Rain Imp
 _Avoid_: Mandatory onset peak, snare transient
 
 **Surface Response**:
-The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. It uses a brief set of broad, partially independent ERB-spaced stochastic bands with coherent material-shaped spectral emphasis and no free-running resonator, recording, long shared envelope, or liquid-bubble model.
+The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. It uses a brief set of overlapping, partially independent ERB-spaced stochastic bands with coherent material-shaped spectral emphasis; every surface remains broadband enough to stand alone rather than compensating for another surface. It has no free-running resonator, recording, long shared envelope, or liquid-bubble model.
 _Avoid_: Diffuse Response, recorded impulse response, bubble tone
 
 **Poisson Shot Synthesis**:
@@ -65,7 +65,7 @@ A quieter delayed secondary contact generated inside one Rain Impact Waveform. I
 _Avoid_: Secondary Poisson event, extra drop stream
 
 **Acoustic Target Profile**:
-A measured aggregate spectral and temporal shape used to constrain generated rain texture. Pwason's current Acoustic Target Profile comes from the default Redwood Rain Reference but contains no recording samples.
+A measured aggregate spectral and temporal shape used to constrain generated rain texture. Pwason's current Acoustic Target Profile includes a nine-band 80 Hz–20 kHz contour from the default Redwood Rain Reference but contains no recording samples or response waveforms.
 _Avoid_: Sample synthesis, spectral note, selected playback profile
 
 **Generated Rain Renderer**:

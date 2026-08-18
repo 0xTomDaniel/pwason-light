@@ -8,26 +8,29 @@ const SURFACES = Object.freeze({
     contactScale: 0.52,
     textureScale: 0.88,
     damping: 0.72,
-    bandAmplitudes: Object.freeze([0.28, 0.36, 0.42, 0.4, 0.48, 0.72, 1.45, 1.7]),
-    bandDecayMilliseconds: Object.freeze([14, 16, 18, 20, 21, 19, 15, 11]),
+    bandAmplitudes: Object.freeze([0.7, 0.78, 0.9, 0.92, 1.05, 1.25, 1, 0.5]),
+    bandDecayMilliseconds: Object.freeze([14, 16, 18, 20, 21, 19, 16.5, 12.1]),
   }),
   litter: Object.freeze({
     contactScale: 0.34,
     textureScale: 1,
     damping: 0.84,
-    bandAmplitudes: Object.freeze([0.9, 1.18, 0.86, 0.48, 0.28, 0.18, 0.13, 0.1]),
-    bandDecayMilliseconds: Object.freeze([15, 18, 19, 17, 14, 11, 8, 6]),
+    bandAmplitudes: Object.freeze([1, 1.12, 1, 0.75, 0.58, 0.42, 0.9, 1.2]),
+    bandDecayMilliseconds: Object.freeze([15, 18, 19, 17, 14, 11, 8.8, 6.6]),
   }),
   wood: Object.freeze({
     contactScale: 0.68,
     textureScale: 0.54,
     damping: 0.64,
-    bandAmplitudes: Object.freeze([0.16, 0.25, 0.42, 0.7, 0.98, 1.12, 0.92, 0.58]),
-    bandDecayMilliseconds: Object.freeze([15, 16, 17, 17, 16, 14, 11, 8]),
+    bandAmplitudes: Object.freeze([0.4, 0.55, 0.7, 0.9, 1.05, 1.1, 0.9, 0.6]),
+    bandDecayMilliseconds: Object.freeze([15, 16, 17, 17, 16, 14, 12.1, 8.8]),
   }),
 });
 
 const ERB_BAND_COUNT = 8;
+const REDWOOD_TARGET_BAND_GAINS = Object.freeze([
+  7, 3.6, 2, 0.8, 0.2, 0.38, 1.2, 7,
+]);
 
 function createRandom(seed) {
   let state = (Number(seed) >>> 0) || 0x6d2b79f5;
@@ -57,8 +60,8 @@ function frequencyAtErbRate(rate) {
 }
 
 function createErbBandpassFilters(sampleRate) {
-  const minimumFrequency = 180;
-  const maximumFrequency = Math.min(12_000, sampleRate * 0.42);
+  const minimumFrequency = 80;
+  const maximumFrequency = Math.min(16_000, sampleRate * 0.42);
   const minimumErb = erbRate(minimumFrequency);
   const maximumErb = erbRate(maximumFrequency);
   const erbStep = (maximumErb - minimumErb) / (ERB_BAND_COUNT - 1);
@@ -75,7 +78,7 @@ function createErbBandpassFilters(sampleRate) {
       frequencyAtErbRate(centerErb + erbStep / 2),
     );
     const bandwidth = Math.max(40, upperFrequency - lowerFrequency);
-    const q = Math.max(1.45, centerFrequency / bandwidth * 4.7);
+    const q = Math.max(1.1, centerFrequency / bandwidth * 4);
     const omega = 2 * Math.PI * centerFrequency / sampleRate;
     const alpha = Math.sin(omega) / (2 * q);
     const a0 = 1 + alpha;
@@ -118,8 +121,8 @@ export function createRainMark({ seed, dropPopulation = 0.5, factors } = {}) {
   const velocityMetersPerSecond = 2.25 + 2.55 * Math.sqrt(diameterMm);
   const sizeNormalized = clamp((diameterMm - 0.3) / 5.1);
   const surfaceWeights = [
-    ["leaf", interpolate(0.72, 0.38, diversity) * effectiveAcousticFactor(settings, "leafSurface")],
-    ["litter", interpolate(0.28, 0.55, diversity) * effectiveAcousticFactor(settings, "litterSurface")],
+    ["leaf", interpolate(0.78, 0.5, diversity) * effectiveAcousticFactor(settings, "leafSurface")],
+    ["litter", interpolate(0.22, 0.45, diversity) * effectiveAcousticFactor(settings, "litterSurface")],
     ["wood", interpolate(0.02, 0.12, diversity) * effectiveAcousticFactor(settings, "woodSurface")],
   ];
   const surfaceWeightTotal = surfaceWeights.reduce((sum, entry) => sum + entry[1], 0);
@@ -154,13 +157,13 @@ export function createRainMark({ seed, dropPopulation = 0.5, factors } = {}) {
       * (surface === "leaf" ? 1 : surface === "litter" ? 0.72 : 0.32),
   );
   const spectralFocus = surface === "leaf"
-    ? clamp(interpolate(0.92, 0.72, sizeNormalized) + (random() - 0.5) * 0.14)
+    ? clamp(interpolate(0.72, 0.58, sizeNormalized) + (random() - 0.5) * 0.14)
     : surface === "litter"
-      ? clamp(interpolate(0.32, 0.14, sizeNormalized) + (random() - 0.5) * 0.14)
-      : clamp(interpolate(0.7, 0.5, sizeNormalized) + (random() - 0.5) * 0.18);
+      ? clamp(interpolate(0.4, 0.25, sizeNormalized) + (random() - 0.5) * 0.14)
+      : clamp(interpolate(0.65, 0.5, sizeNormalized) + (random() - 0.5) * 0.18);
   const spectralSpread = varied(
     random,
-    surface === "leaf" ? 0.17 : surface === "litter" ? 0.21 : 0.18,
+    surface === "leaf" ? 0.32 : surface === "litter" ? 0.3 : 0.27,
     0.28,
     variation,
   );
@@ -226,7 +229,7 @@ export function createRainImpact({
     const position = index / (ERB_BAND_COUNT - 1);
     const distance = (position - rainMark.spectralFocus)
       / Math.max(0.08, rainMark.spectralSpread);
-    return 0.18 + 1.82 * Math.exp(-0.5 * distance * distance);
+    return 0.55 + 1.45 * Math.exp(-0.5 * distance * distance);
   });
   const focusRms = Math.sqrt(
     focusWeights.reduce((sum, weight) => sum + weight * weight, 0)
@@ -241,6 +244,7 @@ export function createRainImpact({
     return {
       filter,
       gain: interpolate(1, surface.bandAmplitudes[index], independence)
+        * REDWOOD_TARGET_BAND_GAINS[index]
         * Math.sqrt(textureGroups[index])
         * textureLevel
         * highFrequencySoftening
@@ -252,14 +256,14 @@ export function createRainImpact({
         * sustainScale
         * dampingScale
         * sizeDecayScale
-        * varied(random, 1, interpolate(0.06, 0.42, independence), variation),
+        * varied(random, 1, interpolate(0.06, 0.9, independence), variation),
       onsetDelaySeconds: random()
-        * interpolate(0, 0.0015, independence)
+        * interpolate(0, 0.002, independence)
         * varied(random, 1, 0.2, variation),
       attackScale: varied(
         random,
         1,
-        interpolate(0.04, 0.38, independence),
+        interpolate(0.04, 0.7, independence),
         variation,
       ),
     };

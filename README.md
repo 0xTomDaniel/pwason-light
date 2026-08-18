@@ -75,13 +75,14 @@ leaf, litter/soil, and wood. Liquid impacts and bubbles are deliberately
 excluded.
 
 The renderer creates a quiet sub-millisecond signed Direct Contact plus a brief
-analytic Surface Response. Each response excites eight broad ERB-spaced
-stochastic bands with event-local amplitudes, small onset offsets, and
-exponential decays. A coherent spectral focus makes some leaf contacts papery
-and bright while litter remains darker; Band Independence controls how strongly
-those regions diverge without turning them into notes. Low, Mid, and High
-Texture scale groups without forcing one shared envelope. Wood and
-Micro-splashes are disabled in the default single-drop baseline.
+analytic Surface Response. Each response excites eight overlapping ERB-spaced
+stochastic bands from roughly 80 Hz–16 kHz with event-local amplitudes, small
+onset offsets, attack variation, and exponential decays. Leaf remains broadly
+papery and bright rather than becoming high-only; litter remains darker while
+retaining upper detail. Band Independence controls how strongly those regions
+diverge without turning them into notes. Low, Mid, and High Texture scale groups
+without forcing one shared envelope. Wood and Micro-splashes are disabled in
+the default single-drop baseline.
 
 Across the complete default response bank, impacts peak within the first few
 milliseconds, the median response delivers 90% of its energy within 35 ms, and
@@ -107,7 +108,8 @@ The model is seeded, nonperiodic, and independent of light-channel wavelength.
 Rain recordings provide visible and optional audible evaluation references only;
 they never supply generated samples. The comparison now includes kurtosis and
 5/20/100/500 ms envelope statistics in addition to spectrum, crest, background
-floor, and cross-band envelope correlation.
+floor, and cross-band envelope correlation. The default renderer is also held
+within 3 dB RMS of Redwood's measured nine-band 80 Hz–20 kHz tonal contour.
 
 ## Rain Reference Library
 
@@ -175,8 +177,9 @@ npm test
 The tests cover seeded Poisson behavior, total-rate coupling, linked and unlinked
 Drop Population controls, coherent Rain Marks, spatial propagation, Acoustic
 Factor normalization and bypass behavior, LED envelopes, early-peak and
-cumulative-energy waveform behavior, distinct evolving leaf/litter signatures,
-independent texture-region decay, response-bank identity, exact block-partition
+cumulative-energy waveform behavior, broad non-extreme leaf/litter signatures,
+the nine-band Redwood tonal target, independent texture-region decay,
+response-bank identity, exact block-partition
 invariance, the shared live/offline Generated Rain Renderer, multiscale temporal
 texture, both reference-file manifests and preparation, pitch-preserving
 time-stretch policy, the bounded Render Loop, signal analysis, and Source Mix
