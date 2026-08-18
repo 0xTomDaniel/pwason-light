@@ -40,6 +40,23 @@ function energyTimeMilliseconds(samples, sampleRate, fraction) {
   return samples.length * 1000 / sampleRate;
 }
 
+function temporalEnergySkewness(samples, sampleRate) {
+  const total = samples.reduce((sum, sample) => sum + sample * sample, 0);
+  const meanSeconds = samples.reduce(
+    (sum, sample, index) => sum + sample * sample * index / sampleRate,
+    0,
+  ) / total;
+  const variance = samples.reduce((sum, sample, index) => {
+    const distance = index / sampleRate - meanSeconds;
+    return sum + sample * sample * distance ** 2;
+  }, 0) / total;
+  const thirdMoment = samples.reduce((sum, sample, index) => {
+    const distance = index / sampleRate - meanSeconds;
+    return sum + sample * sample * distance ** 3;
+  }, 0) / total;
+  return thirdMoment / variance ** 1.5;
+}
+
 function correlation(left, right) {
   const leftMean = average(left);
   const rightMean = average(right);
@@ -118,7 +135,7 @@ test("an analytic surface response is signed, bounded, variable-length, and deca
   }
 });
 
-test("default Rain Impact Waveforms peak early and concentrate one drop's energy briefly", () => {
+test("default Rain Impact Waveforms peak inside a compact contact and concentrate energy briefly", () => {
   const sampleRate = 48_000;
   const impacts = Array.from({ length: 192 }, (_, index) => createRainImpact({
     sampleRate,
@@ -134,9 +151,22 @@ test("default Rain Impact Waveforms peak early and concentrate one drop's energy
     assert.equal(Math.abs(impact[0]), 0);
     assert.equal(Math.abs(impact[impact.length - 1]), 0);
   }
-  assert.ok(quantile(peakTimes, 0.9) <= 6);
+  assert.ok(quantile(peakTimes, 0.9) <= 25);
   assert.ok(quantile(energyTimes, 0.5) <= 35);
   assert.ok(quantile(energyTimes, 0.9) <= 55);
+});
+
+test("default Rain Impacts use compact rounded excitation rather than right-skewed noise bursts", () => {
+  const impacts = Array.from({ length: 192 }, (_, index) => createRainImpact({
+    sampleRate: 48_000,
+    seed: index + 1,
+    dropPopulation: 0.693,
+  }));
+  const skewness = impacts.map(
+    impact => temporalEnergySkewness(impact, 48_000),
+  );
+
+  assert.ok(quantile(skewness, 0.5) < 1.5);
 });
 
 test("Direct Contact and generated surface excitation remain independently auditionable", () => {
@@ -212,6 +242,32 @@ test("a default Rain Impact population spans dark and papery high-frequency mark
   assert.ok(average(highBandRatios) > 0.12);
   assert.ok(quantile(centroids, 0.1) < 4_000);
   assert.ok(quantile(centroids, 0.9) > 5_000);
+});
+
+test("Spectral Sparsity reduces one impact's broad-region occupancy", () => {
+  const sparseFactors = createDefaultAcousticFactors();
+  const broadFactors = createDefaultAcousticFactors();
+  broadFactors.spectralSparsity.enabled = false;
+  const analyzePopulation = factors => Array.from(
+    { length: 64 },
+    (_, index) => analyzeSignal(
+      createRainImpact({
+        sampleRate: 48_000,
+        seed: index + 1,
+        factors,
+        dropPopulation: 0.693,
+      }),
+      48_000,
+      { includeSpectrogram: false },
+    ),
+  );
+  const sparse = analyzePopulation(sparseFactors);
+  const broad = analyzePopulation(broadFactors);
+
+  assert.ok(
+    average(broad.map(analysis => analysis.spectralFlatness))
+      > average(sparse.map(analysis => analysis.spectralFlatness)) * 1.15,
+  );
 });
 
 test("low and high texture regions retain distinct but overlapping decay scales", () => {

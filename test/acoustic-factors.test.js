@@ -11,7 +11,7 @@ import {
 test("every Acoustic Factor has one switch state and one bounded continuous amount", () => {
   const defaults = createDefaultAcousticFactors();
 
-  assert.equal(ACOUSTIC_FACTOR_DEFINITIONS.length, 21);
+  assert.equal(ACOUSTIC_FACTOR_DEFINITIONS.length, 22);
   assert.equal(Object.keys(defaults).length, ACOUSTIC_FACTOR_DEFINITIONS.length);
   for (const definition of ACOUSTIC_FACTOR_DEFINITIONS) {
     assert.equal(typeof defaults[definition.id].enabled, "boolean");
@@ -48,6 +48,7 @@ test("the default preset favors soft leaf and ground splats over hard impacts", 
   assert.deepEqual(defaults.impactBody, { enabled: true, amount: 0.18 });
   assert.deepEqual(defaults.impactSoftness, { enabled: true, amount: 0.9 });
   assert.deepEqual(defaults.highTexture, { enabled: true, amount: 0.32 });
+  assert.deepEqual(defaults.spectralSparsity, { enabled: true, amount: 0.78 });
   assert.deepEqual(defaults.microSplashes, { enabled: false, amount: 0.2 });
   assert.deepEqual(defaults.woodSurface, { enabled: false, amount: 0.2 });
 });

@@ -33,7 +33,7 @@ The optional bidirectional relationship that keeps the normalized Speed and Drop
 _Avoid_: Channel Coupling, Spectral Coupling, Cox modulation
 
 **Rain Impact Waveform**:
-A complete pure-synthesis, band-limited, signed pressure-like response derived from one Rain Mark and used identically for Arrivals from every Channel. It contains a sub-millisecond Direct Contact followed by a brief analytic leaf/ground Surface Response and may contain delayed Micro-splashes, but has no bubble contribution, stable note, stationary background, or relationship to LED wavelength.
+A complete pure-synthesis, band-limited, signed pressure-like response derived from one Rain Mark and used identically for Arrivals from every Channel. It contains a sub-millisecond Direct Contact followed by a compact rounded leaf/ground Surface Response and may contain delayed Micro-splashes, but has no bubble contribution, stable note, stationary background, or relationship to LED wavelength.
 _Avoid_: Note, tone, spectral voice
 
 **Direct Contact**:
@@ -41,8 +41,12 @@ The quiet, sub-millisecond signed pressure response at the start of one Rain Imp
 _Avoid_: Mandatory onset peak, snare transient
 
 **Surface Response**:
-The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. It uses a brief set of overlapping, partially independent ERB-spaced stochastic bands with coherent material-shaped spectral emphasis; every surface remains broadband enough to stand alone rather than compensating for another surface. It has no free-running resonator, recording, long shared envelope, or liquid-bubble model.
+The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. One compact surface-shaped window drives an event-selected sparse subset of eight candidate, partially independent ERB-spaced audio regions with analytically generated noise. Fresh excitation becomes literal zero when the contact window closes; only short filter state remains. Every surface stays broadband as a population rather than making every individual impact broadband. It has no free-running resonator, recording, sustained stochastic tail, or liquid-bubble model.
 _Avoid_: Diffuse Response, recorded impulse response, bubble tone
+
+**Spectral Sparsity**:
+The Acoustic Factor that controls how many of the eight candidate audio-frequency regions one Rain Impact Waveform excites. It changes per-impact occupancy without changing the eight LED Channels, LED wavelength, or Poisson timing.
+_Avoid_: LED spectrum, Channel Coupling, audio Channel
 
 **Poisson Shot Synthesis**:
 The exact sample-wise superposition of generated Rain Impact Waveforms at Steady Poisson arrival times. Dense rain becomes noise-like through overlap without a stationary background recording or a second event process.

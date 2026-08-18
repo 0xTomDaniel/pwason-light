@@ -302,27 +302,7 @@ function updateAcousticFactor(event) {
 
   if (id === "fieldDepth") restartEngine();
   if (id === "compression") applyCompressionSettings();
-  const rebuildRenderer = [
-    "impactBody",
-    "impactSoftness",
-    "tailLength",
-    "eventVariation",
-    "lowTexture",
-    "midTexture",
-    "highTexture",
-    "leafSurface",
-    "litterSurface",
-    "woodSurface",
-    "bandIndependence",
-    "microSplashes",
-    "microSplashDelay",
-    "responseDiversity",
-    "diffuseField",
-    "distanceLoss",
-    "stereoSpread",
-    "airDamping",
-    "densityCompensation",
-  ].includes(id);
+  const rebuildRenderer = id !== "fieldDepth" && id !== "compression";
   if (rebuildRenderer) {
     scheduleAcousticRegeneration({ rebuildRenderer });
   } else if (id === "fieldDepth") {

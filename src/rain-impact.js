@@ -15,7 +15,7 @@ const SURFACES = Object.freeze({
     contactScale: 0.34,
     textureScale: 1,
     damping: 0.84,
-    bandAmplitudes: Object.freeze([1, 1.12, 1, 0.75, 0.58, 0.42, 0.9, 1.2]),
+    bandAmplitudes: Object.freeze([1, 1.12, 1, 0.75, 0.58, 0.42, 0.9, 1]),
     bandDecayMilliseconds: Object.freeze([15, 18, 19, 17, 14, 11, 8.8, 6.6]),
   }),
   wood: Object.freeze({
@@ -29,13 +29,13 @@ const SURFACES = Object.freeze({
 
 const ERB_BAND_COUNT = 8;
 const REDWOOD_TARGET_BAND_GAINS = Object.freeze([
-  5.8, 3.6, 1.65, 0.8, 0.52, 0.75, 1.45, 6.5,
+  5.8, 3.6, 2, 2.15, 1.45, 1.15, 2.05, 8,
 ]);
 const REDWOOD_TARGET_CENTER_SCALES = Object.freeze([
   0.55, 1, 1, 1, 1.2, 1, 0.875, 1,
 ]);
 const REDWOOD_TARGET_Q_SCALES = Object.freeze([
-  3.2, 3.2, 3.2, 3.2, 3, 2.7, 2.7, 1.4,
+  3.2, 3.2, 3.2, 3.2, 3, 2.7, 2.7, 1,
 ]);
 
 function createRandom(seed) {
@@ -143,6 +143,19 @@ function varied(random, center, range, variation) {
   return center * (1 + (random() * 2 - 1) * range * variation);
 }
 
+function compactSurfaceWindow(surface, progress) {
+  if (progress <= 0 || progress >= 1) return 0;
+  if (surface === "litter") {
+    const parabolicGate = 4 * progress * (1 - progress);
+    const gaussian = Math.exp(-0.5 * ((progress - 0.25) / 0.3) ** 2);
+    return parabolicGate * gaussian / 0.86;
+  }
+  const decayPower = surface === "leaf" ? 3 : 4;
+  const peakProgress = 1 / (1 + decayPower);
+  const normalization = peakProgress * (1 - peakProgress) ** decayPower;
+  return progress * (1 - progress) ** decayPower / normalization;
+}
+
 export function createRainMark({ seed, dropPopulation = 0.5, factors } = {}) {
   const random = createRandom(seed);
   const population = clamp(Number(dropPopulation) || 0);
@@ -181,7 +194,7 @@ export function createRainMark({ seed, dropPopulation = 0.5, factors } = {}) {
   const surfaceModel = SURFACES[surface];
   const impactLevel = (0.16 + 0.84 * sizeNormalized ** 1.2)
     * (velocityMetersPerSecond / 8.2)
-    * varied(random, 1, 0.22, variation);
+    * varied(random, 1, 0.3, variation);
   const contactDurationSeconds = varied(
     random,
     interpolate(0.00048, 0.00016, sizeNormalized),
@@ -248,10 +261,12 @@ export function createRainImpact({
   const contactWidth = rainMark.contactDurationSeconds
     * interpolate(0.82, 1.35, softness);
   const contactCenter = contactWidth * 1.25;
+  const surfaceContactDuration = contactWidth
+    * (rainMark.surface === "leaf" ? 80 : rainMark.surface === "litter" ? 65 : 40);
   const contactGain = amount("impactBody")
     * surface.contactScale
     * rainMark.impactLevel
-    * 0.18;
+    * 4.2;
   const independence = amount("bandIndependence");
   const sharedWeight = Math.sqrt(1 - independence);
   const independentWeight = Math.sqrt(independence);
@@ -276,6 +291,43 @@ export function createRainImpact({
     focusWeights.reduce((sum, weight) => sum + weight * weight, 0)
       / focusWeights.length,
   );
+  const spectralSparsity = amount("spectralSparsity");
+  const activeBandCount = Math.max(
+    1,
+    Math.round(interpolate(ERB_BAND_COUNT, 1, spectralSparsity)),
+  );
+  const availableBandIndices = Array.from(
+    { length: ERB_BAND_COUNT },
+    (_, index) => index,
+  ).filter(index => textureGroups[index] > 0);
+  const activeBandIndices = [];
+  while (
+    activeBandIndices.length < activeBandCount
+    && availableBandIndices.length > 0
+  ) {
+    const selectionWeights = availableBandIndices.map(index => (
+      surface.bandAmplitudes[index]
+      * REDWOOD_TARGET_BAND_GAINS[index]
+      * Math.sqrt(textureGroups[index])
+      * focusWeights[index]
+    ));
+    const selectionTotal = selectionWeights.reduce((sum, weight) => sum + weight, 0);
+    let selection = random() * selectionTotal;
+    let selectedOffset = selectionWeights.length - 1;
+    for (let offset = 0; offset < selectionWeights.length; offset += 1) {
+      selection -= selectionWeights[offset];
+      if (selection <= 0) {
+        selectedOffset = offset;
+        break;
+      }
+    }
+    activeBandIndices.push(availableBandIndices[selectedOffset]);
+    availableBandIndices.splice(selectedOffset, 1);
+  }
+  const activeBandSet = new Set(activeBandIndices);
+  const occupancyCompensation = activeBandIndices.length > 0
+    ? Math.sqrt(ERB_BAND_COUNT / activeBandIndices.length)
+    : 0;
   const textureLevel = surface.textureScale
     * surfaceLevel
     * (0.035 + 0.38 * rainMark.impactLevel ** 1.8);
@@ -284,7 +336,8 @@ export function createRainImpact({
     const highFrequencySoftening = 1 - 0.08 * softness * position ** 1.4;
     return {
       filter,
-      gain: interpolate(1, surface.bandAmplitudes[index], independence)
+      gain: (activeBandSet.has(index) ? occupancyCompensation : 0)
+        * interpolate(1, surface.bandAmplitudes[index], independence)
         * REDWOOD_TARGET_BAND_GAINS[index]
         * Math.sqrt(textureGroups[index])
         * textureLevel
@@ -299,14 +352,9 @@ export function createRainImpact({
         * sizeDecayScale
         * varied(random, 1, interpolate(0.06, 0.9, independence), variation),
       onsetDelaySeconds: random()
-        * interpolate(0, 0.002, independence)
+        * interpolate(0, 0.004, independence)
         * varied(random, 1, 0.2, variation),
-      attackScale: varied(
-        random,
-        1,
-        interpolate(0.04, 0.7, independence),
-        variation,
-      ),
+      windowScale: interpolate(1, 0.25 + random() * 1.5, independence),
     };
   });
 
@@ -329,7 +377,11 @@ export function createRainImpact({
     0,
   );
   const responseDuration = clamp(
-    Math.max(contactCenter + contactWidth * 4, longestDecay * 4.2, latestSecondaryContact),
+    Math.max(
+      contactCenter + contactWidth * 4,
+      surfaceContactDuration + longestDecay * 4.2,
+      latestSecondaryContact,
+    ),
     0.025,
     0.14,
   );
@@ -339,18 +391,6 @@ export function createRainImpact({
     1,
     Math.round(rate * 0.0015),
   );
-
-  // Start every band with a stationary stochastic state, then expose it through
-  // the same sub-millisecond physical onset as the contact response.
-  const warmupSamples = Math.max(16, Math.round(rate * 0.004));
-  for (let index = 0; index < warmupSamples; index += 1) {
-    const sharedNoise = random() * 2 - 1;
-    for (const band of bands) {
-      const excitation = sharedNoise * sharedWeight
-        + (random() * 2 - 1) * independentWeight;
-      band.filter(excitation);
-    }
-  }
 
   for (let index = 0; index < samples.length; index += 1) {
     const time = index / rate;
@@ -366,15 +406,21 @@ export function createRainImpact({
     for (const band of bands) {
       const bandTime = time - band.onsetDelaySeconds;
       if (bandTime <= 0) continue;
-      const excitation = sharedNoise * sharedWeight
-        + (random() * 2 - 1) * independentWeight;
-      const bandAttack = 1 - Math.exp(
-        -bandTime / Math.max(0.00002, attackSeconds * band.attackScale),
+      const bandContactDuration = surfaceContactDuration * band.windowScale;
+      const contactProgress = bandTime / bandContactDuration;
+      const contactWindow = compactSurfaceWindow(
+        rainMark.surface,
+        contactProgress,
       );
+      const excitation = contactWindow > 0
+        ? (sharedNoise * sharedWeight
+          + (random() * 2 - 1) * independentWeight) * contactWindow
+        : 0;
+      const postContactTime = Math.max(0, bandTime - bandContactDuration);
       surfaceResponse += band.filter(excitation)
-        * Math.exp(-bandTime / Math.max(0.001, band.decaySeconds))
+        * Math.exp(-postContactTime / Math.max(0.001, band.decaySeconds))
         * band.gain
-        * bandAttack;
+        * 0.7;
     }
 
     let fragments = 0;

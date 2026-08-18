@@ -10,6 +10,7 @@ const DEFINITIONS = [
   { id: "litterSurface", group: "Surface texture", label: "Litter / soil", description: "Prevalence of damped ground responses", defaultAmount: 0.60 },
   { id: "woodSurface", group: "Surface texture", label: "Wood surface", description: "Prevalence of short woody responses", defaultAmount: 0.20, defaultEnabled: false },
   { id: "bandIndependence", group: "Surface texture", label: "Band independence", description: "Decouples low, mid, and high envelopes", defaultAmount: 0.88 },
+  { id: "spectralSparsity", group: "Surface texture", label: "Spectral sparsity", description: "Reduces how many broad audio regions one impact excites", defaultAmount: 0.78 },
   { id: "microSplashes", group: "Surface texture", label: "Micro-splashes", description: "Adds quieter secondary contacts inside one Arrival", defaultAmount: 0.20, defaultEnabled: false },
   { id: "microSplashDelay", group: "Surface texture", label: "Splash delay", description: "Spreads secondary contacts later in the response", defaultAmount: 0.58 },
   { id: "responseDiversity", group: "Surface texture", label: "Surface diversity", description: "Broadens the leaf, litter, and wood surface mixture", defaultAmount: 0.82 },
