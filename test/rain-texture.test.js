@@ -58,7 +58,8 @@ test("Generated Rain Renderer prepares one deterministic live Arrival plan", () 
 
   assert.equal(first.response, second.response);
   assert.equal(first.response, afterCallerMutation.response);
-  assert.ok(first.response.length >= 4_800);
+  assert.ok(first.response.length >= 1_200);
+  assert.ok(first.response.length <= 6_720);
   assert.deepEqual(first.mark, second.mark);
   assert.ok(Math.abs(first.gain - 3.2) < 0.000001);
   assert.equal(afterCallerMutation.gain, first.gain);

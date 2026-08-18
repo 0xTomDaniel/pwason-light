@@ -44,8 +44,8 @@ and wood prevalence, analytic surface excitation and sustain,
 low/mid/high texture, delayed secondary contacts, field depth and propagation,
 high-rate density compensation, and optional compression. **Reset all factors**
 restores the current listening baseline: 70% Distance Loss, 20% Mid Texture,
-60% Distance Air Damping, and Compression off. These controls never alter
-Reference Playback.
+60% Distance Air Damping, Micro-splashes off, Wood Surface off, and Compression
+off. These controls never alter Reference Playback.
 
 At 100% Reference, the simulator continues producing light Arrivals but skips
 generated-audio scheduling.
@@ -73,12 +73,21 @@ velocity proxy, impact level, contact duration, surface damping, target surface,
 and secondary-contact probability. Initial surfaces are leaf, litter/soil, and
 wood. Liquid impacts and bubbles are deliberately excluded.
 
-The renderer creates a variable-length signed Direct Contact plus a finite
-analytic Surface Response. Leaves and wood use heavily damped inharmonic modes
-with brief stochastic excitation; litter uses short independently filtered
-noise energy. That pseudorandom excitation is generated inside each event—no
-recording, grain, impulse response, extracted waveform, stable note, or
-stationary noise bed contributes to synthesis.
+The renderer creates a quiet sub-millisecond signed Direct Contact plus a brief
+analytic Surface Response. Each response excites eight ERB-spaced stochastic
+bands with independent amplitudes and exponential decays. Low, Mid, and High
+Texture scale groups of those bands without forcing them under one shared
+envelope. Leaf, litter/soil, and optional wood use distinct spectral and decay
+profiles; Wood and Micro-splashes are disabled in the default single-drop
+baseline.
+
+Across the complete default response bank, impacts peak within the first few
+milliseconds, the median response delivers 90% of its energy within 35 ms, and
+the 90th percentile does so within 55 ms. Zero-valued endpoints prevent buffer
+seams without delaying the onset through a multi-millisecond fade. No hidden
+resonator remains when the explicit texture controls are off. No recording,
+grain, impulse response, extracted waveform, stable note, long shared envelope,
+or stationary noise bed contributes to synthesis.
 
 Audio is exact Poisson shot synthesis:
 
@@ -157,11 +166,13 @@ npm test
 
 The tests cover seeded Poisson behavior, total-rate coupling, linked and unlinked
 Drop Population controls, coherent Rain Marks, spatial propagation, Acoustic
-Factor normalization and bypass behavior, LED envelopes, pure analytic waveform
-behavior, response-bank identity, exact block-partition invariance, the shared
-live/offline Generated Rain Renderer, multiscale temporal texture, both reference-file
-manifests and preparation, pitch-preserving time-stretch policy, the bounded
-Render Loop, signal analysis, and Source Mix invariants.
+Factor normalization and bypass behavior, LED envelopes, early-peak and
+cumulative-energy waveform behavior, distinct evolving leaf/litter signatures,
+independent texture-region decay, response-bank identity, exact block-partition
+invariance, the shared live/offline Generated Rain Renderer, multiscale temporal
+texture, both reference-file manifests and preparation, pitch-preserving
+time-stretch policy, the bounded Render Loop, signal analysis, and Source Mix
+invariants.
 
 ## Repository map
 

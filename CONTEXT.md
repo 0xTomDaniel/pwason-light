@@ -33,15 +33,15 @@ The optional bidirectional relationship that keeps the normalized Speed and Drop
 _Avoid_: Channel Coupling, Spectral Coupling, Cox modulation
 
 **Rain Impact Waveform**:
-A complete pure-synthesis, band-limited, signed pressure-like response derived from one Rain Mark and used identically for Arrivals from every Channel. It may contain a Direct Contact, an analytic leaf/ground Surface Response, and delayed Micro-splashes, but has no bubble contribution, stable note, or relationship to LED wavelength.
+A complete pure-synthesis, band-limited, signed pressure-like response derived from one Rain Mark and used identically for Arrivals from every Channel. It contains a sub-millisecond Direct Contact followed by a brief analytic leaf/ground Surface Response and may contain delayed Micro-splashes, but has no bubble contribution, stable note, stationary background, or relationship to LED wavelength.
 _Avoid_: Note, tone, spectral voice
 
 **Direct Contact**:
-The bounded early pressure response that can make one Arrival individually perceptible. Its level and duration follow the parent Rain Mark rather than an unrelated random morphology.
+The quiet, sub-millisecond signed pressure response at the start of one Rain Impact Waveform. Its level and duration follow the parent Rain Mark rather than an unrelated random morphology.
 _Avoid_: Mandatory onset peak, snare transient
 
 **Surface Response**:
-The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. It may use brief filtered stochastic excitation and heavily damped modes, but never a recording or liquid-bubble model.
+The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. It uses a brief set of independently decaying ERB-spaced stochastic bands without a free-running resonator, recording, long shared envelope, or liquid-bubble model.
 _Avoid_: Diffuse Response, recorded impulse response, bubble tone
 
 **Poisson Shot Synthesis**:

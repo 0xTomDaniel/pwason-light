@@ -6,6 +6,7 @@ import {
   createRainMark,
 } from "../src/rain-impact.js";
 import { createDefaultAcousticFactors } from "../src/acoustic-factors.js";
+import { analyzeSignal } from "../src/signal-analysis.js";
 
 function rms(samples) {
   const energy = samples.reduce((sum, sample) => sum + sample * sample, 0);
@@ -14,6 +15,29 @@ function rms(samples) {
 
 function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function quantile(values, amount) {
+  const sorted = [...values].sort((left, right) => left - right);
+  return sorted[Math.floor((sorted.length - 1) * amount)];
+}
+
+function peakTimeMilliseconds(samples, sampleRate) {
+  let peakIndex = 0;
+  for (let index = 1; index < samples.length; index += 1) {
+    if (Math.abs(samples[index]) > Math.abs(samples[peakIndex])) peakIndex = index;
+  }
+  return peakIndex * 1000 / sampleRate;
+}
+
+function energyTimeMilliseconds(samples, sampleRate, fraction) {
+  const total = samples.reduce((sum, sample) => sum + sample * sample, 0);
+  let cumulative = 0;
+  for (let index = 0; index < samples.length; index += 1) {
+    cumulative += samples[index] * samples[index];
+    if (cumulative >= total * fraction) return index * 1000 / sampleRate;
+  }
+  return samples.length * 1000 / sampleRate;
 }
 
 function correlation(left, right) {
@@ -94,6 +118,27 @@ test("an analytic surface response is signed, bounded, variable-length, and deca
   }
 });
 
+test("default Rain Impact Waveforms peak early and concentrate one drop's energy briefly", () => {
+  const sampleRate = 48_000;
+  const impacts = Array.from({ length: 192 }, (_, index) => createRainImpact({
+    sampleRate,
+    seed: index + 1,
+    dropPopulation: 0.5,
+  }));
+  const peakTimes = impacts.map(impact => peakTimeMilliseconds(impact, sampleRate));
+  const energyTimes = impacts.map(
+    impact => energyTimeMilliseconds(impact, sampleRate, 0.9),
+  );
+
+  for (const impact of impacts) {
+    assert.equal(Math.abs(impact[0]), 0);
+    assert.equal(Math.abs(impact[impact.length - 1]), 0);
+  }
+  assert.ok(quantile(peakTimes, 0.9) <= 4);
+  assert.ok(quantile(energyTimes, 0.5) <= 35);
+  assert.ok(quantile(energyTimes, 0.9) <= 55);
+});
+
 test("Direct Contact and generated surface excitation remain independently auditionable", () => {
   const sampleRate = 48_000;
   const contactOnly = createDefaultAcousticFactors();
@@ -111,6 +156,84 @@ test("Direct Contact and generated surface excitation remain independently audit
   assert.ok(rms(contact) > 0);
   assert.ok(rms(surface) > 0);
   assert.notDeepEqual(contact, surface);
+});
+
+test("leaf and litter Surface Responses have distinct evolving spectral signatures", () => {
+  const profiles = {};
+  for (const surface of ["leaf", "litter"]) {
+    const factors = createDefaultAcousticFactors();
+    factors.impactBody.enabled = false;
+    factors.microSplashes.enabled = false;
+    for (const id of ["leafSurface", "litterSurface", "woodSurface"]) {
+      factors[id].enabled = id === `${surface}Surface`;
+    }
+    const impacts = Array.from({ length: 32 }, (_, index) => createRainImpact({
+      sampleRate: 48_000,
+      seed: index + 1,
+      factors,
+    }));
+    profiles[surface] = {
+      complete: average(impacts.map(impact => analyzeSignal(
+        impact,
+        48_000,
+        { includeSpectrogram: false },
+      ).spectralCentroidHz)),
+      early: average(impacts.map(impact => analyzeSignal(
+        impact.subarray(0, 576),
+        48_000,
+        { includeSpectrogram: false },
+      ).spectralCentroidHz)),
+      late: average(impacts.map(impact => analyzeSignal(
+        impact.subarray(960, 2_400),
+        48_000,
+        { includeSpectrogram: false },
+      ).spectralCentroidHz)),
+    };
+  }
+
+  assert.ok(profiles.leaf.complete > profiles.litter.complete * 1.25);
+  assert.ok(profiles.leaf.early > profiles.leaf.late * 1.25);
+  assert.ok(profiles.litter.early > profiles.litter.late);
+});
+
+test("low and high texture regions decay on observably different time scales", () => {
+  const energyTimes = {};
+  for (const selected of ["lowTexture", "highTexture"]) {
+    const factors = createDefaultAcousticFactors();
+    factors.impactBody.enabled = false;
+    factors.microSplashes.enabled = false;
+    for (const id of ["lowTexture", "midTexture", "highTexture"]) {
+      factors[id].enabled = id === selected;
+    }
+    energyTimes[selected] = average(Array.from(
+      { length: 32 },
+      (_, index) => energyTimeMilliseconds(
+        createRainImpact({ sampleRate: 48_000, seed: index + 1, factors }),
+        48_000,
+        0.9,
+      ),
+    ));
+  }
+
+  assert.ok(energyTimes.highTexture < energyTimes.lowTexture * 0.65);
+});
+
+test("no hidden resonator remains when every explicit excitation is switched off", () => {
+  const factors = createDefaultAcousticFactors();
+  for (const id of [
+    "impactBody",
+    "lowTexture",
+    "midTexture",
+    "highTexture",
+    "microSplashes",
+  ]) {
+    factors[id].enabled = false;
+  }
+
+  for (let seed = 1; seed <= 32; seed += 1) {
+    const impact = createRainImpact({ sampleRate: 48_000, seed, factors });
+    assert.ok(impact.every(sample => sample === 0));
+  }
 });
 
 test("the response is pure deterministic synthesis with no external audio input", () => {
