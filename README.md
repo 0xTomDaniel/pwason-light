@@ -75,8 +75,8 @@ leaf, litter/soil, and wood. Liquid impacts and bubbles are deliberately
 excluded.
 
 The renderer creates a quiet sub-millisecond signed Direct Contact plus a brief
-analytic Surface Response. Each response excites eight overlapping ERB-spaced
-stochastic bands from roughly 80 Hz–16 kHz with event-local amplitudes, small
+analytic Surface Response. Each response excites eight overlapping ERB-derived
+stochastic bands centered from roughly 100 Hz–18.5 kHz with event-local amplitudes, small
 onset offsets, attack variation, and exponential decays. Leaf remains broadly
 papery and bright rather than becoming high-only; litter remains darker while
 retaining upper detail. Band Independence controls how strongly those regions
@@ -109,7 +109,8 @@ Rain recordings provide visible and optional audible evaluation references only;
 they never supply generated samples. The comparison now includes kurtosis and
 5/20/100/500 ms envelope statistics in addition to spectrum, crest, background
 floor, and cross-band envelope correlation. The default renderer is also held
-within 3 dB RMS of Redwood's measured nine-band 80 Hz–20 kHz tonal contour.
+within 3 dB RMS of Redwood's measured nine-band broad contour and within 2 dB
+RMS of its thirteen-band 80 Hz–19.5 kHz fine contour.
 
 ## Rain Reference Library
 

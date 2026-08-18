@@ -22,10 +22,20 @@ const REDWOOD_BROAD_BAND_PROFILE_DB = Object.freeze([
   -4.8, -2.8, 0, -1, -5.7, -8.2, -4.2, -4.8, -2.6,
 ]);
 
-function normalizedBroadBandProfileDb(analysis) {
-  const energies = REDWOOD_BROAD_BAND_EDGES_HZ.slice(0, -1).map(
+const REDWOOD_FINE_BAND_EDGES_HZ = Object.freeze([
+  80, 375, 750, 1_125, 1_688, 2_438, 3_375,
+  4_500, 6_000, 7_875, 10_125, 12_750, 15_750, 19_500,
+]);
+
+const REDWOOD_FINE_BAND_PROFILE_DB = Object.freeze([
+  -1.6, 0, -4.1, -7.4, -10.3, -12, -13.9,
+  -12.1, -11.1, -7.3, -10.8, -8.1, -3.3,
+]);
+
+function normalizedBandProfileDb(analysis, edges) {
+  const energies = edges.slice(0, -1).map(
     (lowerFrequency, bandIndex) => {
-      const upperFrequency = REDWOOD_BROAD_BAND_EDGES_HZ[bandIndex + 1];
+      const upperFrequency = edges[bandIndex + 1];
       let energy = 0;
       for (let bin = 0; bin < analysis.spectrum.length; bin += 1) {
         const frequency = bin * analysis.sampleRate / analysis.fftSize;
@@ -262,8 +272,14 @@ test("the calibrated Redwood profile produces a continuous high-detail rain fiel
   assert.ok(onsets.rateHz < 50);
   assert.ok(
     profileDistanceDb(
-      normalizedBroadBandProfileDb(analysis),
+      normalizedBandProfileDb(analysis, REDWOOD_BROAD_BAND_EDGES_HZ),
       REDWOOD_BROAD_BAND_PROFILE_DB,
     ) < 3,
+  );
+  assert.ok(
+    profileDistanceDb(
+      normalizedBandProfileDb(analysis, REDWOOD_FINE_BAND_EDGES_HZ),
+      REDWOOD_FINE_BAND_PROFILE_DB,
+    ) < 2,
   );
 });

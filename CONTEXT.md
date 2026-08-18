@@ -65,7 +65,7 @@ A quieter delayed secondary contact generated inside one Rain Impact Waveform. I
 _Avoid_: Secondary Poisson event, extra drop stream
 
 **Acoustic Target Profile**:
-A measured aggregate spectral and temporal shape used to constrain generated rain texture. Pwason's current Acoustic Target Profile includes a nine-band 80 Hz–20 kHz contour from the default Redwood Rain Reference but contains no recording samples or response waveforms.
+A measured aggregate spectral and temporal shape used to constrain generated rain texture. Pwason's current Acoustic Target Profile includes independently normalized nine-band broad and thirteen-band fine contours from the default Redwood Rain Reference but contains no recording samples or response waveforms.
 _Avoid_: Sample synthesis, spectral note, selected playback profile
 
 **Generated Rain Renderer**:

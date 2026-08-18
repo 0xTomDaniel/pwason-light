@@ -210,7 +210,7 @@ test("a default Rain Impact population spans dark and papery high-frequency mark
   const highBandRatios = analyses.map(analysis => analysis.highBandEnergyRatio);
 
   assert.ok(average(highBandRatios) > 0.12);
-  assert.ok(quantile(centroids, 0.1) < 3_000);
+  assert.ok(quantile(centroids, 0.1) < 4_000);
   assert.ok(quantile(centroids, 0.9) > 5_000);
 });
 

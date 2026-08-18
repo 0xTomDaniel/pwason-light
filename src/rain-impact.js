@@ -29,7 +29,13 @@ const SURFACES = Object.freeze({
 
 const ERB_BAND_COUNT = 8;
 const REDWOOD_TARGET_BAND_GAINS = Object.freeze([
-  7, 3.6, 2, 0.8, 0.2, 0.38, 1.2, 7,
+  5.8, 3.6, 1.65, 0.8, 0.52, 0.75, 1.45, 6.5,
+]);
+const REDWOOD_TARGET_CENTER_SCALES = Object.freeze([
+  0.55, 1, 1, 1, 1.2, 1, 0.875, 1,
+]);
+const REDWOOD_TARGET_Q_SCALES = Object.freeze([
+  3.2, 3.2, 3.2, 3.2, 3, 2.7, 2.7, 1.4,
 ]);
 
 function createRandom(seed) {
@@ -60,15 +66,18 @@ function frequencyAtErbRate(rate) {
 }
 
 function createErbBandpassFilters(sampleRate) {
-  const minimumFrequency = 80;
-  const maximumFrequency = Math.min(16_000, sampleRate * 0.42);
+  const minimumFrequency = 180;
+  const maximumFrequency = Math.min(18_500, sampleRate * 0.42);
   const minimumErb = erbRate(minimumFrequency);
   const maximumErb = erbRate(maximumFrequency);
   const erbStep = (maximumErb - minimumErb) / (ERB_BAND_COUNT - 1);
 
   return Array.from({ length: ERB_BAND_COUNT }, (_, index) => {
     const centerErb = minimumErb + erbStep * index;
-    const centerFrequency = frequencyAtErbRate(centerErb);
+    const centerFrequency = Math.min(
+      sampleRate * 0.45,
+      frequencyAtErbRate(centerErb) * REDWOOD_TARGET_CENTER_SCALES[index],
+    );
     const lowerFrequency = Math.max(
       20,
       frequencyAtErbRate(centerErb - erbStep / 2),
@@ -78,7 +87,10 @@ function createErbBandpassFilters(sampleRate) {
       frequencyAtErbRate(centerErb + erbStep / 2),
     );
     const bandwidth = Math.max(40, upperFrequency - lowerFrequency);
-    const q = Math.max(1.1, centerFrequency / bandwidth * 4);
+    const q = Math.max(
+      0.8,
+      centerFrequency / bandwidth * REDWOOD_TARGET_Q_SCALES[index],
+    );
     const omega = 2 * Math.PI * centerFrequency / sampleRate;
     const alpha = Math.sin(omega) / (2 * q);
     const a0 = 1 + alpha;
@@ -96,6 +108,35 @@ function createErbBandpassFilters(sampleRate) {
       return output;
     };
   });
+}
+
+function applyOutputBandwidthLimit(samples, sampleRate) {
+  const cutoffHz = Math.min(20_000, sampleRate * 0.42);
+  const omega = 2 * Math.PI * cutoffHz / sampleRate;
+  const cosine = Math.cos(omega);
+  const sine = Math.sin(omega);
+  const alpha = sine / Math.SQRT2;
+  const a0 = 1 + alpha;
+  const b0 = (1 - cosine) / 2 / a0;
+  const b1 = (1 - cosine) / a0;
+  const b2 = b0;
+  const a1 = -2 * cosine / a0;
+  const a2 = (1 - alpha) / a0;
+  let input1 = 0;
+  let input2 = 0;
+  let output1 = 0;
+  let output2 = 0;
+
+  for (let index = 0; index < samples.length; index += 1) {
+    const input = samples[index];
+    const output = b0 * input + b1 * input1 + b2 * input2
+      - a1 * output1 - a2 * output2;
+    samples[index] = output;
+    input2 = input1;
+    input1 = input;
+    output2 = output1;
+    output1 = output;
+  }
 }
 
 function varied(random, center, range, variation) {
@@ -355,6 +396,9 @@ export function createRainImpact({
       0.98,
     );
   }
+
+  applyOutputBandwidthLimit(samples, rate);
+  samples[samples.length - 1] = 0;
 
   return samples;
 }
