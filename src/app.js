@@ -1,7 +1,6 @@
 import { createPoissonEngine } from "./poisson-engine.js";
 import { sampleLedOutput } from "./led-renderer.js";
-import { createRainImpact } from "./rain-impact.js";
-import { calculateAcousticPropagation } from "./acoustic-propagation.js";
+import { createGeneratedRainRenderer } from "./rain-texture.js";
 import {
   ACOUSTIC_FACTOR_DEFINITIONS,
   createDefaultAcousticFactors,
@@ -42,10 +41,11 @@ const SCHEDULER_TICK_MS = 16;
 const AUDIO_LOOKAHEAD_MS = 50;
 const MAX_EVENTS_PER_TICK = 2500;
 const MAX_EVENT_MARKS_PER_SECOND = 30;
-const RAIN_IMPACT_VARIANTS = 128;
 const MAX_LISTENING_FIELD_RADIUS_METERS = 30;
 const EAR_HEIGHT_METERS = 1.5;
 const ANALYSIS_SAMPLE_RATE = 48_000;
+const ANALYSIS_IMPACT_SECONDS = 0.12;
+const GENERATED_PROFILE_SECONDS = 8;
 const REFERENCE_FILE_LIMIT_BYTES = 25 * 1024 * 1024;
 
 const leds = [...document.querySelectorAll("[data-led]")];
@@ -86,9 +86,17 @@ const comparisonSpectrum = document.querySelector("#comparison-spectrum");
 const generatedCentroid = document.querySelector("#generated-centroid");
 const generatedHighBand = document.querySelector("#generated-high-band");
 const generatedFlatness = document.querySelector("#generated-flatness");
+const generatedCrest = document.querySelector("#generated-crest");
+const generatedEnvelopeVariation = document.querySelector("#generated-envelope-variation");
+const generatedEnvelopeFloor = document.querySelector("#generated-envelope-floor");
+const generatedBandCorrelation = document.querySelector("#generated-band-correlation");
 const referenceCentroid = document.querySelector("#reference-centroid");
 const referenceHighBand = document.querySelector("#reference-high-band");
 const referenceFlatness = document.querySelector("#reference-flatness");
+const referenceCrest = document.querySelector("#reference-crest");
+const referenceEnvelopeVariation = document.querySelector("#reference-envelope-variation");
+const referenceEnvelopeFloor = document.querySelector("#reference-envelope-floor");
+const referenceBandCorrelation = document.querySelector("#reference-band-correlation");
 const acousticFactorList = document.querySelector("#acoustic-factor-list");
 const acousticPresetOutput = document.querySelector("#acoustic-preset-output");
 const resetAcousticFactorsButton = document.querySelector("#reset-acoustic-factors");
@@ -110,26 +118,44 @@ let masterCompressor = null;
 let outputGain = null;
 let outputAnalyser = null;
 let waveformBuffer = null;
-let rainImpactBuffers = [];
+let liveRainRenderer = null;
+let rainAudioBufferCache = new WeakMap();
 let acousticFactors = createDefaultAcousticFactors();
 let selectedReferenceProfile = DEFAULT_RAIN_REFERENCE_PROFILE;
 let selectedReferenceReady = false;
 let referenceMedia = null;
 let referenceMediaSource = null;
-let generatedReferenceSamples = createRainImpact({
+let analysisRainRenderer = createGeneratedRainRenderer({
   sampleRate: ANALYSIS_SAMPLE_RATE,
-  seed: 42,
   factors: acousticFactors,
+  earHeightMeters: EAR_HEIGHT_METERS,
 });
+let generatedReferenceResponse = analysisRainRenderer.prepareArrival({
+  id: 42,
+  rateHz: DEFAULT_RAIN_REFERENCE_PROFILE.naturalRateHz,
+  amplitude: 0.5,
+  position: { radialDistanceMeters: 0, azimuthRadians: 0 },
+}).response;
+let generatedReferenceSamples = generatedReferenceResponse.slice(
+  0,
+  Math.round(ANALYSIS_SAMPLE_RATE * ANALYSIS_IMPACT_SECONDS),
+);
 let generatedReferenceAnalysis = analyzeSignal(
   generatedReferenceSamples,
   ANALYSIS_SAMPLE_RATE,
+);
+let generatedProfileSamples = createCurrentGeneratedProfileSamples();
+let generatedProfileAnalysis = analyzeSignal(
+  generatedProfileSamples,
+  ANALYSIS_SAMPLE_RATE,
+  { includeSpectrogram: false },
 );
 let measuredReferenceSamples = null;
 let measuredReferenceAnalysis = null;
 let measuredReferenceProfileAnalysis = null;
 let comparisonResizeTimer = null;
 let acousticRegenerationTimer = null;
+let acousticWaveformRebuildPending = false;
 let referenceLoadRequest = 0;
 const renderLoop = createRenderLoop({
   draw: renderFrame,
@@ -141,15 +167,32 @@ const renderLoop = createRenderLoop({
 });
 
 function settings() {
-  const fieldDepth = effectiveAcousticFactor(acousticFactors, "fieldDepth");
   return {
     seed,
     rateHz: selectedRateHz(),
     coupling: Number(couplingInput.value),
-    fieldRadiusMeters: fieldDepth === 0
-      ? 0
-      : 1 + fieldDepth * (MAX_LISTENING_FIELD_RADIUS_METERS - 1),
+    fieldRadiusMeters: listeningFieldRadiusMeters(),
   };
+}
+
+function listeningFieldRadiusMeters() {
+  const fieldDepth = effectiveAcousticFactor(acousticFactors, "fieldDepth");
+  return fieldDepth === 0
+    ? 0
+    : 1 + fieldDepth * (MAX_LISTENING_FIELD_RADIUS_METERS - 1);
+}
+
+function createCurrentGeneratedProfileSamples() {
+  const profileEngine = createPoissonEngine({
+    seed: "redwood-generated-profile",
+    rateHz: DEFAULT_RAIN_REFERENCE_PROFILE.naturalRateHz,
+    coupling: 0,
+    fieldRadiusMeters: listeningFieldRadiusMeters(),
+  });
+  return analysisRainRenderer.renderProfile({
+    durationSeconds: GENERATED_PROFILE_SECONDS,
+    nextArrival: () => profileEngine.next(),
+  });
 }
 
 function createAcousticFactorControls() {
@@ -231,7 +274,7 @@ function updateAcousticFactor(event) {
 
   if (id === "fieldDepth") restartEngine();
   if (id === "compression") applyCompressionSettings();
-  if ([
+  const rebuildRenderer = [
     "impactBody",
     "impactSoftness",
     "tailLength",
@@ -242,7 +285,16 @@ function updateAcousticFactor(event) {
     "bandIndependence",
     "microSplashes",
     "microSplashDelay",
-  ].includes(id)) {
+    "responseDiversity",
+    "diffuseField",
+    "distanceLoss",
+    "stereoSpread",
+    "airDamping",
+    "densityCompensation",
+  ].includes(id);
+  if (rebuildRenderer) {
+    scheduleAcousticRegeneration({ rebuildRenderer });
+  } else if (id === "fieldDepth") {
     scheduleAcousticRegeneration();
   }
 }
@@ -256,43 +308,61 @@ function resetAcousticFactors() {
       String(acousticFactors[definition.id].amount);
     updateAcousticFactorRow(definition.id);
   }
-  acousticPresetOutput.textContent = "Redwood matched";
+  acousticPresetOutput.textContent = "Redwood target";
   applyCompressionSettings();
   restartEngine();
-  scheduleAcousticRegeneration();
+  scheduleAcousticRegeneration({ rebuildRenderer: true });
 }
 
-function createRainImpactBuffers() {
-  if (!audioContext) return [];
-  return Array.from({ length: RAIN_IMPACT_VARIANTS }, (_, index) => {
-    const samples = createRainImpact({
-      sampleRate: audioContext.sampleRate,
-      seed: index + 1,
+function regenerateAcousticAssets(rebuildRenderer) {
+  if (rebuildRenderer) {
+    analysisRainRenderer = createGeneratedRainRenderer({
+      sampleRate: ANALYSIS_SAMPLE_RATE,
       factors: acousticFactors,
+      earHeightMeters: EAR_HEIGHT_METERS,
     });
-    const buffer = audioContext.createBuffer(1, samples.length, audioContext.sampleRate);
-    buffer.copyToChannel(samples, 0);
-    return buffer;
-  });
-}
-
-function regenerateAcousticAssets() {
-  generatedReferenceSamples = createRainImpact({
-    sampleRate: ANALYSIS_SAMPLE_RATE,
-    seed: 42,
-    factors: acousticFactors,
-  });
+    generatedReferenceResponse = analysisRainRenderer.prepareArrival({
+      id: 42,
+      rateHz: DEFAULT_RAIN_REFERENCE_PROFILE.naturalRateHz,
+      amplitude: 0.5,
+      position: { radialDistanceMeters: 0, azimuthRadians: 0 },
+    }).response;
+    generatedReferenceSamples = generatedReferenceResponse.slice(
+      0,
+      Math.round(ANALYSIS_SAMPLE_RATE * ANALYSIS_IMPACT_SECONDS),
+    );
+  }
   generatedReferenceAnalysis = analyzeSignal(
     generatedReferenceSamples,
     ANALYSIS_SAMPLE_RATE,
   );
-  if (audioContext) rainImpactBuffers = createRainImpactBuffers();
+  generatedProfileSamples = createCurrentGeneratedProfileSamples();
+  generatedProfileAnalysis = analyzeSignal(
+    generatedProfileSamples,
+    ANALYSIS_SAMPLE_RATE,
+    { includeSpectrogram: false },
+  );
+  if (rebuildRenderer && audioContext) {
+    liveRainRenderer = audioContext.sampleRate === ANALYSIS_SAMPLE_RATE
+      ? analysisRainRenderer
+      : createGeneratedRainRenderer({
+        sampleRate: audioContext.sampleRate,
+        factors: acousticFactors,
+        earHeightMeters: EAR_HEIGHT_METERS,
+      });
+    rainAudioBufferCache = new WeakMap();
+  }
   renderAnalysisComparison();
 }
 
-function scheduleAcousticRegeneration() {
+function scheduleAcousticRegeneration({ rebuildRenderer = false } = {}) {
+  acousticWaveformRebuildPending ||= rebuildRenderer;
   clearTimeout(acousticRegenerationTimer);
-  acousticRegenerationTimer = window.setTimeout(regenerateAcousticAssets, 100);
+  acousticRegenerationTimer = window.setTimeout(() => {
+    const shouldRebuildRenderer = acousticWaveformRebuildPending;
+    acousticWaveformRebuildPending = false;
+    regenerateAcousticAssets(shouldRebuildRenderer);
+  }, 120);
 }
 
 function applyCompressionSettings() {
@@ -444,19 +514,27 @@ function setAnalysisMetrics(analysis, elements) {
   elements.centroid.textContent = formatAnalysisFrequency(analysis.spectralCentroidHz);
   elements.highBand.textContent = `${(analysis.highBandEnergyRatio * 100).toFixed(1)}%`;
   elements.flatness.textContent = analysis.spectralFlatness.toFixed(3);
+  elements.crest.textContent = `${analysis.crestFactor.toFixed(1)}×`;
+  elements.envelopeVariation.textContent = analysis.envelopeCoefficientOfVariation.toFixed(2);
+  elements.envelopeFloor.textContent = `${(analysis.envelopeFloorRatio * 100).toFixed(0)}%`;
+  elements.bandCorrelation.textContent = analysis.bandEnvelopeCorrelation.toFixed(2);
 }
 
 function renderAnalysisComparison() {
   renderSignalWaveform(generatedAnalysisWaveform, generatedReferenceSamples, "#d9ff86");
   renderSignalSpectrogram(generatedAnalysisSpectrogram, generatedReferenceAnalysis);
-  setAnalysisMetrics(generatedReferenceAnalysis, {
+  setAnalysisMetrics(generatedProfileAnalysis, {
     centroid: generatedCentroid,
     highBand: generatedHighBand,
     flatness: generatedFlatness,
+    crest: generatedCrest,
+    envelopeVariation: generatedEnvelopeVariation,
+    envelopeFloor: generatedEnvelopeFloor,
+    bandCorrelation: generatedBandCorrelation,
   });
 
   const spectrumSeries = [{
-    analysis: generatedReferenceAnalysis,
+    analysis: generatedProfileAnalysis,
     color: "#d9ff86",
   }];
 
@@ -471,6 +549,10 @@ function renderAnalysisComparison() {
       centroid: referenceCentroid,
       highBand: referenceHighBand,
       flatness: referenceFlatness,
+      crest: referenceCrest,
+      envelopeVariation: referenceEnvelopeVariation,
+      envelopeFloor: referenceEnvelopeFloor,
+      bandCorrelation: referenceBandCorrelation,
     });
     spectrumSeries.push({
       analysis: measuredReferenceProfileAnalysis,
@@ -716,7 +798,14 @@ function ensureAudio() {
   outputAnalyser = audioContext.createAnalyser();
   outputAnalyser.fftSize = 2048;
   waveformBuffer = new Float32Array(outputAnalyser.fftSize);
-  rainImpactBuffers = createRainImpactBuffers();
+  liveRainRenderer = audioContext.sampleRate === ANALYSIS_SAMPLE_RATE
+    ? analysisRainRenderer
+    : createGeneratedRainRenderer({
+      sampleRate: audioContext.sampleRate,
+      factors: acousticFactors,
+      earHeightMeters: EAR_HEIGHT_METERS,
+    });
+  rainAudioBufferCache = new WeakMap();
   referenceMedia = enablePitchPreservation(new Audio());
   referenceMedia.loop = true;
   referenceMedia.preload = "auto";
@@ -752,47 +841,34 @@ function playEvent(event, scheduledAt) {
   const panner = typeof audioContext.createStereoPanner === "function"
     ? audioContext.createStereoPanner()
     : null;
-  const bufferIndex = Math.imul(event.id, 2654435761) >>> 0;
-  const fullDensityCompensation = Math.min(
-    1,
-    Math.sqrt(12 / Math.max(12, event.rateHz)),
-  );
-  const densityCompensation = effectiveAcousticFactor(
-    acousticFactors,
-    "densityCompensation",
-  );
-  const densityNormalization = 1 - densityCompensation
-    * (1 - fullDensityCompensation);
-  const eventVariation = effectiveAcousticFactor(acousticFactors, "eventVariation");
-  const eventLevel = 0.26 * (1 + (event.amplitude - 0.5) * eventVariation);
-  const propagation = calculateAcousticPropagation(event.position, {
-    earHeightMeters: EAR_HEIGHT_METERS,
-    distanceLoss: effectiveAcousticFactor(acousticFactors, "distanceLoss"),
-    stereoSpread: effectiveAcousticFactor(acousticFactors, "stereoSpread"),
-    airDamping: effectiveAcousticFactor(acousticFactors, "airDamping"),
-  });
+  const plan = liveRainRenderer.prepareArrival(event);
+  let buffer = rainAudioBufferCache.get(plan.response);
+  if (!buffer) {
+    buffer = audioContext.createBuffer(
+      1,
+      plan.response.length,
+      audioContext.sampleRate,
+    );
+    buffer.copyToChannel(plan.response, 0);
+    rainAudioBufferCache.set(plan.response, buffer);
+  }
 
-  source.buffer = rainImpactBuffers[bufferIndex % rainImpactBuffers.length];
-  gain.gain.setValueAtTime(
-    eventLevel *
-      densityNormalization *
-      propagation.relativePressure,
-    startTime,
-  );
-  if (propagation.airDampingCutoffHz < 19_900) {
+  source.buffer = buffer;
+  gain.gain.setValueAtTime(plan.gain, startTime);
+  if (plan.filter.cutoffHz < 19_900) {
     const distanceFilter = audioContext.createBiquadFilter();
     distanceFilter.type = "lowpass";
     distanceFilter.frequency.setValueAtTime(
-      propagation.airDampingCutoffHz,
+      plan.filter.cutoffHz,
       startTime,
     );
-    distanceFilter.Q.value = 0.38;
+    distanceFilter.Q.value = plan.filter.q;
     source.connect(distanceFilter).connect(gain);
   } else {
     source.connect(gain);
   }
   if (panner) {
-    panner.pan.setValueAtTime(propagation.stereoPan, startTime);
+    panner.pan.setValueAtTime(plan.stereoPan, startTime);
     gain.connect(panner).connect(masterGain);
   } else {
     gain.connect(masterGain);

@@ -19,6 +19,65 @@ test("Signal Analysis identifies the frequency shape of a known tone", () => {
   assert.ok(analysis.spectralFlatness < 0.01);
 });
 
+test("Signal Analysis distinguishes a continuous texture from isolated percussive bursts", () => {
+  const sampleRate = 48_000;
+  const continuous = Float32Array.from(
+    { length: sampleRate },
+    (_, index) => 0.2 * Math.sin(2 * Math.PI * 1_000 * index / sampleRate),
+  );
+  const bursts = Float32Array.from(
+    { length: sampleRate },
+    (_, index) => {
+      const position = index % Math.round(sampleRate * 0.2);
+      const envelope = position < sampleRate * 0.01
+        ? Math.exp(-position / (sampleRate * 0.0025))
+        : 0;
+      return envelope * Math.sin(2 * Math.PI * 1_000 * index / sampleRate);
+    },
+  );
+
+  const continuousAnalysis = analyzeSignal(continuous, sampleRate, {
+    includeSpectrogram: false,
+  });
+  const burstAnalysis = analyzeSignal(bursts, sampleRate, {
+    includeSpectrogram: false,
+  });
+
+  assert.ok(continuousAnalysis.envelopeCoefficientOfVariation < 0.05);
+  assert.ok(continuousAnalysis.envelopeFloorRatio > 0.9);
+  assert.ok(burstAnalysis.envelopeCoefficientOfVariation > 2);
+  assert.ok(burstAnalysis.envelopeFloorRatio < 0.05);
+  assert.ok(burstAnalysis.crestFactor > continuousAnalysis.crestFactor * 2);
+});
+
+test("Signal Analysis measures whether frequency-region envelopes move together", () => {
+  const sampleRate = 48_000;
+  const length = sampleRate * 2;
+  const correlated = new Float32Array(length);
+  const alternating = new Float32Array(length);
+
+  for (let index = 0; index < length; index += 1) {
+    const block = Math.floor(index / (sampleRate * 0.05));
+    const commonEnvelope = block % 2 === 0 ? 1 : 0.08;
+    const lowEnvelope = block % 2 === 0 ? 1 : 0.08;
+    const highEnvelope = block % 2 === 0 ? 0.08 : 1;
+    const low = Math.sin(2 * Math.PI * 500 * index / sampleRate);
+    const high = Math.sin(2 * Math.PI * 10_000 * index / sampleRate);
+    correlated[index] = commonEnvelope * (low + high) * 0.2;
+    alternating[index] = (lowEnvelope * low + highEnvelope * high) * 0.2;
+  }
+
+  const together = analyzeSignal(correlated, sampleRate, {
+    includeSpectrogram: false,
+  });
+  const apart = analyzeSignal(alternating, sampleRate, {
+    includeSpectrogram: false,
+  });
+
+  assert.ok(together.bandEnvelopeCorrelation > 0.75);
+  assert.ok(apart.bandEnvelopeCorrelation < 0.3);
+});
+
 test("a Rain Reference comparison isolates its strongest 120 millisecond impact", () => {
   const sampleRate = 48_000;
   const samples = new Float32Array(sampleRate);

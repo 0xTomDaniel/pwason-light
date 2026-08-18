@@ -9,10 +9,12 @@ const DEFINITIONS = [
   { id: "bandIndependence", group: "Surface texture", label: "Band independence", description: "Decouples low, mid, and high envelopes", defaultAmount: 0.88 },
   { id: "microSplashes", group: "Surface texture", label: "Micro-splashes", description: "Adds quieter secondary contacts inside one Arrival", defaultAmount: 0.42 },
   { id: "microSplashDelay", group: "Surface texture", label: "Splash delay", description: "Spreads secondary contacts later in the response", defaultAmount: 0.58 },
+  { id: "responseDiversity", group: "Surface texture", label: "Response diversity", description: "Varies early, soft, and diffuse response shapes", defaultAmount: 0.82 },
+  { id: "diffuseField", group: "Surface texture", label: "Diffuse field", description: "Fills small gaps beneath nearby contacts", defaultAmount: 0.24 },
   { id: "distanceLoss", group: "Space", label: "Distance loss", description: "Fades pressure with source distance", defaultAmount: 1 },
   { id: "fieldDepth", group: "Space", label: "Field depth", description: "Sets how far impact positions extend around the listener", defaultAmount: 0.66 },
   { id: "stereoSpread", group: "Space", label: "Stereo spread", description: "Places impacts continuously across stereo", defaultAmount: 0.86 },
-  { id: "airDamping", group: "Space", label: "Distance air damping", description: "Softens distant high frequencies", defaultAmount: 0.55 },
+  { id: "airDamping", group: "Space", label: "Distance air damping", description: "Softens distant high frequencies", defaultAmount: 0.10 },
   { id: "densityCompensation", group: "Output", label: "Density compensation", description: "Reduces each impact as Speed creates more overlap", defaultAmount: 1 },
   { id: "compression", group: "Output", label: "Compression", description: "Controls dense-overlap peaks", defaultAmount: 0.45 },
 ];

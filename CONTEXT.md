@@ -21,15 +21,27 @@ A homogeneous Poisson arrival process with one constant total lamp rate selected
 _Avoid_: Living rate, Cox process, weather modulation
 
 **Rain Impact Waveform**:
-A generated, band-limited, signed pressure-like response used identically for Arrivals from every Channel. It may contain one primary contact and delayed Micro-splashes but has no pitch or relationship to LED wavelength.
+A complete generated, band-limited, signed pressure-like response used identically for Arrivals from every Channel. It may contain a Direct Contact, independently evolving frequency regions, a Diffuse Response, and delayed Micro-splashes, but has no pitch or relationship to LED wavelength.
 _Avoid_: Note, tone, spectral voice
+
+**Response Family**:
+A seeded statistical morphology assigned to a Rain Impact Waveform. Response Families vary the balance and timing of early, soft, and diffuse energy without claiming that an unlabeled recording event came from a known material.
+_Avoid_: Named surface, extra Arrival, audio Channel
+
+**Direct Contact**:
+The bounded early pressure response that can make one Arrival individually perceptible. A Response Family may make it prominent, quiet, or delayed.
+_Avoid_: Mandatory onset peak, snare transient
+
+**Diffuse Response**:
+The quieter sustained part of a Rain Impact Waveform whose overlap with other Arrivals forms continuous far-field texture. It remains part of its parent Arrival and has no separate clock.
+_Avoid_: Background recording, ambient loop, second Poisson process
 
 **Acoustic Factor**:
 One independently switchable, continuously adjustable contribution or modifier in generated rain audio. Acoustic Factors change response shape, spatial presentation, or output behavior; they never change Channel routing, Source Mix, or the steady Poisson clock.
 _Avoid_: Hidden tuning constant, spectral Channel, weather process
 
 **Acoustic Factor Preset**:
-A complete set of Acoustic Factor switch states and amounts. The default Redwood-matched preset is a starting model, not an automatically fitted truth claim.
+A complete set of Acoustic Factor switch states and amounts. The default Redwood-target preset is a starting model, not an automatically fitted truth claim.
 _Avoid_: Recording profile, sample preset
 
 **Micro-splash**:
@@ -37,8 +49,12 @@ A quieter delayed secondary contact generated inside one Rain Impact Waveform. I
 _Avoid_: Secondary Poisson event, extra drop stream
 
 **Acoustic Target Profile**:
-The measured aggregate frequency shape used to constrain generated Rain Impact Waveforms. Pwason's current Acoustic Target Profile comes from the default Redwood Rain Reference but contains no recording samples.
+A measured aggregate spectral and temporal shape used to constrain generated rain texture. Pwason's current Acoustic Target Profile comes from the default Redwood Rain Reference but contains no recording samples.
 _Avoid_: Sample synthesis, spectral note, selected playback profile
+
+**Generated Rain Renderer**:
+The Module that maps caller-owned Arrivals to complete audible render plans and uses the same path to produce an offline generated profile. It owns Rain Impact Waveform selection, Acoustic Propagation, and event level, but never owns Poisson timing.
+_Avoid_: Poisson engine, recorded-rain player
 
 **Rain Reference**:
 A measured rain recording used to evaluate the generated Rain Impact Waveform. A designer may temporarily replace the visual comparison with a local recording. A Rain Reference never participates in Arrival generation.

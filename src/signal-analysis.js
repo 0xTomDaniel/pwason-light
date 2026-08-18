@@ -3,6 +3,119 @@ const HIGH_BAND_START_HZ = 8_000;
 const IMPACT_DURATION_SECONDS = 0.12;
 const IMPACT_PREROLL_SECONDS = 0.005;
 
+function onePoleCoefficient(cutoffHz, sampleRate) {
+  return 1 - Math.exp(-2 * Math.PI * cutoffHz / sampleRate);
+}
+
+function correlation(first, second) {
+  const count = Math.min(first.length, second.length);
+  if (count === 0) return 0;
+  const firstMean = first.reduce((sum, value) => sum + value, 0) / count;
+  const secondMean = second.reduce((sum, value) => sum + value, 0) / count;
+  let covariance = 0;
+  let firstVariance = 0;
+  let secondVariance = 0;
+
+  for (let index = 0; index < count; index += 1) {
+    const firstOffset = first[index] - firstMean;
+    const secondOffset = second[index] - secondMean;
+    covariance += firstOffset * secondOffset;
+    firstVariance += firstOffset * firstOffset;
+    secondVariance += secondOffset * secondOffset;
+  }
+
+  const denominator = Math.sqrt(firstVariance * secondVariance);
+  return denominator > 0 ? covariance / denominator : 0;
+}
+
+function analyzeTemporalTexture(samples, sampleRate) {
+  const frameSize = Math.max(32, Math.round(sampleRate * 0.005));
+  const hopSize = Math.max(16, Math.floor(frameSize / 2));
+  const frameCount = samples.length <= frameSize
+    ? 1
+    : Math.floor((samples.length - frameSize) / hopSize) + 1;
+  const envelopes = {
+    full: new Float64Array(frameCount),
+    low: new Float64Array(frameCount),
+    mid: new Float64Array(frameCount),
+    high: new Float64Array(frameCount),
+  };
+  const lowSamples = new Float64Array(samples.length);
+  const midSamples = new Float64Array(samples.length);
+  const highSamples = new Float64Array(samples.length);
+  const lowCoefficient = onePoleCoefficient(1_200, sampleRate);
+  const highCoefficient = onePoleCoefficient(8_000, sampleRate);
+  let lowStateA = 0;
+  let lowStateB = 0;
+  let highStateA = 0;
+  let highStateB = 0;
+  let energy = 0;
+  let peak = 0;
+
+  for (let index = 0; index < samples.length; index += 1) {
+    const sample = samples[index] || 0;
+    energy += sample * sample;
+    peak = Math.max(peak, Math.abs(sample));
+    lowStateA += lowCoefficient * (sample - lowStateA);
+    lowStateB += lowCoefficient * (lowStateA - lowStateB);
+    highStateA += highCoefficient * (sample - highStateA);
+    highStateB += highCoefficient * (highStateA - highStateB);
+    lowSamples[index] = lowStateB;
+    midSamples[index] = highStateB - lowStateB;
+    highSamples[index] = sample - highStateB;
+  }
+
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const start = frame * hopSize;
+    const end = Math.min(samples.length, start + frameSize);
+    let fullEnergy = 0;
+    let lowEnergy = 0;
+    let midEnergy = 0;
+    let highEnergy = 0;
+    for (let index = start; index < end; index += 1) {
+      fullEnergy += samples[index] ** 2;
+      lowEnergy += lowSamples[index] ** 2;
+      midEnergy += midSamples[index] ** 2;
+      highEnergy += highSamples[index] ** 2;
+    }
+    const count = Math.max(1, end - start);
+    envelopes.full[frame] = Math.sqrt(fullEnergy / count);
+    envelopes.low[frame] = Math.sqrt(lowEnergy / count);
+    envelopes.mid[frame] = Math.sqrt(midEnergy / count);
+    envelopes.high[frame] = Math.sqrt(highEnergy / count);
+  }
+
+  const envelopeMean = envelopes.full.reduce((sum, value) => sum + value, 0)
+    / envelopes.full.length;
+  const envelopeVariance = envelopes.full.reduce(
+    (sum, value) => sum + (value - envelopeMean) ** 2,
+    0,
+  ) / envelopes.full.length;
+  const sortedEnvelope = [...envelopes.full].sort((left, right) => left - right);
+  const floor = sortedEnvelope[Math.floor((sortedEnvelope.length - 1) * 0.1)] ?? 0;
+  const median = sortedEnvelope[Math.floor((sortedEnvelope.length - 1) * 0.5)] ?? 0;
+  const rms = samples.length > 0 ? Math.sqrt(energy / samples.length) : 0;
+  const bandCorrelations = [
+    correlation(envelopes.low, envelopes.mid),
+    correlation(envelopes.low, envelopes.high),
+    correlation(envelopes.mid, envelopes.high),
+  ];
+
+  return {
+    rms,
+    peak,
+    crestFactor: rms > 0 ? peak / rms : 0,
+    envelopeCoefficientOfVariation: envelopeMean > 0
+      ? Math.sqrt(envelopeVariance) / envelopeMean
+      : 0,
+    envelopeFloorRatio: median > 0 ? floor / median : 0,
+    bandEnvelopeCorrelation: bandCorrelations.reduce(
+      (sum, value) => sum + value,
+      0,
+    ) / bandCorrelations.length,
+  };
+}
+
 function transform(real, imaginary) {
   const size = real.length;
 
@@ -94,6 +207,7 @@ export function analyzeSignal(samples, sampleRate, {
 
   const arithmeticMean = totalEnergy / binCount;
   const geometricMean = Math.exp(logPower / binCount);
+  const temporalTexture = analyzeTemporalTexture(samples, rate);
 
   return Object.freeze({
     durationSeconds: samples.length / rate,
@@ -105,6 +219,7 @@ export function analyzeSignal(samples, sampleRate, {
     spectralCentroidHz: totalEnergy > 0 ? weightedFrequency / totalEnergy : 0,
     highBandEnergyRatio: totalEnergy > 0 ? highBandEnergy / totalEnergy : 0,
     spectralFlatness: arithmeticMean > 0 ? geometricMean / arithmeticMean : 0,
+    ...temporalTexture,
   });
 }
 

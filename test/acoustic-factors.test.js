@@ -11,7 +11,7 @@ import {
 test("every Acoustic Factor has one switch state and one bounded continuous amount", () => {
   const defaults = createDefaultAcousticFactors();
 
-  assert.equal(ACOUSTIC_FACTOR_DEFINITIONS.length, 16);
+  assert.equal(ACOUSTIC_FACTOR_DEFINITIONS.length, 18);
   assert.equal(Object.keys(defaults).length, ACOUSTIC_FACTOR_DEFINITIONS.length);
   for (const definition of ACOUSTIC_FACTOR_DEFINITIONS) {
     assert.equal(typeof defaults[definition.id].enabled, "boolean");

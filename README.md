@@ -37,10 +37,11 @@ never begins automatically.
 
 The separate **Acoustic Factors** panel exposes every audible parameter in the
 generated model with both an on/off switch and a continuous amount slider. Its
-16 controls cover impact shape, independently evolving low/mid/high surface
-textures, delayed Micro-splashes, field depth and propagation, high-rate
-density compensation, and compression. **Reset all factors** restores the
-Redwood-matched defaults. These controls never alter Reference Playback.
+18 controls cover impact shape, statistical Response Family diversity,
+independently evolving low/mid/high textures, a restrained Diffuse Response,
+delayed Micro-splashes, field depth and propagation, high-rate density
+compensation, and compression. **Reset all factors** restores the Redwood-target
+defaults. These controls never alter Reference Playback.
 
 At 100% Reference, the simulator continues producing light Arrivals but skips
 construction of muted procedural audio nodes.
@@ -62,20 +63,31 @@ Distance Air Damping softens remote high frequencies, and Stereo Spread controls
 continuous left-right placement. No additional timing or distance Channels are
 created.
 
-The Rain Impact Waveform is generated from a signed pressure onset and a
-decaying stochastic surface response. Low, mid, and high regions use separately
-generated noise and separately shaped envelopes so they do not rise and fall as
-one snare-like burst. A softened primary pressure response and probabilistic
-delayed Micro-splashes supply within-event structure. Micro-splashes remain part
-of their parent Arrival, preserving the one steady Poisson clock.
+Each Arrival selects one of 128 seeded Rain Impact Waveforms. A waveform is a
+600 ms signed response: it may contain an early Direct Contact, but independently
+timed low/mid/high regions and a quiet Diffuse Response continue underneath it.
+Statistical Response Families vary whether early, soft, or diffuse energy is
+prominent. They are morphology categories, not claims that the recording reveals
+a particular contact material. Delayed Micro-splashes add within-response
+structure while remaining part of their parent Arrival, preserving the one
+steady Poisson clock.
+
+Waveforms retain their seeded amplitude differences; they are not individually
+peak-normalized. Overlap therefore creates a continuous texture with occasional
+near contacts instead of making every Arrival an equally loud transient. One
+Generated Rain Renderer owns waveform selection, event level, distance filtering,
+and stereo placement for both live playback and offline analysis. Poisson timing
+stays outside that Module.
 
 The model is seeded, nonperiodic, oscillator-free, and identical across light
-Channels. Its default Acoustic Factor Preset is calibrated to the Redwood
-recording's steady Acoustic Target Profile: across 128 variants the generated
-profile is approximately 4.87 kHz centroid with 22.1% of energy above 8 kHz,
-versus approximately 4.1 kHz and 23.2% for the measured recording. This spectral
-match is a constraint, not sufficient evidence that the temporal texture is
-fully realistic.
+Channels. The Redwood recording supplies a target rather than samples. In the
+measured 20-second segment its crest factor is approximately 17.9×, envelope CV
+0.44, background-floor ratio 76%, and cross-band envelope correlation 0.48. The
+current generated profile is approximately 12.0×, 0.69, 47%, and 0.47. Its
+2.97 kHz centroid and 11.2% energy above 8 kHz are intentionally darker than
+the reference after listening showed that the former diffuse default produced
+too much static. These measurements constrain the model without overruling
+perceptual evidence or claiming identity.
 
 ## Rain Reference Library
 
@@ -96,10 +108,11 @@ recorded rainfall in Central Amazon forest using a recorder fixed to a tree.
 - Amazon recording license: [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)
 - Local provenance and checksum: [`assets/reference/README.md`](assets/reference/README.md)
 
-The Rain Reference lab compares a generated 120 ms impact with the strongest
-120 ms impact found during the first ten seconds of the selected recording. It
-displays waveforms, spectrograms, normalized spectra, spectral centroid,
-high-frequency energy, and spectral flatness.
+The Rain Reference lab shows the first 120 ms of one complete 600 ms generated
+response beside the strongest 120 ms contact found during the first ten seconds
+of the selected recording. For the steady texture it displays normalized spectra,
+spectral centroid, high-frequency energy, spectral flatness, crest factor,
+envelope variation, background-floor ratio, and cross-band envelope correlation.
 
 The selected recording can also loop as Reference Playback through Source Mix.
 Its calibrated onset density follows Speed using pitch-preserving media time
@@ -134,7 +147,8 @@ npm test
 
 The tests cover seeded Poisson behavior, total-rate coupling, spatial
 propagation, Acoustic Factor normalization and bypass behavior, LED envelopes,
-generated waveform behavior, both reference-file
+generated waveform behavior, the shared live/offline Generated Rain Renderer,
+aggregate temporal texture, both reference-file
 manifests and preparation, pitch-preserving time-stretch policy, the bounded
 Render Loop, signal analysis, and Source Mix invariants.
 
