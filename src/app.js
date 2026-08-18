@@ -2,14 +2,25 @@ import { createPoissonEngine } from "./poisson-engine.js";
 import { sampleLedOutput } from "./led-renderer.js";
 import { createRainImpact } from "./rain-impact.js";
 import { calculateAcousticPropagation } from "./acoustic-propagation.js";
+import {
+  ACOUSTIC_FACTOR_DEFINITIONS,
+  createDefaultAcousticFactors,
+  effectiveAcousticFactor,
+} from "./acoustic-factors.js";
 import { createRenderLoop } from "./render-loop.js";
 import { analyzeSignal } from "./signal-analysis.js";
 import { calculateSourceMix } from "./source-mix.js";
 import {
-  BUNDLED_RAIN_REFERENCE,
-  loadBundledRainReference,
+  DEFAULT_RAIN_REFERENCE_PROFILE,
+  RAIN_REFERENCE_PROFILES,
+  getRainReferenceProfile,
+  loadRainReference,
   prepareRainReference,
 } from "./rain-reference.js";
+import {
+  calculateReferenceTimeStretch,
+  enablePitchPreservation,
+} from "./reference-playback.js";
 import {
   renderEmptySignal,
   renderSignalSpectrogram,
@@ -32,7 +43,7 @@ const AUDIO_LOOKAHEAD_MS = 50;
 const MAX_EVENTS_PER_TICK = 2500;
 const MAX_EVENT_MARKS_PER_SECOND = 30;
 const RAIN_IMPACT_VARIANTS = 128;
-const LISTENING_FIELD_RADIUS_METERS = 20;
+const MAX_LISTENING_FIELD_RADIUS_METERS = 30;
 const EAR_HEIGHT_METERS = 1.5;
 const ANALYSIS_SAMPLE_RATE = 48_000;
 const REFERENCE_FILE_LIMIT_BYTES = 25 * 1024 * 1024;
@@ -49,6 +60,8 @@ const rateOutput = document.querySelector("#rate-output");
 const couplingOutput = document.querySelector("#coupling-output");
 const volumeOutput = document.querySelector("#output-level-output");
 const sourceMixOutput = document.querySelector("#source-mix-output");
+const referenceProfileSelect = document.querySelector("#reference-profile");
+const referenceSpeedOutput = document.querySelector("#reference-speed-output");
 const liveRateOutput = document.querySelector("#live-rate");
 const eventCountOutput = document.querySelector("#event-count");
 const seedOutput = document.querySelector("#seed-output");
@@ -62,6 +75,7 @@ const sampleRateOutput = document.querySelector("#sample-rate-output");
 const scopeWindowOutput = document.querySelector("#scope-window-output");
 const referenceInput = document.querySelector("#rain-reference");
 const referenceStatus = document.querySelector("#reference-status");
+const referenceProvenance = document.querySelector("#reference-provenance");
 const referenceCard = document.querySelector("#reference-analysis-card");
 const referenceFilename = document.querySelector("#reference-filename");
 const generatedAnalysisWaveform = document.querySelector("#generated-analysis-waveform");
@@ -75,6 +89,9 @@ const generatedFlatness = document.querySelector("#generated-flatness");
 const referenceCentroid = document.querySelector("#reference-centroid");
 const referenceHighBand = document.querySelector("#reference-high-band");
 const referenceFlatness = document.querySelector("#reference-flatness");
+const acousticFactorList = document.querySelector("#acoustic-factor-list");
+const acousticPresetOutput = document.querySelector("#acoustic-preset-output");
+const resetAcousticFactorsButton = document.querySelector("#reset-acoustic-factors");
 
 let seed = "steady-rain-01";
 let engine = null;
@@ -94,19 +111,25 @@ let outputGain = null;
 let outputAnalyser = null;
 let waveformBuffer = null;
 let rainImpactBuffers = [];
-let amazonReferenceBuffer = null;
-let amazonReferenceSource = null;
-const generatedReferenceSamples = createRainImpact({
+let acousticFactors = createDefaultAcousticFactors();
+let selectedReferenceProfile = DEFAULT_RAIN_REFERENCE_PROFILE;
+let selectedReferenceReady = false;
+let referenceMedia = null;
+let referenceMediaSource = null;
+let generatedReferenceSamples = createRainImpact({
   sampleRate: ANALYSIS_SAMPLE_RATE,
   seed: 42,
+  factors: acousticFactors,
 });
-const generatedReferenceAnalysis = analyzeSignal(
+let generatedReferenceAnalysis = analyzeSignal(
   generatedReferenceSamples,
   ANALYSIS_SAMPLE_RATE,
 );
 let measuredReferenceSamples = null;
 let measuredReferenceAnalysis = null;
+let measuredReferenceProfileAnalysis = null;
 let comparisonResizeTimer = null;
+let acousticRegenerationTimer = null;
 let referenceLoadRequest = 0;
 const renderLoop = createRenderLoop({
   draw: renderFrame,
@@ -118,12 +141,169 @@ const renderLoop = createRenderLoop({
 });
 
 function settings() {
+  const fieldDepth = effectiveAcousticFactor(acousticFactors, "fieldDepth");
   return {
     seed,
     rateHz: selectedRateHz(),
     coupling: Number(couplingInput.value),
-    fieldRadiusMeters: LISTENING_FIELD_RADIUS_METERS,
+    fieldRadiusMeters: fieldDepth === 0
+      ? 0
+      : 1 + fieldDepth * (MAX_LISTENING_FIELD_RADIUS_METERS - 1),
   };
+}
+
+function createAcousticFactorControls() {
+  acousticFactorList.replaceChildren();
+  let currentGroup = null;
+  let groupElement = null;
+
+  for (const definition of ACOUSTIC_FACTOR_DEFINITIONS) {
+    if (definition.group !== currentGroup) {
+      currentGroup = definition.group;
+      groupElement = document.createElement("section");
+      groupElement.className = "factor-group";
+      const heading = document.createElement("h3");
+      heading.textContent = currentGroup;
+      groupElement.append(heading);
+      acousticFactorList.append(groupElement);
+    }
+
+    const row = document.createElement("article");
+    row.className = "factor-control";
+    row.dataset.factor = definition.id;
+    const heading = document.createElement("div");
+    heading.className = "factor-heading";
+    const switchLabel = document.createElement("label");
+    switchLabel.className = "factor-switch";
+    const toggle = document.createElement("input");
+    toggle.type = "checkbox";
+    toggle.setAttribute("role", "switch");
+    toggle.checked = acousticFactors[definition.id].enabled;
+    toggle.dataset.factorToggle = definition.id;
+    toggle.setAttribute("aria-label", `Enable ${definition.label}`);
+    const title = document.createElement("span");
+    title.textContent = definition.label;
+    switchLabel.append(toggle, title);
+    const output = document.createElement("output");
+    output.dataset.factorOutput = definition.id;
+    heading.append(switchLabel, output);
+
+    const range = document.createElement("input");
+    range.type = "range";
+    range.min = String(definition.min);
+    range.max = String(definition.max);
+    range.step = String(definition.step);
+    range.value = String(acousticFactors[definition.id].amount);
+    range.dataset.factorAmount = definition.id;
+    range.setAttribute("aria-label", `${definition.label} amount`);
+    const description = document.createElement("p");
+    description.textContent = definition.description;
+    row.append(heading, range, description);
+    groupElement.append(row);
+
+    toggle.addEventListener("change", updateAcousticFactor);
+    range.addEventListener("input", updateAcousticFactor);
+    updateAcousticFactorRow(definition.id);
+  }
+}
+
+function updateAcousticFactorRow(id) {
+  const setting = acousticFactors[id];
+  const row = acousticFactorList.querySelector(`[data-factor="${id}"]`);
+  const output = acousticFactorList.querySelector(`[data-factor-output="${id}"]`);
+  row.dataset.enabled = String(setting.enabled);
+  output.value = setting.enabled
+    ? `${Math.round(setting.amount * 100)}%`
+    : `Off · ${Math.round(setting.amount * 100)}%`;
+}
+
+function updateAcousticFactor(event) {
+  const id = event.currentTarget.dataset.factorToggle
+    ?? event.currentTarget.dataset.factorAmount;
+  const toggle = acousticFactorList.querySelector(`[data-factor-toggle="${id}"]`);
+  const range = acousticFactorList.querySelector(`[data-factor-amount="${id}"]`);
+  acousticFactors[id] = {
+    enabled: toggle.checked,
+    amount: Number(range.value),
+  };
+  acousticPresetOutput.textContent = "Custom";
+  updateAcousticFactorRow(id);
+
+  if (id === "fieldDepth") restartEngine();
+  if (id === "compression") applyCompressionSettings();
+  if ([
+    "impactBody",
+    "impactSoftness",
+    "tailLength",
+    "eventVariation",
+    "lowTexture",
+    "midTexture",
+    "highTexture",
+    "bandIndependence",
+    "microSplashes",
+    "microSplashDelay",
+  ].includes(id)) {
+    scheduleAcousticRegeneration();
+  }
+}
+
+function resetAcousticFactors() {
+  acousticFactors = createDefaultAcousticFactors();
+  for (const definition of ACOUSTIC_FACTOR_DEFINITIONS) {
+    acousticFactorList.querySelector(`[data-factor-toggle="${definition.id}"]`).checked =
+      acousticFactors[definition.id].enabled;
+    acousticFactorList.querySelector(`[data-factor-amount="${definition.id}"]`).value =
+      String(acousticFactors[definition.id].amount);
+    updateAcousticFactorRow(definition.id);
+  }
+  acousticPresetOutput.textContent = "Redwood matched";
+  applyCompressionSettings();
+  restartEngine();
+  scheduleAcousticRegeneration();
+}
+
+function createRainImpactBuffers() {
+  if (!audioContext) return [];
+  return Array.from({ length: RAIN_IMPACT_VARIANTS }, (_, index) => {
+    const samples = createRainImpact({
+      sampleRate: audioContext.sampleRate,
+      seed: index + 1,
+      factors: acousticFactors,
+    });
+    const buffer = audioContext.createBuffer(1, samples.length, audioContext.sampleRate);
+    buffer.copyToChannel(samples, 0);
+    return buffer;
+  });
+}
+
+function regenerateAcousticAssets() {
+  generatedReferenceSamples = createRainImpact({
+    sampleRate: ANALYSIS_SAMPLE_RATE,
+    seed: 42,
+    factors: acousticFactors,
+  });
+  generatedReferenceAnalysis = analyzeSignal(
+    generatedReferenceSamples,
+    ANALYSIS_SAMPLE_RATE,
+  );
+  if (audioContext) rainImpactBuffers = createRainImpactBuffers();
+  renderAnalysisComparison();
+}
+
+function scheduleAcousticRegeneration() {
+  clearTimeout(acousticRegenerationTimer);
+  acousticRegenerationTimer = window.setTimeout(regenerateAcousticAssets, 100);
+}
+
+function applyCompressionSettings() {
+  if (!audioContext || !masterCompressor) return;
+  const compression = effectiveAcousticFactor(acousticFactors, "compression");
+  const now = audioContext.currentTime;
+  masterCompressor.threshold.setTargetAtTime(-18 * compression, now, 0.025);
+  masterCompressor.knee.setTargetAtTime(10 * compression, now, 0.025);
+  masterCompressor.ratio.setTargetAtTime(1 + 5 * compression, now, 0.025);
+  masterCompressor.attack.setTargetAtTime(0.002 + 0.006 * compression, now, 0.025);
+  masterCompressor.release.setTargetAtTime(0.08 + 0.28 * compression, now, 0.025);
 }
 
 function selectedRateHz() {
@@ -158,16 +338,17 @@ function updateControlReadouts() {
   sourceMixOutput.value = referencePercent === 0
     ? "Generated only"
     : referencePercent === 100
-      ? "Amazon only"
+      ? `${selectedReferenceProfile.shortTitle} only`
       : `${generatedPercent} / ${referencePercent}`;
   sourceMixInput.setAttribute(
     "aria-valuetext",
     referencePercent === 0
       ? "Generated only"
       : referencePercent === 100
-        ? "Amazon recording only"
-        : `${generatedPercent} percent generated, ${referencePercent} percent Amazon recording`,
+        ? `${selectedReferenceProfile.title} recording only`
+        : `${generatedPercent} percent generated, ${referencePercent} percent selected reference recording`,
   );
+  updateReferenceTimeStretch();
 }
 
 function updateRate() {
@@ -181,34 +362,58 @@ function updateOutputLevel() {
   outputGain.gain.setTargetAtTime(Number(volumeInput.value), audioContext.currentTime, 0.018);
 }
 
-function startAmazonPlayback() {
+function updateReferenceTimeStretch() {
+  const stretch = calculateReferenceTimeStretch(
+    selectedRateHz(),
+    selectedReferenceProfile.naturalRateHz,
+  );
+  if (referenceMedia) referenceMedia.playbackRate = stretch.playbackRate;
+
+  const applied = `${stretch.playbackRate.toFixed(2)}×`;
+  referenceSpeedOutput.value = stretch.limited
+    ? `${applied} ${stretch.requestedRate < stretch.playbackRate ? "clean floor" : "ceiling"} · requested ${stretch.requestedRate.toFixed(2)}×`
+    : `${applied} · pitch held`;
+  referenceSpeedOutput.dataset.state = stretch.limited ? "limited" : "matched";
+  referenceSpeedOutput.setAttribute(
+    "aria-label",
+    stretch.limited
+      ? `Reference playback limited to ${applied}; requested ${stretch.requestedRate.toFixed(2)} times`
+      : `Reference playback ${applied} with pitch preserved`,
+  );
+}
+
+function syncReferenceMediaProfile() {
+  if (!referenceMedia || referenceMedia.dataset.profileId === selectedReferenceProfile.id) return;
+  referenceMedia.pause();
+  referenceMedia.src = selectedReferenceProfile.assetUrl;
+  referenceMedia.dataset.profileId = selectedReferenceProfile.id;
+  referenceMedia.load();
+  updateReferenceTimeStretch();
+}
+
+function startReferencePlayback() {
   if (
-    amazonReferenceSource ||
     !running ||
     !soundInput.checked ||
     Number(sourceMixInput.value) <= 0 ||
     !audioContext ||
     !referenceGain ||
-    !amazonReferenceBuffer
+    !selectedReferenceReady ||
+    !referenceMedia
   ) return;
 
-  const source = audioContext.createBufferSource();
-  source.buffer = amazonReferenceBuffer;
-  source.loop = true;
-  source.connect(referenceGain);
-  source.addEventListener("ended", () => {
-    if (amazonReferenceSource === source) amazonReferenceSource = null;
-  }, { once: true });
-  amazonReferenceSource = source;
-  source.start(audioContext.currentTime);
+  syncReferenceMediaProfile();
+  updateReferenceTimeStretch();
+  void referenceMedia.play().catch(error => {
+    if (error?.name === "AbortError") return;
+    referenceStatus.dataset.state = "error";
+    referenceStatus.textContent = "Reference playback was blocked. Press Stop, then Start again.";
+    console.error(error);
+  });
 }
 
-function stopAmazonPlayback() {
-  if (!amazonReferenceSource) return;
-  const source = amazonReferenceSource;
-  amazonReferenceSource = null;
-  source.stop();
-  source.disconnect();
+function stopReferencePlayback() {
+  referenceMedia?.pause();
 }
 
 function updateSourceMix() {
@@ -221,8 +426,8 @@ function updateSourceMix() {
   masterGain.gain.setTargetAtTime(mix.generatedGain, audioContext.currentTime, 0.025);
   referenceGain.gain.setTargetAtTime(mix.referenceGain, audioContext.currentTime, 0.025);
 
-  if (mix.referenceGain > 0) startAmazonPlayback();
-  else stopAmazonPlayback();
+  if (mix.referenceGain > 0) startReferencePlayback();
+  else stopReferencePlayback();
 }
 
 function formatDecibels(value) {
@@ -255,20 +460,24 @@ function renderAnalysisComparison() {
     color: "#d9ff86",
   }];
 
-  if (measuredReferenceSamples && measuredReferenceAnalysis) {
+  if (
+    measuredReferenceSamples &&
+    measuredReferenceAnalysis &&
+    measuredReferenceProfileAnalysis
+  ) {
     renderSignalWaveform(referenceAnalysisWaveform, measuredReferenceSamples, "#54dce3");
     renderSignalSpectrogram(referenceAnalysisSpectrogram, measuredReferenceAnalysis);
-    setAnalysisMetrics(measuredReferenceAnalysis, {
+    setAnalysisMetrics(measuredReferenceProfileAnalysis, {
       centroid: referenceCentroid,
       highBand: referenceHighBand,
       flatness: referenceFlatness,
     });
     spectrumSeries.push({
-      analysis: measuredReferenceAnalysis,
+      analysis: measuredReferenceProfileAnalysis,
       color: "#54dce3",
     });
   } else {
-    renderEmptySignal(referenceAnalysisWaveform, "Loading scientific Rain Reference");
+    renderEmptySignal(referenceAnalysisWaveform, "Loading selected Rain Reference");
     renderEmptySignal(referenceAnalysisSpectrogram, "Measured impact will appear here");
   }
 
@@ -290,35 +499,60 @@ async function decodeReferenceAudio(arrayBuffer) {
 function applyPreparedRainReference(prepared, filename, status) {
   measuredReferenceSamples = prepared.samples;
   measuredReferenceAnalysis = prepared.analysis;
+  measuredReferenceProfileAnalysis = prepared.profileAnalysis;
   referenceFilename.textContent = filename;
   referenceStatus.dataset.state = "ready";
   referenceStatus.textContent = status;
   renderAnalysisComparison();
 }
 
-async function analyzeBundledRainReference() {
+function renderReferenceProvenance(reference) {
+  referenceProvenance.replaceChildren();
+  const source = document.createElement("a");
+  source.href = reference.sourceUrl ?? reference.datasetUrl;
+  source.textContent = reference.creator
+    ? `${reference.creator} on Freesound`
+    : "Xavier et al. Amazon rainfall dataset";
+  const license = document.createElement("a");
+  license.href = reference.licenseUrl;
+  license.textContent = reference.license;
+  referenceProvenance.append(
+    "Selected: ",
+    source,
+    ` · ${reference.intensity} on ${reference.surface} · ${reference.playbackFormat} · `,
+    license,
+    ". The selector controls analysis and Reference Playback; a local file remains a silent visual override.",
+  );
+}
+
+async function analyzeSelectedRainReference() {
   const request = ++referenceLoadRequest;
+  selectedReferenceReady = false;
+  sourceMixInput.disabled = true;
+  stopReferencePlayback();
+  syncReferenceMediaProfile();
+  renderReferenceProvenance(selectedReferenceProfile);
   referenceCard.setAttribute("aria-busy", "true");
   referenceStatus.dataset.state = "loading";
-  referenceStatus.textContent = "Loading the bundled Amazon forest recording…";
+  referenceStatus.textContent = `Loading ${selectedReferenceProfile.title}…`;
 
   try {
-    const prepared = await loadBundledRainReference({
+    const prepared = await loadRainReference(selectedReferenceProfile, {
       decodeAudioData: decodeReferenceAudio,
     });
     if (request !== referenceLoadRequest) return;
-    amazonReferenceBuffer = prepared.decodedAudio;
+    selectedReferenceReady = true;
     sourceMixInput.disabled = false;
-    startAmazonPlayback();
+    startReferencePlayback();
     applyPreparedRainReference(
       prepared,
-      BUNDLED_RAIN_REFERENCE.title,
-      `Scientific light-rain reference ready. Strongest impact found at ${prepared.peakSeconds.toFixed(3)} s; analysis is silent.`,
+      selectedReferenceProfile.title,
+      `${selectedReferenceProfile.shortTitle} reference ready at a calibrated ${selectedReferenceProfile.naturalRateHz.toFixed(1)} onsets/s. Strongest impact at ${prepared.peakSeconds.toFixed(3)} s.`,
     );
   } catch (error) {
     if (request !== referenceLoadRequest) return;
     referenceStatus.dataset.state = "error";
-    referenceStatus.textContent = "The bundled reference could not be loaded. You can still choose a local recording.";
+    referenceStatus.textContent = "The selected reference could not be loaded. Choose the other profile or a local recording.";
     console.error(error);
   } finally {
     if (request === referenceLoadRequest) {
@@ -482,21 +716,18 @@ function ensureAudio() {
   outputAnalyser = audioContext.createAnalyser();
   outputAnalyser.fftSize = 2048;
   waveformBuffer = new Float32Array(outputAnalyser.fftSize);
-  rainImpactBuffers = Array.from({ length: RAIN_IMPACT_VARIANTS }, (_, index) => {
-    const samples = createRainImpact({ sampleRate: audioContext.sampleRate, seed: index + 1 });
-    const buffer = audioContext.createBuffer(1, samples.length, audioContext.sampleRate);
-    buffer.copyToChannel(samples, 0);
-    return buffer;
-  });
+  rainImpactBuffers = createRainImpactBuffers();
+  referenceMedia = enablePitchPreservation(new Audio());
+  referenceMedia.loop = true;
+  referenceMedia.preload = "auto";
+  referenceMediaSource = audioContext.createMediaElementSource(referenceMedia);
+  referenceMediaSource.connect(referenceGain);
+  syncReferenceMediaProfile();
   const mix = calculateSourceMix(sourceMixInput.value);
   masterGain.gain.value = soundInput.checked ? mix.generatedGain : 0;
   referenceGain.gain.value = soundInput.checked ? mix.referenceGain : 0;
   outputGain.gain.value = Number(volumeInput.value);
-  masterCompressor.threshold.value = -12;
-  masterCompressor.knee.value = 8;
-  masterCompressor.ratio.value = 4;
-  masterCompressor.attack.value = 0.004;
-  masterCompressor.release.value = 0.24;
+  applyCompressionSettings();
   masterGain.connect(masterCompressor);
   referenceGain.connect(masterCompressor);
   masterCompressor
@@ -522,19 +753,44 @@ function playEvent(event, scheduledAt) {
     ? audioContext.createStereoPanner()
     : null;
   const bufferIndex = Math.imul(event.id, 2654435761) >>> 0;
-  const densityNormalization = Math.min(1, Math.sqrt(12 / Math.max(12, event.rateHz)));
+  const fullDensityCompensation = Math.min(
+    1,
+    Math.sqrt(12 / Math.max(12, event.rateHz)),
+  );
+  const densityCompensation = effectiveAcousticFactor(
+    acousticFactors,
+    "densityCompensation",
+  );
+  const densityNormalization = 1 - densityCompensation
+    * (1 - fullDensityCompensation);
+  const eventVariation = effectiveAcousticFactor(acousticFactors, "eventVariation");
+  const eventLevel = 0.26 * (1 + (event.amplitude - 0.5) * eventVariation);
   const propagation = calculateAcousticPropagation(event.position, {
     earHeightMeters: EAR_HEIGHT_METERS,
+    distanceLoss: effectiveAcousticFactor(acousticFactors, "distanceLoss"),
+    stereoSpread: effectiveAcousticFactor(acousticFactors, "stereoSpread"),
+    airDamping: effectiveAcousticFactor(acousticFactors, "airDamping"),
   });
 
   source.buffer = rainImpactBuffers[bufferIndex % rainImpactBuffers.length];
   gain.gain.setValueAtTime(
-    (0.12 + event.amplitude * 0.28) *
+    eventLevel *
       densityNormalization *
       propagation.relativePressure,
     startTime,
   );
-  source.connect(gain);
+  if (propagation.airDampingCutoffHz < 19_900) {
+    const distanceFilter = audioContext.createBiquadFilter();
+    distanceFilter.type = "lowpass";
+    distanceFilter.frequency.setValueAtTime(
+      propagation.airDampingCutoffHz,
+      startTime,
+    );
+    distanceFilter.Q.value = 0.38;
+    source.connect(distanceFilter).connect(gain);
+  } else {
+    source.connect(gain);
+  }
   if (panner) {
     panner.pan.setValueAtTime(propagation.stereoPan, startTime);
     gain.connect(panner).connect(masterGain);
@@ -600,7 +856,7 @@ async function toggleRunning() {
     startButton.setAttribute("aria-pressed", "true");
     restartEngine();
     updateSourceMix();
-    startAmazonPlayback();
+    startReferencePlayback();
     return;
   }
 
@@ -610,7 +866,7 @@ async function toggleRunning() {
   startButton.textContent = "Start process";
   startButton.setAttribute("aria-pressed", "false");
   clearTimeout(timer);
-  stopAmazonPlayback();
+  stopReferencePlayback();
   renderLoop.wake();
 }
 
@@ -635,21 +891,36 @@ soundInput.addEventListener("change", async () => {
     await audioContext.resume();
   }
   updateSourceMix();
-  if (soundInput.checked) startAmazonPlayback();
-  else stopAmazonPlayback();
+  if (soundInput.checked) startReferencePlayback();
+  else stopReferencePlayback();
 });
 couplingInput.addEventListener("change", restartEngine);
+referenceProfileSelect.addEventListener("change", () => {
+  selectedReferenceProfile = getRainReferenceProfile(referenceProfileSelect.value);
+  updateControlReadouts();
+  void analyzeSelectedRainReference();
+});
 referenceInput.addEventListener("change", () => {
   const [file] = referenceInput.files;
   if (file) analyzeRainReference(file);
 });
+resetAcousticFactorsButton.addEventListener("click", resetAcousticFactors);
 window.addEventListener("resize", () => {
   clearTimeout(comparisonResizeTimer);
   comparisonResizeTimer = window.setTimeout(renderAnalysisComparison, 120);
 });
 
+createAcousticFactorControls();
 updateControlReadouts();
+referenceProfileSelect.replaceChildren(...RAIN_REFERENCE_PROFILES.map(reference => {
+  const option = document.createElement("option");
+  option.value = reference.id;
+  option.textContent = reference.title;
+  option.selected = reference.id === selectedReferenceProfile.id;
+  return option;
+}));
+renderReferenceProvenance(selectedReferenceProfile);
 seedOutput.textContent = seed;
 renderAnalysisComparison();
 renderLoop.wake();
-void analyzeBundledRainReference();
+void analyzeSelectedRainReference();

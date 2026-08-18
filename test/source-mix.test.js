@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { calculateSourceMix } from "../src/source-mix.js";
 
-test("Source Mix crossfades continuously between synthesis and Amazon playback", () => {
+test("Source Mix crossfades continuously between synthesis and selected Reference Playback", () => {
   assert.deepEqual(calculateSourceMix(0), {
     generatedGain: 1,
     referenceGain: 0,

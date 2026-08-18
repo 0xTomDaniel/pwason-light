@@ -21,16 +21,44 @@ A homogeneous Poisson arrival process with one constant total lamp rate selected
 _Avoid_: Living rate, Cox process, weather modulation
 
 **Rain Impact Waveform**:
-A generated, band-limited, signed pressure-like response used identically for Arrivals from every Channel. It has no pitch or relationship to LED wavelength.
+A generated, band-limited, signed pressure-like response used identically for Arrivals from every Channel. It may contain one primary contact and delayed Micro-splashes but has no pitch or relationship to LED wavelength.
 _Avoid_: Note, tone, spectral voice
 
+**Acoustic Factor**:
+One independently switchable, continuously adjustable contribution or modifier in generated rain audio. Acoustic Factors change response shape, spatial presentation, or output behavior; they never change Channel routing, Source Mix, or the steady Poisson clock.
+_Avoid_: Hidden tuning constant, spectral Channel, weather process
+
+**Acoustic Factor Preset**:
+A complete set of Acoustic Factor switch states and amounts. The default Redwood-matched preset is a starting model, not an automatically fitted truth claim.
+_Avoid_: Recording profile, sample preset
+
+**Micro-splash**:
+A quieter delayed secondary contact generated inside one Rain Impact Waveform. It belongs to its parent Arrival and never counts as an additional Arrival.
+_Avoid_: Secondary Poisson event, extra drop stream
+
+**Acoustic Target Profile**:
+The measured aggregate frequency shape used to constrain generated Rain Impact Waveforms. Pwason's current Acoustic Target Profile comes from the default Redwood Rain Reference but contains no recording samples.
+_Avoid_: Sample synthesis, spectral note, selected playback profile
+
 **Rain Reference**:
-A measured rain recording used to evaluate the generated Rain Impact Waveform. Pwason has a documented scientific forest-rain default; a designer may temporarily replace the visual comparison with a local recording. A Rain Reference never participates in Arrival generation.
+A measured rain recording used to evaluate the generated Rain Impact Waveform. A designer may temporarily replace the visual comparison with a local recording. A Rain Reference never participates in Arrival generation.
 _Avoid_: Sample bank, recorded waveform generator
 
+**Reference Library**:
+The two bundled Rain References available for traceable analysis and playback: the default CC0 Redwood leaves-and-ground recording and the retained scientific Amazon recording.
+_Avoid_: Sample bank, synthesis corpus
+
+**Reference Profile**:
+One Reference Library entry: its recording, provenance, surface, format, checksum, and calibrated natural onset density. Selecting a profile controls both visual analysis and Reference Playback.
+_Avoid_: Audio Channel, spectral profile
+
 **Reference Playback**:
-Audible looping playback of the bundled scientific Rain Reference. It is a comparison source alongside generated Arrivals, not a source for generating them. A local Rain Reference is never Reference Playback.
+Audible looping playback of the selected Reference Profile. It is a comparison source alongside generated Arrivals, not a source for generating them. A local Rain Reference is never Reference Playback.
 _Avoid_: Sample synthesis, recorded Arrival
+
+**Reference Time Stretch**:
+Pitch-preserving transport-speed change applied to Reference Playback relative to its calibrated onset density. A steady recording can mask the perceived change, so Reference Time Stretch is not proof of event-level density matching. The clean range is 0.75×–4×; a capped value is explicitly marked as limited.
+_Avoid_: Pitch shift, spectral matching, resampling synthesis
 
 **Source Mix**:
 The continuous listening balance between generated Arrivals and Reference Playback. Its midpoint audibly blends both sources.
@@ -41,11 +69,11 @@ The continuous location assigned to an Arrival within the Listening Field. It is
 _Avoid_: Distance Channel, audio Channel
 
 **Listening Field**:
-The finite physical area around the listener over which Arrivals are positioned for sound reproduction.
+The finite physical area around the listener over which Arrivals are positioned for sound reproduction. Its radius is controlled by the Field Depth Acoustic Factor.
 _Avoid_: Spectral field, Channel bank
 
 **Acoustic Propagation**:
-The distance loss and left-right direction applied between an Impact Position and the listener.
+The distance loss, high-frequency air damping, and left-right direction applied between an Impact Position and the listener.
 _Avoid_: Distance voice, rain layer
 
 **Spectral Mapping**:

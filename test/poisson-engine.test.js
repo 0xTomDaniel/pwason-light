@@ -87,3 +87,15 @@ test("Arrivals are positioned uniformly across the configured Listening Field", 
   )));
   assert.ok(Math.abs(meanAreaFraction - 0.5) < 0.01);
 });
+
+test("a disabled Field Depth collapses Impact Positions without changing Arrivals", () => {
+  const engine = createPoissonEngine({
+    seed: "no-field-depth",
+    rateHz: 12,
+    fieldRadiusMeters: 0,
+  });
+  const arrivals = Array.from({ length: 20 }, () => engine.next());
+
+  assert.ok(arrivals.every(arrival => arrival.position.radialDistanceMeters === 0));
+  assert.ok(arrivals.every(arrival => arrival.rateHz === 12));
+});

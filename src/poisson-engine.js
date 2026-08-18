@@ -61,9 +61,12 @@ export function createPoissonEngine({
   const random = createRandom(seed);
   const baseRate = clamp(Number(rateHz) || 3, MINIMUM_RATE_HZ, MAXIMUM_RATE_HZ);
   const channelCoupling = clamp(Number(coupling) || 0, 0, 1);
+  const requestedFieldRadius = Number(fieldRadiusMeters);
   const listeningFieldRadius = Math.max(
-    0.1,
-    Number(fieldRadiusMeters) || DEFAULT_FIELD_RADIUS_METERS,
+    0,
+    Number.isFinite(requestedFieldRadius)
+      ? requestedFieldRadius
+      : DEFAULT_FIELD_RADIUS_METERS,
   );
   let eventId = 0;
   let elapsed = 0;

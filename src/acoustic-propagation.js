@@ -7,7 +7,12 @@ function finiteNumber(value, fallback) {
 
 export function calculateAcousticPropagation(
   position,
-  { earHeightMeters = DEFAULT_EAR_HEIGHT_METERS } = {},
+  {
+    earHeightMeters = DEFAULT_EAR_HEIGHT_METERS,
+    distanceLoss = 1,
+    stereoSpread = 1,
+    airDamping = 0,
+  } = {},
 ) {
   const radialDistanceMeters = Math.max(
     0,
@@ -19,11 +24,20 @@ export function calculateAcousticPropagation(
     finiteNumber(earHeightMeters, DEFAULT_EAR_HEIGHT_METERS),
   );
   const sourceDistanceMeters = Math.hypot(radialDistanceMeters, listenerHeight);
-  const stereoPan = (2 / Math.PI) * Math.asin(Math.sin(azimuthRadians));
+  const fullDistancePressure = listenerHeight / sourceDistanceMeters;
+  const distanceAmount = Math.max(0, Math.min(1, finiteNumber(distanceLoss, 1)));
+  const spreadAmount = Math.max(0, Math.min(1, finiteNumber(stereoSpread, 1)));
+  const dampingAmount = Math.max(0, Math.min(1, finiteNumber(airDamping, 0)));
+  const fullStereoPan = (2 / Math.PI) * Math.asin(Math.sin(azimuthRadians));
+  const distanceFraction = radialDistanceMeters / Math.max(
+    radialDistanceMeters + listenerHeight,
+    0.01,
+  );
 
   return Object.freeze({
     sourceDistanceMeters,
-    relativePressure: listenerHeight / sourceDistanceMeters,
-    stereoPan: Math.max(-1, Math.min(1, stereoPan)),
+    relativePressure: 1 - distanceAmount * (1 - fullDistancePressure),
+    stereoPan: Math.max(-1, Math.min(1, fullStereoPan * spreadAmount)),
+    airDampingCutoffHz: 20_000 - 17_500 * dampingAmount * distanceFraction,
   });
 }

@@ -32,3 +32,25 @@ test("Acoustic Propagation fills the stereo field evenly between center and each
     assert.ok(Math.abs(propagation.stereoPan - expectedPan) < 0.000001);
   }
 });
+
+test("Acoustic Propagation exposes independent distance, spread, and air-damping factors", () => {
+  const position = { radialDistanceMeters: 12, azimuthRadians: Math.PI / 2 };
+  const dry = calculateAcousticPropagation(position, {
+    distanceLoss: 0,
+    stereoSpread: 0,
+    airDamping: 0,
+  });
+  const distant = calculateAcousticPropagation(position, {
+    distanceLoss: 1,
+    stereoSpread: 0.5,
+    airDamping: 1,
+  });
+
+  assert.equal(dry.relativePressure, 1);
+  assert.equal(dry.stereoPan, 0);
+  assert.equal(dry.airDampingCutoffHz, 20_000);
+  assert.ok(distant.relativePressure < 1);
+  assert.equal(distant.stereoPan, 0.5);
+  assert.ok(distant.airDampingCutoffHz < 20_000);
+  assert.ok(distant.airDampingCutoffHz >= 2_500);
+});
