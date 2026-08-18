@@ -91,3 +91,23 @@ test("a Rain Reference comparison isolates its strongest 120 millisecond impact"
   assert.equal(impact.startSeconds, 0.495);
   assert.ok(Math.abs(impact.samples[240] + 0.9) < 0.000001);
 });
+
+test("Signal Analysis exposes impulsiveness and multiscale envelope structure", () => {
+  const sampleRate = 8_000;
+  const steady = Float32Array.from(
+    { length: sampleRate * 2 },
+    (_, index) => 0.2 * Math.sin(2 * Math.PI * 400 * index / sampleRate),
+  );
+  const impulses = new Float32Array(sampleRate * 2);
+  for (let index = 0; index < impulses.length; index += 800) impulses[index] = 1;
+
+  const steadyAnalysis = analyzeSignal(steady, sampleRate, { includeSpectrogram: false });
+  const impulseAnalysis = analyzeSignal(impulses, sampleRate, { includeSpectrogram: false });
+
+  assert.ok(impulseAnalysis.sampleKurtosis > steadyAnalysis.sampleKurtosis * 10);
+  assert.deepEqual(Object.keys(impulseAnalysis.envelopeScales), ["5", "20", "100", "500"]);
+  assert.ok(
+    impulseAnalysis.envelopeScales[20].coefficientOfVariation
+      > steadyAnalysis.envelopeScales[20].coefficientOfVariation,
+  );
+});

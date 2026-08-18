@@ -20,21 +20,37 @@ _Avoid_: Spectral Coupling
 A homogeneous Poisson arrival process with one constant total lamp rate selected by Speed.
 _Avoid_: Living rate, Cox process, weather modulation
 
+**Rain Mark**:
+The audio-only physical interpretation assigned to an Arrival by the Generated Rain Renderer. It coherently relates a synthesized impact's drop-size class, velocity, surface response, level, duration, and secondary-contact behavior without changing the light event.
+_Avoid_: Arrival, LED mark, recorded grain
+
+**Drop Population**:
+A continuously adjustable probability distribution from fine-dominant rain through mixed rain to large-drop-rich rain. It changes Rain Marks without changing the steady Poisson rate unless explicitly linked to Speed.
+_Avoid_: Drop size, drop statistics, audio rate
+
+**Speed–Population Link**:
+The optional bidirectional relationship that keeps the normalized Speed and Drop Population slider positions aligned. It does not alter Channel Coupling or introduce time-varying weather.
+_Avoid_: Channel Coupling, Spectral Coupling, Cox modulation
+
 **Rain Impact Waveform**:
-A complete generated, band-limited, signed pressure-like response used identically for Arrivals from every Channel. It may contain a Direct Contact, independently evolving frequency regions, a Diffuse Response, and delayed Micro-splashes, but has no pitch or relationship to LED wavelength.
+A complete pure-synthesis, band-limited, signed pressure-like response derived from one Rain Mark and used identically for Arrivals from every Channel. It may contain a Direct Contact, an analytic leaf/ground Surface Response, and delayed Micro-splashes, but has no bubble contribution, stable note, or relationship to LED wavelength.
 _Avoid_: Note, tone, spectral voice
 
-**Response Family**:
-A seeded statistical morphology assigned to a Rain Impact Waveform. Response Families vary the balance and timing of early, soft, and diffuse energy without claiming that an unlabeled recording event came from a known material.
-_Avoid_: Named surface, extra Arrival, audio Channel
-
 **Direct Contact**:
-The bounded early pressure response that can make one Arrival individually perceptible. A Response Family may make it prominent, quiet, or delayed.
+The bounded early pressure response that can make one Arrival individually perceptible. Its level and duration follow the parent Rain Mark rather than an unrelated random morphology.
 _Avoid_: Mandatory onset peak, snare transient
 
-**Diffuse Response**:
-The quieter sustained part of a Rain Impact Waveform whose overlap with other Arrivals forms continuous far-field texture. It remains part of its parent Arrival and has no separate clock.
-_Avoid_: Background recording, ambient loop, second Poisson process
+**Surface Response**:
+The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. It may use brief filtered stochastic excitation and heavily damped modes, but never a recording or liquid-bubble model.
+_Avoid_: Diffuse Response, recorded impulse response, bubble tone
+
+**Poisson Shot Synthesis**:
+The exact sample-wise superposition of generated Rain Impact Waveforms at Steady Poisson arrival times. Dense rain becomes noise-like through overlap without a stationary background recording or a second event process.
+_Avoid_: Ambient loop, generic noise bed, granular playback
+
+**Pure Synthesis**:
+Generated audio whose samples come only from algorithmic excitation, response, propagation, and summation. Rain References may be analyzed or auditioned as evaluation evidence but never supply samples, grains, impulse responses, or extracted texture waveforms to generated audio.
+_Avoid_: Sample synthesis, resynthesis, recording-derived texture
 
 **Acoustic Factor**:
 One independently switchable, continuously adjustable contribution or modifier in generated rain audio. Acoustic Factors change response shape, spatial presentation, or output behavior; they never change Channel routing, Source Mix, or the steady Poisson clock.
@@ -53,7 +69,7 @@ A measured aggregate spectral and temporal shape used to constrain generated rai
 _Avoid_: Sample synthesis, spectral note, selected playback profile
 
 **Generated Rain Renderer**:
-The Module that maps caller-owned Arrivals to complete audible render plans and uses the same path to produce an offline generated profile. It owns Rain Impact Waveform selection, Acoustic Propagation, and event level, but never owns Poisson timing.
+The Module that maps caller-owned Arrivals and the selected Drop Population to complete audible render plans and uses the same path to produce an offline generated profile. It owns Rain Mark sampling, Rain Impact Waveform generation, Acoustic Propagation, and exact block accumulation, but never owns or modifies Poisson timing.
 _Avoid_: Poisson engine, recorded-rain player
 
 **Rain Reference**:

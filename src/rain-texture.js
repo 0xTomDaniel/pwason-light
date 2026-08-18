@@ -3,11 +3,13 @@ import {
   normalizeAcousticFactors,
 } from "./acoustic-factors.js";
 import { calculateAcousticPropagation } from "./acoustic-propagation.js";
-import { createRainImpact } from "./rain-impact.js";
+import { createRainBlockAccumulator } from "./rain-block-accumulator.js";
+import { createRainImpact, createRainMark } from "./rain-impact.js";
 
-const RAIN_IMPACT_VARIANTS = 128;
+const RAIN_IMPACT_VARIANTS = 192;
 const DEFAULT_EAR_HEIGHT_METERS = 1.5;
 const FILTER_Q = 0.38;
+const GENERATED_EVENT_LEVEL = 3.2;
 
 function finiteNumber(value, fallback) {
   const number = Number(value);
@@ -33,7 +35,8 @@ function eventRendering(event, factors, earHeightMeters) {
     * (1 - fullDensityCompensation);
   const eventVariation = effectiveAcousticFactor(factors, "eventVariation");
   const amplitude = Math.max(0, finiteNumber(event.amplitude, 0.5));
-  const eventLevel = 0.26 * (1 + (amplitude - 0.5) * eventVariation);
+  const eventLevel = GENERATED_EVENT_LEVEL
+    * (1 + (amplitude - 0.5) * eventVariation);
 
   return {
     gain: eventLevel * densityNormalization * propagation.relativePressure,
@@ -49,6 +52,7 @@ export function createGeneratedRainRenderer({
   sampleRate = 48_000,
   factors,
   earHeightMeters = DEFAULT_EAR_HEIGHT_METERS,
+  dropPopulation = 0.5,
 } = {}) {
   const rate = Math.max(8_000, finiteNumber(sampleRate, 48_000));
   const listenerHeight = Math.max(
@@ -56,62 +60,77 @@ export function createGeneratedRainRenderer({
     finiteNumber(earHeightMeters, DEFAULT_EAR_HEIGHT_METERS),
   );
   const factorSnapshot = normalizeAcousticFactors(factors);
+  const population = Math.max(0, Math.min(1, finiteNumber(dropPopulation, 0.5)));
   const variants = Array.from(
     { length: RAIN_IMPACT_VARIANTS },
-    (_, index) => createRainImpact({
-      sampleRate: rate,
-      seed: index + 1,
-      factors: factorSnapshot,
-    }),
+    (_, index) => {
+      const seed = index + 1;
+      const mark = createRainMark({
+        seed,
+        dropPopulation: population,
+        factors: factorSnapshot,
+      });
+      return Object.freeze({
+        mark,
+        response: createRainImpact({
+          sampleRate: rate,
+          seed,
+          factors: factorSnapshot,
+          dropPopulation: population,
+          mark,
+        }),
+      });
+    },
   );
 
   function prepareArrival(arrival) {
     const id = Math.max(0, Math.floor(finiteNumber(arrival?.id, 0)));
-    const response = variants[
-      (Math.imul(id, 2654435761) >>> 0) % variants.length
-    ];
+    const variantIndex = (Math.imul(id, 2654435761) >>> 0) % variants.length;
+    const variant = variants[variantIndex];
     const rendering = eventRendering(arrival ?? {}, factorSnapshot, listenerHeight);
 
     return Object.freeze({
-      response,
+      mark: variant.mark,
+      response: variant.response,
+      variantIndex,
       gain: rendering.gain,
       stereoPan: rendering.stereoPan,
       filter: rendering.filter,
     });
   }
 
-  function renderProfile({ durationSeconds = 8, nextArrival } = {}) {
+  function exportResponseBank() {
+    return Object.freeze(variants.map(variant => variant.response));
+  }
+
+  function renderProfile({
+    durationSeconds = 8,
+    nextArrival,
+    blockSize = 128,
+  } = {}) {
     if (typeof nextArrival !== "function") {
       throw new TypeError("Generated Rain Renderer requires a nextArrival function.");
     }
     const duration = Math.max(0.1, finiteNumber(durationSeconds, 8));
     const samples = new Float32Array(Math.round(rate * duration));
+    const accumulator = createRainBlockAccumulator({ sampleRate: rate });
 
     for (
       let arrival = nextArrival();
       arrival?.at < duration;
       arrival = nextArrival()
     ) {
-      const plan = prepareArrival(arrival);
-      const start = Math.round(arrival.at * rate);
-      const cutoffHz = Math.min(plan.filter.cutoffHz, rate * 0.45);
-      const coefficient = 1 - Math.exp(-2 * Math.PI * cutoffHz / rate);
-      let filterA = 0;
-      let filterB = 0;
+      accumulator.schedule(Math.round(arrival.at * rate), prepareArrival(arrival));
+    }
 
-      for (
-        let index = 0;
-        index < plan.response.length && start + index < samples.length;
-        index += 1
-      ) {
-        filterA += coefficient * (plan.response[index] - filterA);
-        filterB += coefficient * (filterA - filterB);
-        samples[start + index] += filterB * plan.gain;
-      }
+    const partition = Math.max(1, Math.round(finiteNumber(blockSize, 128)));
+    for (let offset = 0; offset < samples.length; offset += partition) {
+      const length = Math.min(partition, samples.length - offset);
+      samples.set(accumulator.render(length)[0], offset);
     }
 
     return samples;
   }
 
-  return Object.freeze({ prepareArrival, renderProfile });
+  return Object.freeze({ prepareArrival, renderProfile, exportResponseBank });
 }

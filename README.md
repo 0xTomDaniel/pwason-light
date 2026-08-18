@@ -28,8 +28,10 @@ never begins automatically.
 | Control | Behavior |
 | --- | --- |
 | Speed | Continuously selects the total lamp Arrival rate from 1 to 1,000 events/s on a logarithmic scale. |
+| Drop Population | Moves the audio Rain Mark distribution from fine-dominant through mixed to large-drop-rich without changing the Arrival rate. |
+| Link Speed + Drop Population | Bidirectionally aligns both normalized slider positions; switching it off preserves their current values. |
 | Channel Coupling | Moves a fixed total Arrival rate between private Channel events and events shared by all eight Channels. |
-| Output level | Controls the complete post-compression browser output. |
+| Output level | Controls the complete post-output-stage browser signal. |
 | Reference profile | Selects the cleaner Redwood leaves-and-ground field recording or the scientific Amazon forest recording for both playback and visual analysis. |
 | Source Mix | Crossfades between generated rain and the selected recording. Generated is 0%, the equal-power blend is 50%, and Reference-only is 100%. |
 | Audio response | Enables or mutes both generated audio and Reference Playback. |
@@ -37,14 +39,16 @@ never begins automatically.
 
 The separate **Acoustic Factors** panel exposes every audible parameter in the
 generated model with both an on/off switch and a continuous amount slider. Its
-18 controls cover impact shape, statistical Response Family diversity,
-independently evolving low/mid/high textures, a restrained Diffuse Response,
-delayed Micro-splashes, field depth and propagation, high-rate density
-compensation, and compression. **Reset all factors** restores the Redwood-target
-defaults. These controls never alter Reference Playback.
+21 controls cover Direct Contact shape, individually switchable leaf, litter,
+and wood prevalence, analytic surface excitation and sustain,
+low/mid/high texture, delayed secondary contacts, field depth and propagation,
+high-rate density compensation, and optional compression. **Reset all factors**
+restores the current listening baseline: 70% Distance Loss, 20% Mid Texture,
+60% Distance Air Damping, and Compression off. These controls never alter
+Reference Playback.
 
 At 100% Reference, the simulator continues producing light Arrivals but skips
-construction of muted procedural audio nodes.
+generated-audio scheduling.
 
 ## Rain model
 
@@ -63,31 +67,36 @@ Distance Air Damping softens remote high frequencies, and Stereo Spread controls
 continuous left-right placement. No additional timing or distance Channels are
 created.
 
-Each Arrival selects one of 128 seeded Rain Impact Waveforms. A waveform is a
-600 ms signed response: it may contain an early Direct Contact, but independently
-timed low/mid/high regions and a quiet Diffuse Response continue underneath it.
-Statistical Response Families vary whether early, soft, or diffuse energy is
-prominent. They are morphology categories, not claims that the recording reveals
-a particular contact material. Delayed Micro-splashes add within-response
-structure while remaining part of their parent Arrival, preserving the one
-steady Poisson clock.
+Each Arrival receives an audio-only Rain Mark. Drop Population changes the
+probability distribution over drop diameter; the same mark coherently derives a
+velocity proxy, impact level, contact duration, surface damping, target surface,
+and secondary-contact probability. Initial surfaces are leaf, litter/soil, and
+wood. Liquid impacts and bubbles are deliberately excluded.
 
-Waveforms retain their seeded amplitude differences; they are not individually
-peak-normalized. Overlap therefore creates a continuous texture with occasional
-near contacts instead of making every Arrival an equally loud transient. One
-Generated Rain Renderer owns waveform selection, event level, distance filtering,
-and stereo placement for both live playback and offline analysis. Poisson timing
-stays outside that Module.
+The renderer creates a variable-length signed Direct Contact plus a finite
+analytic Surface Response. Leaves and wood use heavily damped inharmonic modes
+with brief stochastic excitation; litter uses short independently filtered
+noise energy. That pseudorandom excitation is generated inside each event—no
+recording, grain, impulse response, extracted waveform, stable note, or
+stationary noise bed contributes to synthesis.
 
-The model is seeded, nonperiodic, oscillator-free, and identical across light
-Channels. The Redwood recording supplies a target rather than samples. In the
-measured 20-second segment its crest factor is approximately 17.9×, envelope CV
-0.44, background-floor ratio 76%, and cross-band envelope correlation 0.48. The
-current generated profile is approximately 12.0×, 0.69, 47%, and 0.47. Its
-2.97 kHz centroid and 11.2% energy above 8 kHz are intentionally darker than
-the reference after listening showed that the former diffuse default produced
-too much static. These measurements constrain the model without overruling
-perceptual evidence or claiming identity.
+Audio is exact Poisson shot synthesis:
+
+```text
+x(t) = Σ h(t − tᵢ; Mᵢ)
+```
+
+The same Generated Rain Renderer prepares live and offline plans. A thin
+AudioWorklet sums those plans in continuous blocks, preserving response and
+distance-filter state across boundaries instead of constructing thousands of
+short-lived browser nodes. Tests prove the offline output is identical across
+different block partitions. Poisson timing remains outside the renderer.
+
+The model is seeded, nonperiodic, and independent of light-channel wavelength.
+Rain recordings provide visible and optional audible evaluation references only;
+they never supply generated samples. The comparison now includes kurtosis and
+5/20/100/500 ms envelope statistics in addition to spectrum, crest, background
+floor, and cross-band envelope correlation.
 
 ## Rain Reference Library
 
@@ -108,11 +117,12 @@ recorded rainfall in Central Amazon forest using a recorder fixed to a tree.
 - Amazon recording license: [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)
 - Local provenance and checksum: [`assets/reference/README.md`](assets/reference/README.md)
 
-The Rain Reference lab shows the first 120 ms of one complete 600 ms generated
+The Rain Reference lab shows the first 120 ms of one complete variable-length generated
 response beside the strongest 120 ms contact found during the first ten seconds
 of the selected recording. For the steady texture it displays normalized spectra,
 spectral centroid, high-frequency energy, spectral flatness, crest factor,
-envelope variation, background-floor ratio, and cross-band envelope correlation.
+sample kurtosis, multiscale envelope variation, background-floor ratio, and
+cross-band envelope correlation.
 
 The selected recording can also loop as Reference Playback through Source Mix.
 Its calibrated onset density follows Speed using pitch-preserving media time
@@ -145,10 +155,11 @@ Requires a current Node.js runtime. The project has no package dependencies.
 npm test
 ```
 
-The tests cover seeded Poisson behavior, total-rate coupling, spatial
-propagation, Acoustic Factor normalization and bypass behavior, LED envelopes,
-generated waveform behavior, the shared live/offline Generated Rain Renderer,
-aggregate temporal texture, both reference-file
+The tests cover seeded Poisson behavior, total-rate coupling, linked and unlinked
+Drop Population controls, coherent Rain Marks, spatial propagation, Acoustic
+Factor normalization and bypass behavior, LED envelopes, pure analytic waveform
+behavior, response-bank identity, exact block-partition invariance, the shared
+live/offline Generated Rain Renderer, multiscale temporal texture, both reference-file
 manifests and preparation, pitch-preserving time-stretch policy, the bounded
 Render Loop, signal analysis, and Source Mix invariants.
 

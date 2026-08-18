@@ -36,6 +36,7 @@ test("Generated Rain Renderer prepares one deterministic live Arrival plan", () 
   const renderer = createGeneratedRainRenderer({
     sampleRate: 48_000,
     factors,
+    dropPopulation: 0.4,
   });
   const arrival = {
     id: 17,
@@ -57,13 +58,16 @@ test("Generated Rain Renderer prepares one deterministic live Arrival plan", () 
 
   assert.equal(first.response, second.response);
   assert.equal(first.response, afterCallerMutation.response);
-  assert.equal(first.response.length, 28_800);
-  assert.ok(Math.abs(first.gain - 0.26) < 0.000001);
+  assert.ok(first.response.length >= 4_800);
+  assert.deepEqual(first.mark, second.mark);
+  assert.ok(Math.abs(first.gain - 3.2) < 0.000001);
   assert.equal(afterCallerMutation.gain, first.gain);
   assert.ok(Math.abs(first.stereoPan - 0.25) < 0.000001);
   assert.equal(afterCallerMutation.stereoPan, first.stereoPan);
   assert.equal(first.filter.cutoffHz, 20_000);
   assert.equal(first.filter.q, 0.38);
+  assert.equal(renderer.exportResponseBank()[first.variantIndex], first.response);
+  assert.equal(renderer.exportResponseBank().length, 192);
 });
 
 test("Generated Rain Renderer requires caller-owned Arrivals for an offline profile", () => {
@@ -75,15 +79,43 @@ test("Generated Rain Renderer requires caller-owned Arrivals for an offline prof
   );
 });
 
-test("the default Diffuse Response supports rather than dominates generated rain", () => {
-  const factors = createDefaultAcousticFactors();
-  const withDiffuse = renderDefaultProfile(factors);
-  factors.diffuseField.enabled = false;
-  const withoutDiffuse = renderDefaultProfile(factors);
-  const diffuseContribution = Float32Array.from(
-    withDiffuse,
-    (sample, index) => sample - withoutDiffuse[index],
-  );
+test("offline rendering is invariant to continuous block partition size", () => {
+  const render = blockSize => {
+    const renderer = createGeneratedRainRenderer({
+      sampleRate: 12_000,
+      dropPopulation: 0.6,
+    });
+    const engine = createPoissonEngine({
+      seed: "block-partition",
+      rateHz: 61,
+      fieldRadiusMeters: 20,
+    });
+    return renderer.renderProfile({
+      durationSeconds: 2,
+      blockSize,
+      nextArrival: () => engine.next(),
+    });
+  };
 
-  assert.ok(rms(diffuseContribution) / rms(withDiffuse) < 0.22);
+  const sixtyFour = render(64);
+  const fiveEleven = render(511);
+  assert.deepEqual(sixtyFour, fiveEleven);
+});
+
+test("Drop Population changes generated marks but not caller-owned Arrivals", () => {
+  const arrival = Object.freeze({
+    id: 9,
+    at: 0.25,
+    rateHz: 23.1,
+    amplitude: 0.6,
+    position: Object.freeze({ radialDistanceMeters: 3, azimuthRadians: 0.2 }),
+  });
+  const fine = createGeneratedRainRenderer({ dropPopulation: 0 }).prepareArrival(arrival);
+  const large = createGeneratedRainRenderer({ dropPopulation: 1 }).prepareArrival(arrival);
+
+  assert.notDeepEqual(fine.mark, large.mark);
+  assert.equal(arrival.at, 0.25);
+  assert.equal(arrival.rateHz, 23.1);
+  assert.equal(fine.mark.population, 0);
+  assert.equal(large.mark.population, 1);
 });

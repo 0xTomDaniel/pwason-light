@@ -28,6 +28,36 @@ function correlation(first, second) {
   return denominator > 0 ? covariance / denominator : 0;
 }
 
+function analyzeEnvelopeScale(samples, sampleRate, milliseconds) {
+  const frameSize = Math.max(1, Math.round(sampleRate * milliseconds / 1000));
+  const hopSize = Math.max(1, Math.floor(frameSize / 2));
+  const frameCount = samples.length <= frameSize
+    ? 1
+    : Math.floor((samples.length - frameSize) / hopSize) + 1;
+  const envelope = new Float64Array(frameCount);
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const start = frame * hopSize;
+    const end = Math.min(samples.length, start + frameSize);
+    let energy = 0;
+    for (let index = start; index < end; index += 1) {
+      energy += (samples[index] || 0) ** 2;
+    }
+    envelope[frame] = Math.sqrt(energy / Math.max(1, end - start));
+  }
+  const mean = envelope.reduce((sum, value) => sum + value, 0) / envelope.length;
+  const variance = envelope.reduce(
+    (sum, value) => sum + (value - mean) ** 2,
+    0,
+  ) / envelope.length;
+  const sorted = [...envelope].sort((left, right) => left - right);
+  const floor = sorted[Math.floor((sorted.length - 1) * 0.1)] ?? 0;
+  const median = sorted[Math.floor((sorted.length - 1) * 0.5)] ?? 0;
+  return Object.freeze({
+    coefficientOfVariation: mean > 0 ? Math.sqrt(variance) / mean : 0,
+    floorRatio: median > 0 ? floor / median : 0,
+  });
+}
+
 function analyzeTemporalTexture(samples, sampleRate) {
   const frameSize = Math.max(32, Math.round(sampleRate * 0.005));
   const hopSize = Math.max(16, Math.floor(frameSize / 2));
@@ -51,9 +81,11 @@ function analyzeTemporalTexture(samples, sampleRate) {
   let highStateB = 0;
   let energy = 0;
   let peak = 0;
+  let sampleMean = 0;
 
   for (let index = 0; index < samples.length; index += 1) {
     const sample = samples[index] || 0;
+    sampleMean += sample;
     energy += sample * sample;
     peak = Math.max(peak, Math.abs(sample));
     lowStateA += lowCoefficient * (sample - lowStateA);
@@ -64,6 +96,7 @@ function analyzeTemporalTexture(samples, sampleRate) {
     midSamples[index] = highStateB - lowStateB;
     highSamples[index] = sample - highStateB;
   }
+  sampleMean /= Math.max(1, samples.length);
 
   for (let frame = 0; frame < frameCount; frame += 1) {
     const start = frame * hopSize;
@@ -100,6 +133,21 @@ function analyzeTemporalTexture(samples, sampleRate) {
     correlation(envelopes.low, envelopes.high),
     correlation(envelopes.mid, envelopes.high),
   ];
+  let sampleVariance = 0;
+  let fourthMoment = 0;
+  for (const sample of samples) {
+    const centered = sample - sampleMean;
+    sampleVariance += centered ** 2;
+    fourthMoment += centered ** 4;
+  }
+  sampleVariance /= Math.max(1, samples.length);
+  fourthMoment /= Math.max(1, samples.length);
+  const envelopeScales = Object.freeze(Object.fromEntries(
+    [5, 20, 100, 500].map(milliseconds => [
+      milliseconds,
+      analyzeEnvelopeScale(samples, sampleRate, milliseconds),
+    ]),
+  ));
 
   return {
     rms,
@@ -113,6 +161,10 @@ function analyzeTemporalTexture(samples, sampleRate) {
       (sum, value) => sum + value,
       0,
     ) / bandCorrelations.length,
+    sampleKurtosis: sampleVariance > 0
+      ? fourthMoment / (sampleVariance ** 2)
+      : 0,
+    envelopeScales,
   };
 }
 

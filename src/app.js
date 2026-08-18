@@ -1,4 +1,5 @@
 import { createPoissonEngine } from "./poisson-engine.js";
+import { createRainControls } from "./rain-controls.js";
 import { sampleLedOutput } from "./led-renderer.js";
 import { createGeneratedRainRenderer } from "./rain-texture.js";
 import {
@@ -52,11 +53,14 @@ const leds = [...document.querySelectorAll("[data-led]")];
 const startButton = document.querySelector("#start-stop");
 const reseedButton = document.querySelector("#reseed");
 const rateInput = document.querySelector("#rate");
+const dropPopulationInput = document.querySelector("#drop-population");
+const speedPopulationLinkInput = document.querySelector("#speed-population-link");
 const couplingInput = document.querySelector("#coupling");
 const volumeInput = document.querySelector("#output-level");
 const sourceMixInput = document.querySelector("#source-mix");
 const soundInput = document.querySelector("#sound-enabled");
 const rateOutput = document.querySelector("#rate-output");
+const dropPopulationOutput = document.querySelector("#drop-population-output");
 const couplingOutput = document.querySelector("#coupling-output");
 const volumeOutput = document.querySelector("#output-level-output");
 const sourceMixOutput = document.querySelector("#source-mix-output");
@@ -90,6 +94,8 @@ const generatedCrest = document.querySelector("#generated-crest");
 const generatedEnvelopeVariation = document.querySelector("#generated-envelope-variation");
 const generatedEnvelopeFloor = document.querySelector("#generated-envelope-floor");
 const generatedBandCorrelation = document.querySelector("#generated-band-correlation");
+const generatedKurtosis = document.querySelector("#generated-kurtosis");
+const generatedEnvelope100 = document.querySelector("#generated-envelope-100");
 const referenceCentroid = document.querySelector("#reference-centroid");
 const referenceHighBand = document.querySelector("#reference-high-band");
 const referenceFlatness = document.querySelector("#reference-flatness");
@@ -97,6 +103,8 @@ const referenceCrest = document.querySelector("#reference-crest");
 const referenceEnvelopeVariation = document.querySelector("#reference-envelope-variation");
 const referenceEnvelopeFloor = document.querySelector("#reference-envelope-floor");
 const referenceBandCorrelation = document.querySelector("#reference-band-correlation");
+const referenceKurtosis = document.querySelector("#reference-kurtosis");
+const referenceEnvelope100 = document.querySelector("#reference-envelope-100");
 const acousticFactorList = document.querySelector("#acoustic-factor-list");
 const acousticPresetOutput = document.querySelector("#acoustic-preset-output");
 const resetAcousticFactorsButton = document.querySelector("#reset-acoustic-factors");
@@ -120,7 +128,13 @@ let outputAnalyser = null;
 let waveformBuffer = null;
 let liveRainRenderer = null;
 let rainAudioBufferCache = new WeakMap();
+let rainWorkletNode = null;
 let acousticFactors = createDefaultAcousticFactors();
+const rainControls = createRainControls({
+  speedLog: rateInput.value,
+  dropPopulation: dropPopulationInput.value,
+  linked: speedPopulationLinkInput.checked,
+});
 let selectedReferenceProfile = DEFAULT_RAIN_REFERENCE_PROFILE;
 let selectedReferenceReady = false;
 let referenceMedia = null;
@@ -129,6 +143,7 @@ let analysisRainRenderer = createGeneratedRainRenderer({
   sampleRate: ANALYSIS_SAMPLE_RATE,
   factors: acousticFactors,
   earHeightMeters: EAR_HEIGHT_METERS,
+  dropPopulation: rainControls.snapshot().dropPopulation,
 });
 let generatedReferenceResponse = analysisRainRenderer.prepareArrival({
   id: 42,
@@ -282,6 +297,9 @@ function updateAcousticFactor(event) {
     "lowTexture",
     "midTexture",
     "highTexture",
+    "leafSurface",
+    "litterSurface",
+    "woodSurface",
     "bandIndependence",
     "microSplashes",
     "microSplashDelay",
@@ -320,6 +338,7 @@ function regenerateAcousticAssets(rebuildRenderer) {
       sampleRate: ANALYSIS_SAMPLE_RATE,
       factors: acousticFactors,
       earHeightMeters: EAR_HEIGHT_METERS,
+      dropPopulation: rainControls.snapshot().dropPopulation,
     });
     generatedReferenceResponse = analysisRainRenderer.prepareArrival({
       id: 42,
@@ -349,8 +368,13 @@ function regenerateAcousticAssets(rebuildRenderer) {
         sampleRate: audioContext.sampleRate,
         factors: acousticFactors,
         earHeightMeters: EAR_HEIGHT_METERS,
+        dropPopulation: rainControls.snapshot().dropPopulation,
       });
     rainAudioBufferCache = new WeakMap();
+    rainWorkletNode?.port.postMessage({
+      type: "configure",
+      responses: liveRainRenderer.exportResponseBank(),
+    });
   }
   renderAnalysisComparison();
 }
@@ -377,7 +401,7 @@ function applyCompressionSettings() {
 }
 
 function selectedRateHz() {
-  return 10 ** Number(rateInput.value);
+  return rainControls.snapshot().rateHz;
 }
 
 function formatRate(rateHz) {
@@ -398,10 +422,24 @@ function restartEngine() {
 }
 
 function updateControlReadouts() {
-  const rateHz = selectedRateHz();
+  const controls = rainControls.snapshot();
+  const rateHz = controls.rateHz;
+  rateInput.value = String(controls.speedLog);
+  dropPopulationInput.value = String(controls.dropPopulation);
+  speedPopulationLinkInput.checked = controls.linked;
   rateOutput.value = `${formatRate(rateHz)} events/s`;
   rateInput.setAttribute("aria-valuetext", `${formatRate(rateHz)} events per second`);
   couplingOutput.value = `${Math.round(Number(couplingInput.value) * 100)}%`;
+  const populationPercent = Math.round(controls.dropPopulation * 100);
+  dropPopulationOutput.value = controls.dropPopulation < 0.34
+    ? `Fine · ${populationPercent}%`
+    : controls.dropPopulation < 0.67
+      ? `Mixed · ${populationPercent}%`
+      : `Large · ${populationPercent}%`;
+  dropPopulationInput.setAttribute(
+    "aria-valuetext",
+    `${dropPopulationOutput.value} drop population`,
+  );
   volumeOutput.value = `${Math.round(Number(volumeInput.value) * 100)}%`;
   const referencePercent = Math.round(Number(sourceMixInput.value) * 100);
   const generatedPercent = 100 - referencePercent;
@@ -422,8 +460,25 @@ function updateControlReadouts() {
 }
 
 function updateRate() {
+  rainControls.setSpeedLog(rateInput.value);
   updateControlReadouts();
   restartEngine();
+  if (rainControls.snapshot().linked) {
+    scheduleAcousticRegeneration({ rebuildRenderer: true });
+  }
+}
+
+function updateDropPopulation() {
+  rainControls.setDropPopulation(dropPopulationInput.value);
+  updateControlReadouts();
+  if (rainControls.snapshot().linked) restartEngine();
+  scheduleAcousticRegeneration({ rebuildRenderer: true });
+}
+
+function updateSpeedPopulationLink() {
+  rainControls.setLinked(speedPopulationLinkInput.checked);
+  updateControlReadouts();
+  scheduleAcousticRegeneration({ rebuildRenderer: true });
 }
 
 function updateOutputLevel() {
@@ -518,6 +573,9 @@ function setAnalysisMetrics(analysis, elements) {
   elements.envelopeVariation.textContent = analysis.envelopeCoefficientOfVariation.toFixed(2);
   elements.envelopeFloor.textContent = `${(analysis.envelopeFloorRatio * 100).toFixed(0)}%`;
   elements.bandCorrelation.textContent = analysis.bandEnvelopeCorrelation.toFixed(2);
+  elements.kurtosis.textContent = analysis.sampleKurtosis.toFixed(1);
+  elements.envelope100.textContent = analysis.envelopeScales[100]
+    .coefficientOfVariation.toFixed(2);
 }
 
 function renderAnalysisComparison() {
@@ -531,6 +589,8 @@ function renderAnalysisComparison() {
     envelopeVariation: generatedEnvelopeVariation,
     envelopeFloor: generatedEnvelopeFloor,
     bandCorrelation: generatedBandCorrelation,
+    kurtosis: generatedKurtosis,
+    envelope100: generatedEnvelope100,
   });
 
   const spectrumSeries = [{
@@ -553,6 +613,8 @@ function renderAnalysisComparison() {
       envelopeVariation: referenceEnvelopeVariation,
       envelopeFloor: referenceEnvelopeFloor,
       bandCorrelation: referenceBandCorrelation,
+      kurtosis: referenceKurtosis,
+      envelope100: referenceEnvelope100,
     });
     spectrumSeries.push({
       analysis: measuredReferenceProfileAnalysis,
@@ -781,7 +843,7 @@ function renderFrame(now) {
   renderWaveform();
 }
 
-function ensureAudio() {
+async function ensureAudio() {
   if (audioContext) return;
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) {
@@ -804,6 +866,7 @@ function ensureAudio() {
       sampleRate: audioContext.sampleRate,
       factors: acousticFactors,
       earHeightMeters: EAR_HEIGHT_METERS,
+      dropPopulation: rainControls.snapshot().dropPopulation,
     });
   rainAudioBufferCache = new WeakMap();
   referenceMedia = enablePitchPreservation(new Audio());
@@ -817,6 +880,25 @@ function ensureAudio() {
   referenceGain.gain.value = soundInput.checked ? mix.referenceGain : 0;
   outputGain.gain.value = Number(volumeInput.value);
   applyCompressionSettings();
+  if (audioContext.audioWorklet && typeof AudioWorkletNode === "function") {
+    try {
+      await audioContext.audioWorklet.addModule(
+        new URL("./rain-worklet.js", import.meta.url),
+      );
+      rainWorkletNode = new AudioWorkletNode(audioContext, "rain-block-renderer", {
+        numberOfInputs: 0,
+        numberOfOutputs: 1,
+        outputChannelCount: [2],
+        processorOptions: {
+          responses: liveRainRenderer.exportResponseBank(),
+        },
+      });
+      rainWorkletNode.connect(masterGain);
+    } catch (error) {
+      rainWorkletNode = null;
+      console.warn("Continuous rain block renderer unavailable; using node fallback.", error);
+    }
+  }
   masterGain.connect(masterCompressor);
   referenceGain.connect(masterCompressor);
   masterCompressor
@@ -876,6 +958,34 @@ function playEvent(event, scheduledAt) {
   source.start(startTime);
 }
 
+function scheduleAudioBatch(events) {
+  if (
+    !events.length
+    || !soundInput.checked
+    || Number(sourceMixInput.value) >= 1
+    || !audioContext
+  ) return;
+  if (rainWorkletNode) {
+    rainWorkletNode.port.postMessage({
+      type: "schedule",
+      events: events.map(({ event, scheduledAt }) => ({
+        plan: (() => {
+          const prepared = liveRainRenderer.prepareArrival(event);
+          return {
+            variantIndex: prepared.variantIndex,
+            gain: prepared.gain,
+            stereoPan: prepared.stereoPan,
+            filter: prepared.filter,
+          };
+        })(),
+        startFrame: Math.round(scheduledAt * audioContext.sampleRate),
+      })),
+    });
+    return;
+  }
+  for (const scheduled of events) playEvent(scheduled.event, scheduled.scheduledAt);
+}
+
 function renderEventMark(event) {
   const markStride = Math.max(1, Math.ceil(event.rateHz / MAX_EVENT_MARKS_PER_SECOND));
   if (event.id % markStride !== 0) return;
@@ -907,6 +1017,7 @@ function scheduleNext() {
     performance.now() - simulationStartedAt + AUDIO_LOOKAHEAD_MS
   ) / 1000;
   let emittedThisTick = 0;
+  const audioBatch = [];
 
   while (
     nextScheduledEvent.at <= elapsedSeconds &&
@@ -914,17 +1025,22 @@ function scheduleNext() {
   ) {
     const startedAt = simulationStartedAt + nextScheduledEvent.at * 1000;
     scheduledArrivals.push({ event: nextScheduledEvent, startedAt });
-    playEvent(nextScheduledEvent, audioTimelineStartedAt + nextScheduledEvent.at);
+    audioBatch.push({
+      event: nextScheduledEvent,
+      scheduledAt: audioTimelineStartedAt + nextScheduledEvent.at,
+    });
     nextScheduledEvent = engine.next();
     emittedThisTick += 1;
   }
+
+  scheduleAudioBatch(audioBatch);
 
   timer = window.setTimeout(scheduleNext, SCHEDULER_TICK_MS);
 }
 
 async function toggleRunning() {
   if (!running) {
-    ensureAudio();
+    await ensureAudio();
     if (audioContext?.state === "suspended") await audioContext.resume();
     running = true;
     simulator.dataset.running = "true";
@@ -942,6 +1058,10 @@ async function toggleRunning() {
   startButton.textContent = "Start process";
   startButton.setAttribute("aria-pressed", "false");
   clearTimeout(timer);
+  rainWorkletNode?.port.postMessage({
+    type: "reset",
+    startFrame: Math.round((audioContext?.currentTime ?? 0) * (audioContext?.sampleRate ?? 1)),
+  });
   stopReferencePlayback();
   renderLoop.wake();
 }
@@ -958,11 +1078,13 @@ function reseed() {
 startButton.addEventListener("click", toggleRunning);
 reseedButton.addEventListener("click", reseed);
 rateInput.addEventListener("input", updateRate);
+dropPopulationInput.addEventListener("input", updateDropPopulation);
+speedPopulationLinkInput.addEventListener("change", updateSpeedPopulationLink);
 couplingInput.addEventListener("input", updateControlReadouts);
 volumeInput.addEventListener("input", updateOutputLevel);
 sourceMixInput.addEventListener("input", updateSourceMix);
 soundInput.addEventListener("change", async () => {
-  ensureAudio();
+  await ensureAudio();
   if (soundInput.checked && audioContext?.state === "suspended") {
     await audioContext.resume();
   }
