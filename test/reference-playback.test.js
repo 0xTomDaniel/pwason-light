@@ -6,18 +6,18 @@ import {
   enablePitchPreservation,
 } from "../src/reference-playback.js";
 
-test("Reference Playback follows Speed relative to the recording's measured natural rate", () => {
-  assert.deepEqual(calculateReferenceTimeStretch(80, 80), {
+test("Reference Playback follows Speed relative to its explicit comparison rate", () => {
+  assert.deepEqual(calculateReferenceTimeStretch(120, 120), {
     requestedRate: 1,
     playbackRate: 1,
     limited: false,
   });
-  assert.deepEqual(calculateReferenceTimeStretch(60, 80), {
+  assert.deepEqual(calculateReferenceTimeStretch(90, 120), {
     requestedRate: 0.75,
     playbackRate: 0.75,
     limited: false,
   });
-  assert.deepEqual(calculateReferenceTimeStretch(160, 80), {
+  assert.deepEqual(calculateReferenceTimeStretch(240, 120), {
     requestedRate: 2,
     playbackRate: 2,
     limited: false,

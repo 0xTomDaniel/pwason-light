@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { analyzeSignal, extractProminentImpact } from "../src/signal-analysis.js";
+import {
+  analyzeSignal,
+  detectProminentOnsets,
+  extractProminentImpact,
+} from "../src/signal-analysis.js";
 
 test("Signal Analysis identifies the frequency shape of a known tone", () => {
   const sampleRate = 48_000;
@@ -110,4 +114,28 @@ test("Signal Analysis exposes impulsiveness and multiscale envelope structure", 
     impulseAnalysis.envelopeScales[20].coefficientOfVariation
       > steadyAnalysis.envelopeScales[20].coefficientOfVariation,
   );
+});
+
+test("Signal Analysis counts prominent onsets with one shared detector", () => {
+  const sampleRate = 48_000;
+  const durationSeconds = 2;
+  const samples = new Float32Array(sampleRate * durationSeconds);
+  const onsetTimes = [0.2, 0.5, 0.9, 1.25, 1.7];
+
+  for (const onsetTime of onsetTimes) {
+    const start = Math.round(onsetTime * sampleRate);
+    for (let offset = 0; offset < sampleRate * 0.008; offset += 1) {
+      samples[start + offset] += Math.sin(2 * Math.PI * 3_200 * offset / sampleRate)
+        * Math.exp(-offset / (sampleRate * 0.002));
+    }
+  }
+
+  const detection = detectProminentOnsets(samples, sampleRate);
+
+  assert.equal(detection.count, onsetTimes.length);
+  assert.equal(detection.rateHz, onsetTimes.length / durationSeconds);
+  assert.equal(detection.timesSeconds.length, onsetTimes.length);
+  onsetTimes.forEach((expected, index) => {
+    assert.ok(Math.abs(detection.timesSeconds[index] - expected) < 0.01);
+  });
 });

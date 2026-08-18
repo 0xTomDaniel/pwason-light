@@ -21,7 +21,7 @@ A homogeneous Poisson arrival process with one constant total lamp rate selected
 _Avoid_: Living rate, Cox process, weather modulation
 
 **Rain Mark**:
-The audio-only physical interpretation assigned to an Arrival by the Generated Rain Renderer. It coherently relates a synthesized impact's drop-size class, velocity, surface response, level, duration, and secondary-contact behavior without changing the light event.
+The audio-only physical interpretation assigned to an Arrival by the Generated Rain Renderer. It coherently relates a synthesized impact's drop-size class, velocity, surface response, level, duration, broad spectral focus, and secondary-contact behavior without changing the light event.
 _Avoid_: Arrival, LED mark, recorded grain
 
 **Drop Population**:
@@ -41,7 +41,7 @@ The quiet, sub-millisecond signed pressure response at the start of one Rain Imp
 _Avoid_: Mandatory onset peak, snare transient
 
 **Surface Response**:
-The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. It uses a brief set of independently decaying ERB-spaced stochastic bands without a free-running resonator, recording, long shared envelope, or liquid-bubble model.
+The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. It uses a brief set of broad, partially independent ERB-spaced stochastic bands with coherent material-shaped spectral emphasis and no free-running resonator, recording, long shared envelope, or liquid-bubble model.
 _Avoid_: Diffuse Response, recorded impulse response, bubble tone
 
 **Poisson Shot Synthesis**:
@@ -81,15 +81,23 @@ The two bundled Rain References available for traceable analysis and playback: t
 _Avoid_: Sample bank, synthesis corpus
 
 **Reference Profile**:
-One Reference Library entry: its recording, provenance, surface, format, checksum, and calibrated natural onset density. Selecting a profile controls both visual analysis and Reference Playback.
+One Reference Library entry: its recording, provenance, surface, format, checksum, detected prominent-onset rate, and optional equivalent total-Arrival calibration. Selecting a profile controls both visual analysis and Reference Playback.
 _Avoid_: Audio Channel, spectral profile
+
+**Prominent Onset Rate**:
+The rate of foreground energy increases found by the shared onset detector in generated or recorded audio. It observes only detectable contacts and is not the total physical Arrival rate.
+_Avoid_: Speed, physical drop rate, natural rate
+
+**Equivalent Total-Arrival Rate**:
+An independently identified total Poisson rate used to compare generated rain and Reference Playback at similar perceived density. Redwood's current 120 Arrivals/s value is an operator tempo match, not a measured physical-drop count; an uncalibrated Reference Profile remains visibly uncalibrated.
+_Avoid_: Prominent Onset Rate, exact rainfall intensity
 
 **Reference Playback**:
 Audible looping playback of the selected Reference Profile. It is a comparison source alongside generated Arrivals, not a source for generating them. A local Rain Reference is never Reference Playback.
 _Avoid_: Sample synthesis, recorded Arrival
 
 **Reference Time Stretch**:
-Pitch-preserving transport-speed change applied to Reference Playback relative to its calibrated onset density. A steady recording can mask the perceived change, so Reference Time Stretch is not proof of event-level density matching. The clean range is 0.75×–4×; a capped value is explicitly marked as limited.
+Pitch-preserving transport-speed change applied to Reference Playback relative to its Equivalent Total-Arrival Rate when available, with an explicit detected-onset fallback for an uncalibrated profile. A steady recording can mask the perceived change, so Reference Time Stretch is not proof of event-level density matching. The clean range is 0.75×–4×; a capped value is explicitly marked as limited.
 _Avoid_: Pitch shift, spectral matching, resampling synthesis
 
 **Source Mix**:

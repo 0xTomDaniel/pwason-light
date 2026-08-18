@@ -8,7 +8,7 @@ import {
   effectiveAcousticFactor,
 } from "./acoustic-factors.js";
 import { createRenderLoop } from "./render-loop.js";
-import { analyzeSignal } from "./signal-analysis.js";
+import { analyzeSignal, detectProminentOnsets } from "./signal-analysis.js";
 import { calculateSourceMix } from "./source-mix.js";
 import {
   DEFAULT_RAIN_REFERENCE_PROFILE,
@@ -16,6 +16,7 @@ import {
   getRainReferenceProfile,
   loadRainReference,
   prepareRainReference,
+  resolveReferenceCalibration,
 } from "./rain-reference.js";
 import {
   calculateReferenceTimeStretch,
@@ -96,6 +97,9 @@ const generatedEnvelopeFloor = document.querySelector("#generated-envelope-floor
 const generatedBandCorrelation = document.querySelector("#generated-band-correlation");
 const generatedKurtosis = document.querySelector("#generated-kurtosis");
 const generatedEnvelope100 = document.querySelector("#generated-envelope-100");
+const generatedProfileLabel = document.querySelector("#generated-profile-label");
+const generatedTotalRate = document.querySelector("#generated-total-rate");
+const generatedDetectedRate = document.querySelector("#generated-detected-rate");
 const referenceCentroid = document.querySelector("#reference-centroid");
 const referenceHighBand = document.querySelector("#reference-high-band");
 const referenceFlatness = document.querySelector("#reference-flatness");
@@ -105,6 +109,8 @@ const referenceEnvelopeFloor = document.querySelector("#reference-envelope-floor
 const referenceBandCorrelation = document.querySelector("#reference-band-correlation");
 const referenceKurtosis = document.querySelector("#reference-kurtosis");
 const referenceEnvelope100 = document.querySelector("#reference-envelope-100");
+const referenceDetectedRate = document.querySelector("#reference-detected-rate");
+const referenceTotalRate = document.querySelector("#reference-total-rate");
 const acousticFactorList = document.querySelector("#acoustic-factor-list");
 const acousticPresetOutput = document.querySelector("#acoustic-preset-output");
 const resetAcousticFactorsButton = document.querySelector("#reset-acoustic-factors");
@@ -136,6 +142,7 @@ const rainControls = createRainControls({
   linked: speedPopulationLinkInput.checked,
 });
 let selectedReferenceProfile = DEFAULT_RAIN_REFERENCE_PROFILE;
+let selectedReferenceCalibration = resolveReferenceCalibration(selectedReferenceProfile);
 let selectedReferenceReady = false;
 let referenceMedia = null;
 let referenceMediaSource = null;
@@ -147,7 +154,7 @@ let analysisRainRenderer = createGeneratedRainRenderer({
 });
 let generatedReferenceResponse = analysisRainRenderer.prepareArrival({
   id: 42,
-  rateHz: DEFAULT_RAIN_REFERENCE_PROFILE.naturalRateHz,
+  rateHz: selectedReferenceCalibration.comparisonRateHz,
   amplitude: 0.5,
   position: { radialDistanceMeters: 0, azimuthRadians: 0 },
 }).response;
@@ -165,9 +172,15 @@ let generatedProfileAnalysis = analyzeSignal(
   ANALYSIS_SAMPLE_RATE,
   { includeSpectrogram: false },
 );
+let generatedProfileOnsets = detectProminentOnsets(
+  generatedProfileSamples,
+  ANALYSIS_SAMPLE_RATE,
+);
 let measuredReferenceSamples = null;
 let measuredReferenceAnalysis = null;
 let measuredReferenceProfileAnalysis = null;
+let measuredReferenceOnsets = null;
+let measuredReferenceCalibration = null;
 let comparisonResizeTimer = null;
 let acousticRegenerationTimer = null;
 let acousticWaveformRebuildPending = false;
@@ -199,8 +212,8 @@ function listeningFieldRadiusMeters() {
 
 function createCurrentGeneratedProfileSamples() {
   const profileEngine = createPoissonEngine({
-    seed: "redwood-generated-profile",
-    rateHz: DEFAULT_RAIN_REFERENCE_PROFILE.naturalRateHz,
+    seed: `${selectedReferenceProfile.id}-generated-profile`,
+    rateHz: selectedReferenceCalibration.comparisonRateHz,
     coupling: 0,
     fieldRadiusMeters: listeningFieldRadiusMeters(),
   });
@@ -342,7 +355,7 @@ function regenerateAcousticAssets(rebuildRenderer) {
     });
     generatedReferenceResponse = analysisRainRenderer.prepareArrival({
       id: 42,
-      rateHz: DEFAULT_RAIN_REFERENCE_PROFILE.naturalRateHz,
+      rateHz: selectedReferenceCalibration.comparisonRateHz,
       amplitude: 0.5,
       position: { radialDistanceMeters: 0, azimuthRadians: 0 },
     }).response;
@@ -360,6 +373,10 @@ function regenerateAcousticAssets(rebuildRenderer) {
     generatedProfileSamples,
     ANALYSIS_SAMPLE_RATE,
     { includeSpectrogram: false },
+  );
+  generatedProfileOnsets = detectProminentOnsets(
+    generatedProfileSamples,
+    ANALYSIS_SAMPLE_RATE,
   );
   if (rebuildRenderer && audioContext) {
     liveRainRenderer = audioContext.sampleRate === ANALYSIS_SAMPLE_RATE
@@ -490,7 +507,7 @@ function updateOutputLevel() {
 function updateReferenceTimeStretch() {
   const stretch = calculateReferenceTimeStretch(
     selectedRateHz(),
-    selectedReferenceProfile.naturalRateHz,
+    selectedReferenceCalibration.comparisonRateHz,
   );
   if (referenceMedia) referenceMedia.playbackRate = stretch.playbackRate;
 
@@ -578,6 +595,33 @@ function setAnalysisMetrics(analysis, elements) {
     .coefficientOfVariation.toFixed(2);
 }
 
+function renderRateCalibration() {
+  const calibration = selectedReferenceCalibration;
+  const generatedRateLabel = `${formatRate(calibration.comparisonRateHz)}/s`;
+  generatedProfileLabel.textContent = calibration.isTotalCalibrated
+    ? `120 ms contact · 8 s at ${generatedRateLabel} total`
+    : `120 ms contact · 8 s at ${generatedRateLabel} onset-rate fallback`;
+  generatedTotalRate.textContent = generatedRateLabel;
+  generatedTotalRate.title = calibration.isTotalCalibrated
+    ? "Equivalent total Poisson Arrival rate"
+    : "No total-rate calibration; using detected-onset density visibly as a fallback";
+  generatedDetectedRate.textContent = `${formatRate(generatedProfileOnsets.rateHz)}/s`;
+
+  if (!measuredReferenceOnsets) {
+    referenceDetectedRate.textContent = "—";
+    referenceTotalRate.textContent = "—";
+    return;
+  }
+
+  referenceDetectedRate.textContent = `${formatRate(measuredReferenceOnsets.rateHz)}/s`;
+  referenceDetectedRate.title = measuredReferenceCalibration
+    ? `Stored detector baseline: ${formatRate(measuredReferenceCalibration.detectedOnsetRateHz)}/s`
+    : "Detected in the local ten-second analysis window";
+  referenceTotalRate.textContent = measuredReferenceCalibration?.isTotalCalibrated
+    ? `${formatRate(measuredReferenceCalibration.equivalentTotalRateHz)}/s`
+    : "Uncalibrated";
+}
+
 function renderAnalysisComparison() {
   renderSignalWaveform(generatedAnalysisWaveform, generatedReferenceSamples, "#d9ff86");
   renderSignalSpectrogram(generatedAnalysisSpectrogram, generatedReferenceAnalysis);
@@ -592,6 +636,7 @@ function renderAnalysisComparison() {
     kurtosis: generatedKurtosis,
     envelope100: generatedEnvelope100,
   });
+  renderRateCalibration();
 
   const spectrumSeries = [{
     analysis: generatedProfileAnalysis,
@@ -640,10 +685,12 @@ async function decodeReferenceAudio(arrayBuffer) {
   }
 }
 
-function applyPreparedRainReference(prepared, filename, status) {
+function applyPreparedRainReference(prepared, filename, status, calibration = null) {
   measuredReferenceSamples = prepared.samples;
   measuredReferenceAnalysis = prepared.analysis;
   measuredReferenceProfileAnalysis = prepared.profileAnalysis;
+  measuredReferenceOnsets = prepared.prominentOnsets;
+  measuredReferenceCalibration = calibration;
   referenceFilename.textContent = filename;
   referenceStatus.dataset.state = "ready";
   referenceStatus.textContent = status;
@@ -672,6 +719,11 @@ function renderReferenceProvenance(reference) {
 async function analyzeSelectedRainReference() {
   const request = ++referenceLoadRequest;
   selectedReferenceReady = false;
+  measuredReferenceSamples = null;
+  measuredReferenceAnalysis = null;
+  measuredReferenceProfileAnalysis = null;
+  measuredReferenceOnsets = null;
+  measuredReferenceCalibration = null;
   sourceMixInput.disabled = true;
   stopReferencePlayback();
   syncReferenceMediaProfile();
@@ -679,6 +731,7 @@ async function analyzeSelectedRainReference() {
   referenceCard.setAttribute("aria-busy", "true");
   referenceStatus.dataset.state = "loading";
   referenceStatus.textContent = `Loading ${selectedReferenceProfile.title}…`;
+  renderAnalysisComparison();
 
   try {
     const prepared = await loadRainReference(selectedReferenceProfile, {
@@ -691,7 +744,10 @@ async function analyzeSelectedRainReference() {
     applyPreparedRainReference(
       prepared,
       selectedReferenceProfile.title,
-      `${selectedReferenceProfile.shortTitle} reference ready at a calibrated ${selectedReferenceProfile.naturalRateHz.toFixed(1)} onsets/s. Strongest impact at ${prepared.peakSeconds.toFixed(3)} s.`,
+      selectedReferenceCalibration.isTotalCalibrated
+        ? `${selectedReferenceProfile.shortTitle} reference: ${selectedReferenceCalibration.detectedOnsetRateHz.toFixed(1)} detected onsets/s; provisional ${selectedReferenceCalibration.equivalentTotalRateHz.toFixed(0)} total Arrivals/s. Current window detects ${prepared.prominentOnsets.rateHz.toFixed(1)}/s. Strongest impact at ${prepared.peakSeconds.toFixed(3)} s.`
+        : `${selectedReferenceProfile.shortTitle} reference: ${selectedReferenceCalibration.detectedOnsetRateHz.toFixed(1)} detected onsets/s; total Arrival rate uncalibrated. Current window detects ${prepared.prominentOnsets.rateHz.toFixed(1)}/s. Strongest impact at ${prepared.peakSeconds.toFixed(3)} s.`,
+      selectedReferenceCalibration,
     );
   } catch (error) {
     if (request !== referenceLoadRequest) return;
@@ -721,7 +777,7 @@ async function analyzeRainReference(file) {
     applyPreparedRainReference(
       prepared,
       file.name,
-      `Local override ready. Strongest impact found at ${prepared.peakSeconds.toFixed(3)} s; the file remains local and silent.`,
+      `Local override ready at ${prepared.prominentOnsets.rateHz.toFixed(1)} detected onsets/s; total Arrival rate is uncalibrated. Strongest impact found at ${prepared.peakSeconds.toFixed(3)} s; the file remains local and silent.`,
     );
   } catch (error) {
     if (request !== referenceLoadRequest) return;
@@ -1095,7 +1151,9 @@ soundInput.addEventListener("change", async () => {
 couplingInput.addEventListener("change", restartEngine);
 referenceProfileSelect.addEventListener("change", () => {
   selectedReferenceProfile = getRainReferenceProfile(referenceProfileSelect.value);
+  selectedReferenceCalibration = resolveReferenceCalibration(selectedReferenceProfile);
   updateControlReadouts();
+  regenerateAcousticAssets(false);
   void analyzeSelectedRainReference();
 });
 referenceInput.addEventListener("change", () => {

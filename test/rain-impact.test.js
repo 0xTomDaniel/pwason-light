@@ -134,7 +134,7 @@ test("default Rain Impact Waveforms peak early and concentrate one drop's energy
     assert.equal(Math.abs(impact[0]), 0);
     assert.equal(Math.abs(impact[impact.length - 1]), 0);
   }
-  assert.ok(quantile(peakTimes, 0.9) <= 4);
+  assert.ok(quantile(peakTimes, 0.9) <= 6);
   assert.ok(quantile(energyTimes, 0.5) <= 35);
   assert.ok(quantile(energyTimes, 0.9) <= 55);
 });
@@ -192,11 +192,29 @@ test("leaf and litter Surface Responses have distinct evolving spectral signatur
   }
 
   assert.ok(profiles.leaf.complete > profiles.litter.complete * 1.25);
-  assert.ok(profiles.leaf.early > profiles.leaf.late * 1.25);
-  assert.ok(profiles.litter.early > profiles.litter.late);
+  assert.ok(profiles.leaf.early > profiles.leaf.late * 1.08);
+  assert.ok(profiles.litter.early > profiles.litter.late * 1.05);
 });
 
-test("low and high texture regions decay on observably different time scales", () => {
+test("a default Rain Impact population spans dark and papery high-frequency marks", () => {
+  const analyses = Array.from({ length: 96 }, (_, index) => analyzeSignal(
+    createRainImpact({
+      sampleRate: 48_000,
+      seed: index + 1,
+      dropPopulation: 0.693,
+    }),
+    48_000,
+    { includeSpectrogram: false },
+  ));
+  const centroids = analyses.map(analysis => analysis.spectralCentroidHz);
+  const highBandRatios = analyses.map(analysis => analysis.highBandEnergyRatio);
+
+  assert.ok(average(highBandRatios) > 0.12);
+  assert.ok(quantile(centroids, 0.1) < 3_000);
+  assert.ok(quantile(centroids, 0.9) > 5_000);
+});
+
+test("low and high texture regions retain distinct but overlapping decay scales", () => {
   const energyTimes = {};
   for (const selected of ["lowTexture", "highTexture"]) {
     const factors = createDefaultAcousticFactors();
@@ -215,7 +233,8 @@ test("low and high texture regions decay on observably different time scales", (
     ));
   }
 
-  assert.ok(energyTimes.highTexture < energyTimes.lowTexture * 0.65);
+  assert.ok(energyTimes.highTexture < energyTimes.lowTexture);
+  assert.ok(energyTimes.highTexture > energyTimes.lowTexture * 0.6);
 });
 
 test("no hidden resonator remains when every explicit excitation is switched off", () => {

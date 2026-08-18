@@ -4,6 +4,7 @@ import test from "node:test";
 import { createDefaultAcousticFactors } from "../src/acoustic-factors.js";
 import { createPoissonEngine } from "../src/poisson-engine.js";
 import { createGeneratedRainRenderer } from "../src/rain-texture.js";
+import { analyzeSignal, detectProminentOnsets } from "../src/signal-analysis.js";
 
 function rms(samples) {
   const energy = samples.reduce((sum, sample) => sum + sample * sample, 0);
@@ -119,4 +120,72 @@ test("Drop Population changes generated marks but not caller-owned Arrivals", ()
   assert.equal(arrival.rateHz, 23.1);
   assert.equal(fine.mark.population, 0);
   assert.equal(large.mark.population, 1);
+});
+
+test("Band Independence materially decorrelates frequency-region envelopes", () => {
+  const render = enabled => {
+    const factors = createDefaultAcousticFactors();
+    factors.bandIndependence = { enabled, amount: 1 };
+    const renderer = createGeneratedRainRenderer({
+      sampleRate: 24_000,
+      factors,
+      dropPopulation: 0.693,
+    });
+    const engine = createPoissonEngine({
+      seed: "band-independence-profile",
+      rateHz: 120,
+      fieldRadiusMeters: 20,
+    });
+    return analyzeSignal(renderer.renderProfile({
+      durationSeconds: 4,
+      nextArrival: () => engine.next(),
+    }), 24_000, { includeSpectrogram: false });
+  };
+
+  const locked = render(false);
+  const independent = render(true);
+
+  assert.ok(
+    independent.bandEnvelopeCorrelation
+      < locked.bandEnvelopeCorrelation - 0.12,
+  );
+});
+
+test("the calibrated Redwood profile produces a continuous high-detail rain field", () => {
+  const factors = createDefaultAcousticFactors();
+  const renderer = createGeneratedRainRenderer({
+    sampleRate: 48_000,
+    factors,
+    dropPopulation: 0.693,
+  });
+  const engine = createPoissonEngine({
+    seed: "redwood-ground-generated-profile",
+    rateHz: 120,
+    fieldRadiusMeters: 20,
+  });
+  const samples = renderer.renderProfile({
+    durationSeconds: 8,
+    nextArrival: () => engine.next(),
+  });
+  const analysis = analyzeSignal(samples, 48_000, { includeSpectrogram: false });
+  const onsets = detectProminentOnsets(samples, 48_000);
+
+  assert.ok(analysis.spectralCentroidHz > 3_000);
+  assert.ok(analysis.spectralCentroidHz < 6_500);
+  assert.ok(analysis.highBandEnergyRatio > 0.12);
+  assert.ok(analysis.highBandEnergyRatio < 0.3);
+  assert.ok(analysis.spectralFlatness > 0.005);
+  assert.ok(analysis.spectralFlatness < 0.08);
+  assert.ok(analysis.envelopeCoefficientOfVariation > 0.3);
+  assert.ok(analysis.envelopeCoefficientOfVariation < 0.7);
+  assert.ok(analysis.envelopeFloorRatio > 0.35);
+  assert.ok(analysis.bandEnvelopeCorrelation < 0.7);
+  assert.ok(analysis.crestFactor > 9.5);
+  assert.ok(analysis.crestFactor < 18);
+  assert.ok(analysis.sampleKurtosis > 6.5);
+  assert.ok(analysis.sampleKurtosis < 16);
+  assert.ok(analysis.envelopeScales[100].coefficientOfVariation > 0.18);
+  assert.ok(analysis.envelopeScales[100].coefficientOfVariation < 0.45);
+  assert.ok(onsets.rateHz > 20);
+  assert.ok(onsets.rateHz < 50);
 });

@@ -70,16 +70,18 @@ created.
 Each Arrival receives an audio-only Rain Mark. Drop Population changes the
 probability distribution over drop diameter; the same mark coherently derives a
 velocity proxy, impact level, contact duration, surface damping, target surface,
-and secondary-contact probability. Initial surfaces are leaf, litter/soil, and
-wood. Liquid impacts and bubbles are deliberately excluded.
+broad spectral focus, and secondary-contact probability. Initial surfaces are
+leaf, litter/soil, and wood. Liquid impacts and bubbles are deliberately
+excluded.
 
 The renderer creates a quiet sub-millisecond signed Direct Contact plus a brief
-analytic Surface Response. Each response excites eight ERB-spaced stochastic
-bands with independent amplitudes and exponential decays. Low, Mid, and High
-Texture scale groups of those bands without forcing them under one shared
-envelope. Leaf, litter/soil, and optional wood use distinct spectral and decay
-profiles; Wood and Micro-splashes are disabled in the default single-drop
-baseline.
+analytic Surface Response. Each response excites eight broad ERB-spaced
+stochastic bands with event-local amplitudes, small onset offsets, and
+exponential decays. A coherent spectral focus makes some leaf contacts papery
+and bright while litter remains darker; Band Independence controls how strongly
+those regions diverge without turning them into notes. Low, Mid, and High
+Texture scale groups without forcing one shared envelope. Wood and
+Micro-splashes are disabled in the default single-drop baseline.
 
 Across the complete default response bank, impacts peak within the first few
 milliseconds, the median response delivers 90% of its energy within 35 ms, and
@@ -130,12 +132,18 @@ The Rain Reference lab shows the first 120 ms of one complete variable-length ge
 response beside the strongest 120 ms contact found during the first ten seconds
 of the selected recording. For the steady texture it displays normalized spectra,
 spectral centroid, high-frequency energy, spectral flatness, crest factor,
-sample kurtosis, multiscale envelope variation, background-floor ratio, and
-cross-band envelope correlation.
+sample kurtosis, multiscale envelope variation, background-floor ratio,
+cross-band envelope correlation, generated total Arrival rate, and prominent
+onsets detected from both sources by the same algorithm.
 
 The selected recording can also loop as Reference Playback through Source Mix.
-Its calibrated onset density follows Speed using pitch-preserving media time
-stretch: Redwood is calibrated at 23.1 onsets/s and Amazon at 15.8 onsets/s.
+Detected foreground onsets are not treated as the physical drop count: Redwood
+stores a 23.1 onsets/s detector baseline and a separate provisional
+operator-tempo match of 120 total Arrivals/s. Reference Playback is therefore
+1× at Speed 120, and the generated comparison also runs at 120 Arrivals/s.
+Amazon stores 15.8 detected onsets/s but remains explicitly uncalibrated rather
+than inheriting Redwood's multiplier. Profiles without a total-rate calibration
+visibly fall back to their detected-onset rate for comparison.
 Because steady rain is statistically stationary, transport-rate changes can
 be difficult to hear and are not event-level resynthesis. The clean range is
 0.75×–4×; the interface visibly reports when the requested transport lies

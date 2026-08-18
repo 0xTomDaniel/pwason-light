@@ -8,22 +8,22 @@ const SURFACES = Object.freeze({
     contactScale: 0.52,
     textureScale: 0.88,
     damping: 0.72,
-    bandAmplitudes: Object.freeze([0.28, 0.48, 0.76, 1, 0.92, 0.7, 0.44, 0.22]),
-    bandDecayMilliseconds: Object.freeze([22, 20, 17, 15, 12, 9, 7, 5]),
+    bandAmplitudes: Object.freeze([0.28, 0.36, 0.42, 0.4, 0.48, 0.72, 1.45, 1.7]),
+    bandDecayMilliseconds: Object.freeze([14, 16, 18, 20, 21, 19, 15, 11]),
   }),
   litter: Object.freeze({
     contactScale: 0.34,
     textureScale: 1,
     damping: 0.84,
-    bandAmplitudes: Object.freeze([0.52, 0.82, 1, 0.78, 0.48, 0.27, 0.14, 0.07]),
-    bandDecayMilliseconds: Object.freeze([18, 16, 14, 11, 9, 7, 5, 4]),
+    bandAmplitudes: Object.freeze([0.9, 1.18, 0.86, 0.48, 0.28, 0.18, 0.13, 0.1]),
+    bandDecayMilliseconds: Object.freeze([15, 18, 19, 17, 14, 11, 8, 6]),
   }),
   wood: Object.freeze({
     contactScale: 0.68,
     textureScale: 0.54,
     damping: 0.64,
-    bandAmplitudes: Object.freeze([0.18, 0.3, 0.48, 0.72, 0.92, 1, 0.74, 0.42]),
-    bandDecayMilliseconds: Object.freeze([18, 17, 15, 13, 11, 9, 7, 5]),
+    bandAmplitudes: Object.freeze([0.16, 0.25, 0.42, 0.7, 0.98, 1.12, 0.92, 0.58]),
+    bandDecayMilliseconds: Object.freeze([15, 16, 17, 17, 16, 14, 11, 8]),
   }),
 });
 
@@ -75,7 +75,7 @@ function createErbBandpassFilters(sampleRate) {
       frequencyAtErbRate(centerErb + erbStep / 2),
     );
     const bandwidth = Math.max(40, upperFrequency - lowerFrequency);
-    const q = Math.max(0.55, centerFrequency / bandwidth);
+    const q = Math.max(1.45, centerFrequency / bandwidth * 4.7);
     const omega = 2 * Math.PI * centerFrequency / sampleRate;
     const alpha = Math.sin(omega) / (2 * q);
     const a0 = 1 + alpha;
@@ -118,8 +118,8 @@ export function createRainMark({ seed, dropPopulation = 0.5, factors } = {}) {
   const velocityMetersPerSecond = 2.25 + 2.55 * Math.sqrt(diameterMm);
   const sizeNormalized = clamp((diameterMm - 0.3) / 5.1);
   const surfaceWeights = [
-    ["leaf", interpolate(0.82, 0.52, diversity) * effectiveAcousticFactor(settings, "leafSurface")],
-    ["litter", interpolate(0.16, 0.36, diversity) * effectiveAcousticFactor(settings, "litterSurface")],
+    ["leaf", interpolate(0.72, 0.38, diversity) * effectiveAcousticFactor(settings, "leafSurface")],
+    ["litter", interpolate(0.28, 0.55, diversity) * effectiveAcousticFactor(settings, "litterSurface")],
     ["wood", interpolate(0.02, 0.12, diversity) * effectiveAcousticFactor(settings, "woodSurface")],
   ];
   const surfaceWeightTotal = surfaceWeights.reduce((sum, entry) => sum + entry[1], 0);
@@ -153,6 +153,17 @@ export function createRainMark({ seed, dropPopulation = 0.5, factors } = {}) {
     (0.04 + sizeNormalized * 0.48)
       * (surface === "leaf" ? 1 : surface === "litter" ? 0.72 : 0.32),
   );
+  const spectralFocus = surface === "leaf"
+    ? clamp(interpolate(0.92, 0.72, sizeNormalized) + (random() - 0.5) * 0.14)
+    : surface === "litter"
+      ? clamp(interpolate(0.32, 0.14, sizeNormalized) + (random() - 0.5) * 0.14)
+      : clamp(interpolate(0.7, 0.5, sizeNormalized) + (random() - 0.5) * 0.18);
+  const spectralSpread = varied(
+    random,
+    surface === "leaf" ? 0.17 : surface === "litter" ? 0.21 : 0.18,
+    0.28,
+    variation,
+  );
 
   return Object.freeze({
     population,
@@ -165,6 +176,8 @@ export function createRainMark({ seed, dropPopulation = 0.5, factors } = {}) {
     contactDurationSeconds,
     surfaceDamping,
     splashProbability,
+    spectralFocus,
+    spectralSpread,
   });
 }
 
@@ -209,18 +222,29 @@ export function createRainImpact({
     amount("highTexture"),
     amount("highTexture"),
   ];
+  const focusWeights = Array.from({ length: ERB_BAND_COUNT }, (_, index) => {
+    const position = index / (ERB_BAND_COUNT - 1);
+    const distance = (position - rainMark.spectralFocus)
+      / Math.max(0.08, rainMark.spectralSpread);
+    return 0.18 + 1.82 * Math.exp(-0.5 * distance * distance);
+  });
+  const focusRms = Math.sqrt(
+    focusWeights.reduce((sum, weight) => sum + weight * weight, 0)
+      / focusWeights.length,
+  );
   const textureLevel = surface.textureScale
     * surfaceLevel
-    * interpolate(0.07, 0.15, rainMark.impactLevel);
+    * (0.035 + 0.38 * rainMark.impactLevel ** 1.8);
   const bands = filters.map((filter, index) => {
     const position = index / (ERB_BAND_COUNT - 1);
-    const highFrequencySoftening = 1 - 0.24 * softness * position ** 1.4;
+    const highFrequencySoftening = 1 - 0.08 * softness * position ** 1.4;
     return {
       filter,
-      gain: surface.bandAmplitudes[index]
-        * textureGroups[index]
+      gain: interpolate(1, surface.bandAmplitudes[index], independence)
+        * Math.sqrt(textureGroups[index])
         * textureLevel
         * highFrequencySoftening
+        * interpolate(1, focusWeights[index] / focusRms, independence)
         * varied(random, 1, 0.16, variation),
       decaySeconds: surface.bandDecayMilliseconds[index]
         / 1000
@@ -228,7 +252,16 @@ export function createRainImpact({
         * sustainScale
         * dampingScale
         * sizeDecayScale
-        * varied(random, 1, 0.14, variation),
+        * varied(random, 1, interpolate(0.06, 0.42, independence), variation),
+      onsetDelaySeconds: random()
+        * interpolate(0, 0.0015, independence)
+        * varied(random, 1, 0.2, variation),
+      attackScale: varied(
+        random,
+        1,
+        interpolate(0.04, 0.38, independence),
+        variation,
+      ),
     };
   });
 
@@ -286,12 +319,17 @@ export function createRainImpact({
     const sharedNoise = random() * 2 - 1;
     let surfaceResponse = 0;
     for (const band of bands) {
+      const bandTime = time - band.onsetDelaySeconds;
+      if (bandTime <= 0) continue;
       const excitation = sharedNoise * sharedWeight
         + (random() * 2 - 1) * independentWeight;
+      const bandAttack = 1 - Math.exp(
+        -bandTime / Math.max(0.00002, attackSeconds * band.attackScale),
+      );
       surfaceResponse += band.filter(excitation)
-        * Math.exp(-time / Math.max(0.001, band.decaySeconds))
+        * Math.exp(-bandTime / Math.max(0.001, band.decaySeconds))
         * band.gain
-        * attack;
+        * bandAttack;
     }
 
     let fragments = 0;

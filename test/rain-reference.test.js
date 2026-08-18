@@ -9,6 +9,7 @@ import {
   getRainReferenceProfile,
   loadRainReference,
   prepareRainReference,
+  resolveReferenceCalibration,
 } from "../src/rain-reference.js";
 
 test("the bundled Rain Reference is the cited Amazon light-rain research recording", async () => {
@@ -42,6 +43,38 @@ test("the Reference Library keeps Amazon and adds the CC0 leaf-and-ground record
   );
 });
 
+test("Reference Profiles separate detected onsets from equivalent total Arrivals", () => {
+  const redwood = getRainReferenceProfile("redwood-ground");
+  const amazon = getRainReferenceProfile("amazon-forest");
+
+  assert.equal(redwood.detectedOnsetRateHz, 23.1);
+  assert.equal(redwood.equivalentTotalRateHz, 120);
+  assert.ok(Math.abs(redwood.prominenceFraction - 0.1925) < 0.000001);
+  assert.equal(redwood.calibrationKind, "operator-tempo-match");
+
+  assert.equal(amazon.detectedOnsetRateHz, 15.8);
+  assert.equal(amazon.equivalentTotalRateHz, null);
+  assert.equal(amazon.prominenceFraction, null);
+  assert.equal(amazon.calibrationKind, "detected-onsets-only");
+});
+
+test("Reference calibration chooses an explicit generation and playback basis", () => {
+  assert.deepEqual(resolveReferenceCalibration(getRainReferenceProfile("redwood-ground")), {
+    detectedOnsetRateHz: 23.1,
+    equivalentTotalRateHz: 120,
+    comparisonRateHz: 120,
+    prominenceFraction: 0.1925,
+    isTotalCalibrated: true,
+  });
+  assert.deepEqual(resolveReferenceCalibration(getRainReferenceProfile("amazon-forest")), {
+    detectedOnsetRateHz: 15.8,
+    equivalentTotalRateHz: null,
+    comparisonRateHz: 15.8,
+    prominenceFraction: null,
+    isTotalCalibrated: false,
+  });
+});
+
 test("unknown Reference Profile ids are rejected", () => {
   assert.throws(
     () => getRainReferenceProfile("storm-drain"),
@@ -69,6 +102,8 @@ test("Rain Reference preparation downmixes browser audio and isolates one impact
   assert.equal(prepared.analysis.sampleRate, sampleRate);
   assert.equal(prepared.profileAnalysis.durationSeconds, 1);
   assert.equal(prepared.profileAnalysis.spectrogram.length, 0);
+  assert.equal(prepared.prominentOnsets.count, 1);
+  assert.equal(prepared.prominentOnsets.rateHz, 1);
 });
 
 test("the Rain Reference loader fetches and prepares a selected profile", async () => {

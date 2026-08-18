@@ -9,9 +9,9 @@ function positiveFinite(value, name) {
   return number;
 }
 
-export function calculateReferenceTimeStretch(speedHz, naturalRateHz) {
+export function calculateReferenceTimeStretch(speedHz, comparisonRateHz) {
   const requestedRate = positiveFinite(speedHz, "Speed") /
-    positiveFinite(naturalRateHz, "Reference natural rate");
+    positiveFinite(comparisonRateHz, "Reference comparison rate");
   const playbackRate = Math.min(
     MAXIMUM_PITCH_PRESERVING_RATE,
     Math.max(MINIMUM_PITCH_PRESERVING_RATE, requestedRate),

@@ -1,4 +1,8 @@
-import { analyzeSignal, extractProminentImpact } from "./signal-analysis.js";
+import {
+  analyzeSignal,
+  detectProminentOnsets,
+  extractProminentImpact,
+} from "./signal-analysis.js";
 
 const MAX_ANALYSIS_SECONDS = 10;
 
@@ -20,7 +24,10 @@ const REDWOOD_GROUND_REFERENCE = Object.freeze({
   playbackFormat: "Freesound high-quality MP3 preview",
   originalFormat: "44.1 kHz, 16-bit stereo WAV",
   sha256: "ebf3ab59c140a5d44f939f3f871a58ed205377dcccb02fe6d0147d29535fcadb",
-  naturalRateHz: 23.1,
+  detectedOnsetRateHz: 23.1,
+  equivalentTotalRateHz: 120,
+  prominenceFraction: 23.1 / 120,
+  calibrationKind: "operator-tempo-match",
 });
 
 export const AMAZON_RAIN_REFERENCE = Object.freeze({
@@ -41,7 +48,10 @@ export const AMAZON_RAIN_REFERENCE = Object.freeze({
   licenseUrl: "https://creativecommons.org/licenses/by/4.0/",
   md5: "8a2351b76dcb0145f24705596ab32665",
   playbackFormat: "48 kHz, 16-bit mono WAV",
-  naturalRateHz: 15.8,
+  detectedOnsetRateHz: 15.8,
+  equivalentTotalRateHz: null,
+  prominenceFraction: null,
+  calibrationKind: "detected-onsets-only",
 });
 
 export const RAIN_REFERENCE_PROFILES = Object.freeze([
@@ -55,6 +65,28 @@ export function getRainReferenceProfile(profileId) {
   const profile = RAIN_REFERENCE_PROFILES.find(candidate => candidate.id === profileId);
   if (!profile) throw new RangeError(`Unknown Rain Reference Profile: ${profileId}`);
   return profile;
+}
+
+export function resolveReferenceCalibration(reference) {
+  const detectedOnsetRateHz = Number(reference?.detectedOnsetRateHz);
+  if (!Number.isFinite(detectedOnsetRateHz) || detectedOnsetRateHz <= 0) {
+    throw new RangeError("Reference detected-onset rate must be positive.");
+  }
+  const candidateTotal = Number(reference?.equivalentTotalRateHz);
+  const equivalentTotalRateHz = Number.isFinite(candidateTotal) && candidateTotal > 0
+    ? candidateTotal
+    : null;
+  const isTotalCalibrated = equivalentTotalRateHz !== null;
+
+  return Object.freeze({
+    detectedOnsetRateHz,
+    equivalentTotalRateHz,
+    comparisonRateHz: equivalentTotalRateHz ?? detectedOnsetRateHz,
+    prominenceFraction: isTotalCalibrated
+      ? detectedOnsetRateHz / equivalentTotalRateHz
+      : null,
+    isTotalCalibrated,
+  });
 }
 
 export function prepareRainReference(decodedAudio) {
@@ -78,6 +110,7 @@ export function prepareRainReference(decodedAudio) {
     profileAnalysis: analyzeSignal(monoSamples, decodedAudio.sampleRate, {
       includeSpectrogram: false,
     }),
+    prominentOnsets: detectProminentOnsets(monoSamples, decodedAudio.sampleRate),
   };
 }
 

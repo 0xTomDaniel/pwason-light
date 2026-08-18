@@ -2,6 +2,9 @@ const DEFAULT_FFT_SIZE = 512;
 const HIGH_BAND_START_HZ = 8_000;
 const IMPACT_DURATION_SECONDS = 0.12;
 const IMPACT_PREROLL_SECONDS = 0.005;
+const ONSET_WINDOW_SECONDS = 256 / 48_000;
+const ONSET_HOP_SECONDS = 128 / 48_000;
+const ONSET_REFRACTORY_SECONDS = 0.01;
 
 function onePoleCoefficient(cutoffHz, sampleRate) {
   return 1 - Math.exp(-2 * Math.PI * cutoffHz / sampleRate);
@@ -55,6 +58,59 @@ function analyzeEnvelopeScale(samples, sampleRate, milliseconds) {
   return Object.freeze({
     coefficientOfVariation: mean > 0 ? Math.sqrt(variance) / mean : 0,
     floorRatio: median > 0 ? floor / median : 0,
+  });
+}
+
+export function detectProminentOnsets(samples, sampleRate) {
+  const rate = Math.max(8_000, Number(sampleRate) || 48_000);
+  const frameSize = Math.max(8, Math.round(rate * ONSET_WINDOW_SECONDS));
+  const hopSize = Math.max(1, Math.round(rate * ONSET_HOP_SECONDS));
+  const frameCount = samples.length < frameSize
+    ? 0
+    : Math.floor((samples.length - frameSize) / hopSize) + 1;
+  const logEnergy = new Float64Array(frameCount);
+  const positiveFlux = new Float64Array(frameCount);
+
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const start = frame * hopSize;
+    let energy = 0;
+    for (let index = start; index < start + frameSize; index += 1) {
+      const sample = samples[index] || 0;
+      energy += sample * sample;
+    }
+    logEnergy[frame] = Math.log(Math.max(energy / frameSize, 1e-20));
+    if (frame > 0) {
+      positiveFlux[frame] = Math.max(0, logEnergy[frame] - logEnergy[frame - 1]);
+    }
+  }
+
+  const sortedFlux = [...positiveFlux].sort((left, right) => left - right);
+  const threshold = sortedFlux[Math.floor((sortedFlux.length - 1) * 0.85)] ?? 0;
+  const refractoryFrames = Math.max(
+    1,
+    Math.round(ONSET_REFRACTORY_SECONDS * rate / hopSize),
+  );
+  const timesSeconds = [];
+  let lastOnsetFrame = -refractoryFrames;
+
+  for (let frame = 1; frame < frameCount - 1; frame += 1) {
+    const flux = positiveFlux[frame];
+    if (
+      flux > threshold
+      && flux >= positiveFlux[frame - 1]
+      && flux > positiveFlux[frame + 1]
+      && frame - lastOnsetFrame >= refractoryFrames
+    ) {
+      timesSeconds.push((frame * hopSize + frameSize / 2) / rate);
+      lastOnsetFrame = frame;
+    }
+  }
+
+  const durationSeconds = samples.length / rate;
+  return Object.freeze({
+    count: timesSeconds.length,
+    rateHz: durationSeconds > 0 ? timesSeconds.length / durationSeconds : 0,
+    timesSeconds: Object.freeze(timesSeconds),
   });
 }
 
