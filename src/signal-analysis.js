@@ -2,8 +2,6 @@ const DEFAULT_FFT_SIZE = 512;
 const SPECTROGRAM_FFT_SIZE = 1_024;
 const SPECTROGRAM_HOP_SECONDS = 0.001;
 const HIGH_BAND_START_HZ = 8_000;
-const IMPACT_DURATION_SECONDS = 0.12;
-const IMPACT_PREROLL_SECONDS = 0.005;
 const ONSET_WINDOW_SECONDS = 256 / 48_000;
 const ONSET_HOP_SECONDS = 128 / 48_000;
 const ONSET_REFRACTORY_SECONDS = 0.01;
@@ -267,9 +265,12 @@ function transform(real, imaginary) {
   }
 }
 
-function createSpectrogram(samples, sampleRate) {
-  const size = SPECTROGRAM_FFT_SIZE;
-  const hopSize = Math.max(1, Math.round(sampleRate * SPECTROGRAM_HOP_SECONDS));
+function createSpectrogram(samples, sampleRate, {
+  fftSize = SPECTROGRAM_FFT_SIZE,
+  hopSeconds = SPECTROGRAM_HOP_SECONDS,
+} = {}) {
+  const size = Math.max(64, 2 ** Math.round(Math.log2(fftSize)));
+  const hopSize = Math.max(1, Math.round(sampleRate * hopSeconds));
   const binCount = size / 2 + 1;
   const frameCount = Math.max(1, Math.ceil(samples.length / hopSize));
   const frames = [];
@@ -295,9 +296,84 @@ function createSpectrogram(samples, sampleRate) {
   return { frames, fftSize: size, hopSize };
 }
 
+export function analyzeSpectralFrames(samples, sampleRate, {
+  fftSize = SPECTROGRAM_FFT_SIZE,
+  hopSeconds = 0.01,
+  minimumFrequencyHz = 80,
+  maximumFrequencyHz = 20_000,
+  pointCount = 96,
+} = {}) {
+  const rate = Math.max(8_000, Number(sampleRate) || 48_000);
+  const size = Math.max(64, 2 ** Math.round(Math.log2(fftSize)));
+  const hopSize = Math.max(1, Math.round(rate * hopSeconds));
+  const points = Math.max(8, Math.round(pointCount));
+  const minimumFrequency = Math.max(1, Number(minimumFrequencyHz) || 80);
+  const maximumFrequency = Math.max(
+    minimumFrequency,
+    Math.min(Number(maximumFrequencyHz) || 20_000, rate / 2),
+  );
+  const frequenciesHz = Float64Array.from(
+    { length: points },
+    (_, index) => minimumFrequency * (
+      maximumFrequency / minimumFrequency
+    ) ** (index / Math.max(1, points - 1)),
+  );
+  const frameStarts = samples.length <= size
+    ? [0]
+    : Array.from(
+      { length: Math.floor((samples.length - size) / hopSize) + 1 },
+      (_, index) => index * hopSize,
+    );
+  const frames = [];
+  const meanPowers = new Float64Array(points);
+
+  for (const frameStart of frameStarts) {
+    const real = new Float64Array(size);
+    const imaginary = new Float64Array(size);
+    for (let index = 0; index < size; index += 1) {
+      const window = 0.5 - 0.5 * Math.cos(2 * Math.PI * index / (size - 1));
+      real[index] = (samples[frameStart + index] || 0) * window;
+    }
+    transform(real, imaginary);
+
+    const framePowers = new Float64Array(points);
+    for (let point = 0; point < points; point += 1) {
+      const binPosition = frequenciesHz[point] * size / rate;
+      const lowerBin = Math.min(size / 2, Math.floor(binPosition));
+      const upperBin = Math.min(size / 2, lowerBin + 1);
+      const mix = binPosition - lowerBin;
+      const lowerPower = real[lowerBin] ** 2 + imaginary[lowerBin] ** 2;
+      const upperPower = real[upperBin] ** 2 + imaginary[upperBin] ** 2;
+      const power = lowerPower + (upperPower - lowerPower) * mix;
+      framePowers[point] = power;
+      meanPowers[point] += power;
+    }
+    frames.push(framePowers);
+  }
+
+  for (let point = 0; point < points; point += 1) {
+    meanPowers[point] /= frameStarts.length;
+  }
+
+  return Object.freeze({
+    sampleRate: rate,
+    fftSize: size,
+    hopSize,
+    frequenciesHz,
+    frameCentersSeconds: Float64Array.from(
+      frameStarts,
+      start => (start + size / 2) / rate,
+    ),
+    frames: Object.freeze(frames),
+    meanPowers,
+  });
+}
+
 export function analyzeSignal(samples, sampleRate, {
   fftSize = DEFAULT_FFT_SIZE,
   includeSpectrogram = true,
+  spectrogramFftSize = SPECTROGRAM_FFT_SIZE,
+  spectrogramHopSeconds = SPECTROGRAM_HOP_SECONDS,
 } = {}) {
   const rate = Math.max(8_000, Number(sampleRate) || 48_000);
   const size = Math.max(64, 2 ** Math.round(Math.log2(fftSize)));
@@ -327,8 +403,15 @@ export function analyzeSignal(samples, sampleRate, {
   }
 
   const spectrogramAnalysis = includeSpectrogram
-    ? createSpectrogram(samples, rate)
-    : { frames: [], fftSize: SPECTROGRAM_FFT_SIZE, hopSize: Math.round(rate * SPECTROGRAM_HOP_SECONDS) };
+    ? createSpectrogram(samples, rate, {
+      fftSize: spectrogramFftSize,
+      hopSeconds: spectrogramHopSeconds,
+    })
+    : {
+      frames: [],
+      fftSize: spectrogramFftSize,
+      hopSize: Math.round(rate * spectrogramHopSeconds),
+    };
 
   let totalEnergy = 0;
   let weightedFrequency = 0;
@@ -363,27 +446,58 @@ export function analyzeSignal(samples, sampleRate, {
   });
 }
 
-export function extractProminentImpact(samples, sampleRate) {
-  const rate = Math.max(8_000, Number(sampleRate) || 48_000);
-  const sampleCount = Math.round(rate * IMPACT_DURATION_SECONDS);
-  const prerollSamples = Math.round(rate * IMPACT_PREROLL_SECONDS);
-  let peakIndex = 0;
+function interpolatedSpectrumPower(analysis, frequencyHz) {
+  const binPosition = Math.max(
+    0,
+    Math.min(
+      analysis.spectrum.length - 1,
+      frequencyHz * analysis.fftSize / analysis.sampleRate,
+    ),
+  );
+  const lowerBin = Math.floor(binPosition);
+  const upperBin = Math.min(analysis.spectrum.length - 1, lowerBin + 1);
+  const mix = binPosition - lowerBin;
+  return analysis.spectrum[lowerBin]
+    + (analysis.spectrum[upperBin] - analysis.spectrum[lowerBin]) * mix;
+}
 
-  for (let index = 1; index < samples.length; index += 1) {
-    if (Math.abs(samples[index]) > Math.abs(samples[peakIndex])) peakIndex = index;
+export function compareNormalizedSpectra(first, second, {
+  minimumFrequencyHz = 80,
+  pointCount = 256,
+  floorDecibels = -60,
+} = {}) {
+  if (!first?.spectrum?.length || !second?.spectrum?.length) {
+    throw new TypeError("Normalized spectrum comparison requires two analyses.");
+  }
+  const minimumFrequency = Math.max(1, Number(minimumFrequencyHz) || 80);
+  const maximumFrequency = Math.min(first.sampleRate, second.sampleRate) / 2;
+  const points = Math.max(2, Math.round(Number(pointCount) || 256));
+  const frequencies = Array.from({ length: points }, (_, index) => (
+    minimumFrequency * (maximumFrequency / minimumFrequency)
+      ** (index / (points - 1))
+  ));
+  const firstPowers = frequencies.map(
+    frequency => interpolatedSpectrumPower(first, frequency),
+  );
+  const secondPowers = frequencies.map(
+    frequency => interpolatedSpectrumPower(second, frequency),
+  );
+  const firstPeak = Math.max(...firstPowers, 1e-20);
+  const secondPeak = Math.max(...secondPowers, 1e-20);
+  const floor = Math.min(-1, Number(floorDecibels) || -60);
+  let squaredError = 0;
+
+  for (let index = 0; index < points; index += 1) {
+    const firstDecibels = Math.max(
+      floor,
+      10 * Math.log10(Math.max(firstPowers[index] / firstPeak, 1e-20)),
+    );
+    const secondDecibels = Math.max(
+      floor,
+      10 * Math.log10(Math.max(secondPowers[index] / secondPeak, 1e-20)),
+    );
+    squaredError += (firstDecibels - secondDecibels) ** 2;
   }
 
-  const latestStart = Math.max(0, samples.length - sampleCount);
-  const startIndex = Math.min(
-    latestStart,
-    Math.max(0, peakIndex - prerollSamples),
-  );
-  const impactSamples = new Float32Array(sampleCount);
-  impactSamples.set(samples.subarray(startIndex, startIndex + sampleCount));
-
-  return Object.freeze({
-    samples: impactSamples,
-    startSeconds: startIndex / rate,
-    peakSeconds: peakIndex / rate,
-  });
+  return Math.sqrt(squaredError / points);
 }

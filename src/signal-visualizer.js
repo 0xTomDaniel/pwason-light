@@ -79,7 +79,30 @@ export function prepareWaveformEnvelope(
   return Object.freeze({ minimums, maximums, normalizationGain });
 }
 
-export function renderSignalWaveform(canvas, samples, color) {
+function drawTimeMarker(context, width, height, markerFraction, label) {
+  if (!Number.isFinite(markerFraction)) return;
+  const x = clamp(markerFraction, 0, 1) * width;
+  context.save();
+  context.strokeStyle = "rgba(255, 237, 179, 0.82)";
+  context.lineWidth = 1;
+  context.setLineDash([4, 4]);
+  context.beginPath();
+  context.moveTo(x, 0);
+  context.lineTo(x, height);
+  context.stroke();
+  context.setLineDash([]);
+  if (label) {
+    context.fillStyle = "rgba(255, 237, 179, 0.9)";
+    context.font = "9px IBM Plex Mono, monospace";
+    context.fillText(label, Math.min(width - 56, x + 5), height - 7);
+  }
+  context.restore();
+}
+
+export function renderSignalWaveform(canvas, samples, color, {
+  markerFraction = null,
+  markerLabel = "",
+} = {}) {
   const { context, width, height } = prepareCanvas(canvas);
   drawGrid(context, width, height);
   const envelope = prepareWaveformEnvelope(samples, Math.round(width));
@@ -109,6 +132,7 @@ export function renderSignalWaveform(canvas, samples, color) {
   }
   context.stroke();
   context.globalAlpha = 1;
+  drawTimeMarker(context, width, height, markerFraction, markerLabel);
 }
 
 const SPECTROGRAM_COLORS = Object.freeze([
@@ -132,7 +156,10 @@ function heatColor(intensity) {
   ));
 }
 
-export function renderSignalSpectrogram(canvas, analysis) {
+export function renderSignalSpectrogram(canvas, analysis, {
+  markerFraction = null,
+  markerLabel = "",
+} = {}) {
   const { context, width, height } = prepareCanvas(canvas);
   const frames = analysis.spectrogram;
   if (frames.length === 0) {
@@ -207,6 +234,7 @@ export function renderSignalSpectrogram(canvas, analysis) {
     / Math.log(maximumFrequency / minimumFrequency));
   context.fillText("1k", 7, oneKilohertzY - 4);
   context.fillText("80 Hz", 7, height - 7);
+  drawTimeMarker(context, width, height, markerFraction, markerLabel);
 }
 
 function spectrumDecibels(analysis, frequency, peakPower) {
@@ -249,6 +277,134 @@ export function renderSpectrumComparison(canvas, series) {
   context.fillText("80 Hz", 7, height - 7);
   context.fillText("1 kHz", width * 0.39, height - 7);
   context.fillText(`${Math.round(maximumFrequency / 1000)} kHz`, width - 38, height - 7);
+}
+
+export function renderProfileResidual(canvas, series) {
+  const { context, width, height } = prepareCanvas(canvas);
+  drawGrid(context, width, height);
+  if (series.length === 0) {
+    renderEmptySignal(canvas, "Residuals will appear when references are ready");
+    return;
+  }
+  const magnitudes = series.flatMap(item => (
+    [...item.comparison.profileResidualDecibels].map(value => Math.abs(value))
+  )).sort((left, right) => left - right);
+  const robustMagnitude = magnitudes[
+    Math.floor((magnitudes.length - 1) * 0.95)
+  ] ?? 12;
+  const scaleDecibels = Math.min(
+    36,
+    Math.max(12, Math.ceil(robustMagnitude / 6) * 6),
+  );
+  const centerY = height / 2;
+
+  context.strokeStyle = "rgba(229, 236, 217, 0.34)";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(0, centerY);
+  context.lineTo(width, centerY);
+  context.stroke();
+
+  for (const item of series) {
+    const values = item.comparison.profileResidualDecibels;
+    context.strokeStyle = item.color;
+    context.fillStyle = item.fillColor;
+    context.lineWidth = 1.6;
+    context.beginPath();
+    for (let index = 0; index < values.length; index += 1) {
+      const x = index * width / Math.max(1, values.length - 1);
+      const bounded = clamp(values[index], -scaleDecibels, scaleDecibels);
+      const y = centerY - bounded / scaleDecibels * height * 0.46;
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.stroke();
+  }
+
+  context.fillStyle = "rgba(229, 236, 217, 0.68)";
+  context.font = "9px IBM Plex Mono, monospace";
+  context.fillText(`+${scaleDecibels} dB excess`, 7, 12);
+  context.fillText("0 dB", 7, centerY - 5);
+  context.fillText(`−${scaleDecibels} dB missing`, 7, height - 7);
+  context.fillText("80 Hz", 68, height - 7);
+  context.fillText("1 kHz", width * 0.457, height - 7);
+  context.fillText("20 kHz", width - 43, height - 7);
+}
+
+const RESIDUAL_MISSING = Object.freeze([34, 153, 164]);
+const RESIDUAL_NEUTRAL = Object.freeze([12, 16, 13]);
+const RESIDUAL_EXCESS = Object.freeze([224, 116, 69]);
+
+function residualColor(decibels, scaleDecibels) {
+  const amount = clamp(Math.abs(decibels) / scaleDecibels, 0, 1) ** 0.72;
+  const target = decibels < 0 ? RESIDUAL_MISSING : RESIDUAL_EXCESS;
+  return RESIDUAL_NEUTRAL.map((channel, index) => Math.round(
+    channel + (target[index] - channel) * amount,
+  ));
+}
+
+export function renderDistributionResidual(canvas, comparison, {
+  scaleDecibels = 18,
+} = {}) {
+  const { context, width, height } = prepareCanvas(canvas);
+  if (!comparison?.distributionResidualDecibels?.length) {
+    renderEmptySignal(canvas, "Distribution residual will appear here");
+    return;
+  }
+  const imageWidth = canvas.width;
+  const imageHeight = canvas.height;
+  const rows = comparison.distributionResidualDecibels;
+  const pixels = context.createImageData(imageWidth, imageHeight);
+
+  for (let y = 0; y < imageHeight; y += 1) {
+    const visualRow = Math.min(
+      rows.length - 1,
+      Math.floor((1 - y / Math.max(1, imageHeight)) * rows.length),
+    );
+    const values = rows[visualRow];
+    for (let x = 0; x < imageWidth; x += 1) {
+      const position = x * (values.length - 1) / Math.max(1, imageWidth - 1);
+      const lower = Math.floor(position);
+      const upper = Math.min(values.length - 1, lower + 1);
+      const value = values[lower] + (values[upper] - values[lower])
+        * (position - lower);
+      const color = residualColor(value, scaleDecibels);
+      const pixel = (y * imageWidth + x) * 4;
+      pixels.data[pixel] = color[0];
+      pixels.data[pixel + 1] = color[1];
+      pixels.data[pixel + 2] = color[2];
+      pixels.data[pixel + 3] = 255;
+    }
+  }
+  context.putImageData(pixels, 0, 0);
+
+  context.strokeStyle = "rgba(229, 236, 217, 0.16)";
+  context.lineWidth = 1;
+  context.beginPath();
+  for (let row = 1; row < rows.length; row += 1) {
+    const y = height * row / rows.length;
+    context.moveTo(0, y);
+    context.lineTo(width, y);
+  }
+  for (const fraction of [0.25, 0.5, 0.75]) {
+    context.moveTo(width * fraction, 0);
+    context.lineTo(width * fraction, height);
+  }
+  context.stroke();
+
+  context.fillStyle = "rgba(245, 248, 237, 0.8)";
+  context.font = "9px IBM Plex Mono, monospace";
+  const reversedQuantiles = [...comparison.quantiles].reverse();
+  reversedQuantiles.forEach((probability, row) => {
+    context.fillText(
+      `q${Math.round(probability * 100)}`,
+      7,
+      height * (row + 0.5) / reversedQuantiles.length + 3,
+    );
+  });
+  context.fillText("80 Hz", 48, height - 7);
+  context.fillText("1 kHz", width * 0.457, height - 7);
+  context.fillText("20 kHz", width - 43, height - 7);
 }
 
 export function renderEmptySignal(canvas, message) {

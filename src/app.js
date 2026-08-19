@@ -9,13 +9,13 @@ import {
 } from "./acoustic-factors.js";
 import { createRenderLoop } from "./render-loop.js";
 import {
-  analyzeSignal,
-  detectProminentOnsets,
-  extractProminentImpact,
-} from "./signal-analysis.js";
+  analyzeRainField,
+  compareRainFieldDiagnostics,
+} from "./rain-diagnostics.js";
 import { calculateSourceMix } from "./source-mix.js";
 import {
   DEFAULT_RAIN_REFERENCE_PROFILE,
+  FARNELL_RAIN_REFERENCE,
   RAIN_REFERENCE_PROFILES,
   getRainReferenceProfile,
   loadRainReference,
@@ -25,9 +25,12 @@ import {
 import {
   calculateReferenceTimeStretch,
   enablePitchPreservation,
+  resolveReferencePlaybackWindow,
 } from "./reference-playback.js";
 import {
   renderEmptySignal,
+  renderDistributionResidual,
+  renderProfileResidual,
   renderSignalSpectrogram,
   renderSignalWaveform,
   renderSpectrumComparison,
@@ -90,7 +93,12 @@ const generatedAnalysisWaveform = document.querySelector("#generated-analysis-wa
 const generatedAnalysisSpectrogram = document.querySelector("#generated-analysis-spectrogram");
 const referenceAnalysisWaveform = document.querySelector("#reference-analysis-waveform");
 const referenceAnalysisSpectrogram = document.querySelector("#reference-analysis-spectrogram");
+const farnellCard = document.querySelector("#farnell-analysis-card");
+const farnellFilename = document.querySelector("#farnell-filename");
+const farnellAnalysisWaveform = document.querySelector("#farnell-analysis-waveform");
+const farnellAnalysisSpectrogram = document.querySelector("#farnell-analysis-spectrogram");
 const comparisonSpectrum = document.querySelector("#comparison-spectrum");
+const selectedSpectrumLabel = document.querySelector("#selected-spectrum-label");
 const generatedCentroid = document.querySelector("#generated-centroid");
 const generatedHighBand = document.querySelector("#generated-high-band");
 const generatedFlatness = document.querySelector("#generated-flatness");
@@ -114,6 +122,37 @@ const referenceKurtosis = document.querySelector("#reference-kurtosis");
 const referenceEnvelope100 = document.querySelector("#reference-envelope-100");
 const referenceDetectedRate = document.querySelector("#reference-detected-rate");
 const referenceTotalRate = document.querySelector("#reference-total-rate");
+const referenceSpectrumDistance = document.querySelector("#reference-spectrum-distance");
+const farnellCentroid = document.querySelector("#farnell-centroid");
+const farnellHighBand = document.querySelector("#farnell-high-band");
+const farnellFlatness = document.querySelector("#farnell-flatness");
+const farnellCrest = document.querySelector("#farnell-crest");
+const farnellEnvelopeVariation = document.querySelector("#farnell-envelope-variation");
+const farnellEnvelopeFloor = document.querySelector("#farnell-envelope-floor");
+const farnellBandCorrelation = document.querySelector("#farnell-band-correlation");
+const farnellKurtosis = document.querySelector("#farnell-kurtosis");
+const farnellEnvelope100 = document.querySelector("#farnell-envelope-100");
+const farnellDetectedRate = document.querySelector("#farnell-detected-rate");
+const farnellSpectrumDistance = document.querySelector("#farnell-spectrum-distance");
+const farnellWindowDistance = document.querySelector("#farnell-window-distance");
+const generatedWindowDistance = document.querySelector("#generated-window-distance");
+const referenceWindowDistance = document.querySelector("#reference-window-distance");
+const profileResidual = document.querySelector("#profile-residual");
+const selectedResidualLabel = document.querySelector("#selected-residual-label");
+const selectedDistributionTitle = document.querySelector("#selected-distribution-title");
+const selectedDistributionResidual = document.querySelector("#selected-distribution-residual");
+const farnellDistributionResidual = document.querySelector("#farnell-distribution-residual");
+const selectedDistributionDistance = document.querySelector("#selected-distribution-distance");
+const farnellDistributionDistance = document.querySelector("#farnell-distribution-distance");
+const generatedImpactWaveform = document.querySelector("#generated-impact-waveform");
+const generatedImpactSpectrogram = document.querySelector("#generated-impact-spectrogram");
+const generatedImpactLabel = document.querySelector("#generated-impact-label");
+const referenceImpactWaveform = document.querySelector("#reference-impact-waveform");
+const referenceImpactSpectrogram = document.querySelector("#reference-impact-spectrogram");
+const referenceImpactLabel = document.querySelector("#reference-impact-label");
+const farnellImpactWaveform = document.querySelector("#farnell-impact-waveform");
+const farnellImpactSpectrogram = document.querySelector("#farnell-impact-spectrogram");
+const farnellImpactLabel = document.querySelector("#farnell-impact-label");
 const acousticFactorList = document.querySelector("#acoustic-factor-list");
 const acousticPresetOutput = document.querySelector("#acoustic-preset-output");
 const resetAcousticFactorsButton = document.querySelector("#reset-acoustic-factors");
@@ -156,28 +195,28 @@ let analysisRainRenderer = createGeneratedRainRenderer({
   dropPopulation: rainControls.snapshot().dropPopulation,
 });
 let generatedProfileSamples = createCurrentGeneratedProfileSamples();
-let generatedReferenceSamples = extractProminentImpact(
-  generatedProfileSamples,
-  ANALYSIS_SAMPLE_RATE,
-).samples;
-let generatedReferenceAnalysis = analyzeSignal(
-  generatedReferenceSamples,
-  ANALYSIS_SAMPLE_RATE,
-);
-let generatedProfileAnalysis = analyzeSignal(
-  generatedProfileSamples,
-  ANALYSIS_SAMPLE_RATE,
-  { includeSpectrogram: false },
-);
-let generatedProfileOnsets = detectProminentOnsets(
+let generatedDiagnostics = analyzeRainField(
   generatedProfileSamples,
   ANALYSIS_SAMPLE_RATE,
 );
+let generatedReferenceSamples = generatedDiagnostics.representativeField.samples;
+let generatedReferenceAnalysis = generatedDiagnostics.representativeField.analysis;
+let generatedProfileAnalysis = generatedDiagnostics.profileAnalysis;
+let generatedProfileOnsets = generatedDiagnostics.prominentOnsets;
+let generatedImpact = generatedDiagnostics.impactMicroscope;
+let measuredReferenceDiagnostics = null;
 let measuredReferenceSamples = null;
 let measuredReferenceAnalysis = null;
 let measuredReferenceProfileAnalysis = null;
 let measuredReferenceOnsets = null;
 let measuredReferenceCalibration = null;
+let measuredReferenceImpact = null;
+let farnellReferenceDiagnostics = null;
+let farnellReferenceSamples = null;
+let farnellReferenceAnalysis = null;
+let farnellReferenceProfileAnalysis = null;
+let farnellReferenceOnsets = null;
+let farnellReferenceImpact = null;
 let comparisonResizeTimer = null;
 let acousticRegenerationTimer = null;
 let acousticWaveformRebuildPending = false;
@@ -332,23 +371,15 @@ function regenerateAcousticAssets(rebuildRenderer) {
     });
   }
   generatedProfileSamples = createCurrentGeneratedProfileSamples();
-  generatedReferenceSamples = extractProminentImpact(
-    generatedProfileSamples,
-    ANALYSIS_SAMPLE_RATE,
-  ).samples;
-  generatedReferenceAnalysis = analyzeSignal(
-    generatedReferenceSamples,
-    ANALYSIS_SAMPLE_RATE,
-  );
-  generatedProfileAnalysis = analyzeSignal(
-    generatedProfileSamples,
-    ANALYSIS_SAMPLE_RATE,
-    { includeSpectrogram: false },
-  );
-  generatedProfileOnsets = detectProminentOnsets(
+  generatedDiagnostics = analyzeRainField(
     generatedProfileSamples,
     ANALYSIS_SAMPLE_RATE,
   );
+  generatedReferenceSamples = generatedDiagnostics.representativeField.samples;
+  generatedReferenceAnalysis = generatedDiagnostics.representativeField.analysis;
+  generatedProfileAnalysis = generatedDiagnostics.profileAnalysis;
+  generatedProfileOnsets = generatedDiagnostics.prominentOnsets;
+  generatedImpact = generatedDiagnostics.impactMicroscope;
   if (rebuildRenderer && audioContext) {
     liveRainRenderer = audioContext.sampleRate === ANALYSIS_SAMPLE_RATE
       ? analysisRainRenderer
@@ -441,8 +472,8 @@ function updateControlReadouts() {
     referencePercent === 0
       ? "Generated only"
       : referencePercent === 100
-        ? `${selectedReferenceProfile.title} recording only`
-        : `${generatedPercent} percent generated, ${referencePercent} percent selected reference recording`,
+        ? `${selectedReferenceProfile.title} only`
+        : `${generatedPercent} percent generated, ${referencePercent} percent selected Rain Reference`,
   );
   updateReferenceTimeStretch();
 }
@@ -500,8 +531,23 @@ function syncReferenceMediaProfile() {
   referenceMedia.pause();
   referenceMedia.src = selectedReferenceProfile.assetUrl;
   referenceMedia.dataset.profileId = selectedReferenceProfile.id;
+  referenceMedia.loop = !resolveReferencePlaybackWindow(
+    selectedReferenceProfile,
+  ).isBounded;
   referenceMedia.load();
   updateReferenceTimeStretch();
+}
+
+function constrainReferencePlaybackToProfile() {
+  if (!referenceMedia) return;
+  const playbackWindow = resolveReferencePlaybackWindow(selectedReferenceProfile);
+  if (!playbackWindow.isBounded) return;
+  if (
+    referenceMedia.currentTime < playbackWindow.startSeconds
+    || referenceMedia.currentTime >= playbackWindow.endSeconds
+  ) {
+    referenceMedia.currentTime = playbackWindow.startSeconds;
+  }
 }
 
 function startReferencePlayback() {
@@ -516,6 +562,7 @@ function startReferencePlayback() {
   ) return;
 
   syncReferenceMediaProfile();
+  constrainReferencePlaybackToProfile();
   updateReferenceTimeStretch();
   void referenceMedia.play().catch(error => {
     if (error?.name === "AbortError") return;
@@ -567,9 +614,8 @@ function setAnalysisMetrics(analysis, elements) {
 }
 
 function renderRateCalibration() {
-  const calibration = selectedReferenceCalibration;
   const generatedRateLabel = `${formatRate(selectedRateHz())}/s`;
-  generatedProfileLabel.textContent = `120 ms field · 8 s at ${generatedRateLabel} selected Speed`;
+  generatedProfileLabel.textContent = `1 s representative @ ${generatedDiagnostics.representativeField.centerSeconds.toFixed(2)} s · 8 s at ${generatedRateLabel}`;
   generatedTotalRate.textContent = generatedRateLabel;
   generatedTotalRate.title = "Selected total Poisson Arrival rate";
   generatedDetectedRate.textContent = `${formatRate(generatedProfileOnsets.rateHz)}/s`;
@@ -577,21 +623,53 @@ function renderRateCalibration() {
   if (!measuredReferenceOnsets) {
     referenceDetectedRate.textContent = "—";
     referenceTotalRate.textContent = "—";
-    return;
+  } else {
+    referenceDetectedRate.textContent = `${formatRate(measuredReferenceOnsets.rateHz)}/s`;
+    referenceDetectedRate.title = measuredReferenceCalibration
+      ? `Stored detector baseline: ${formatRate(measuredReferenceCalibration.detectedOnsetRateHz)}/s`
+      : "Detected in the local ten-second analysis window";
+    referenceTotalRate.textContent = measuredReferenceCalibration?.isTotalCalibrated
+      ? `${formatRate(measuredReferenceCalibration.equivalentTotalRateHz)}/s`
+      : "Uncalibrated";
   }
 
-  referenceDetectedRate.textContent = `${formatRate(measuredReferenceOnsets.rateHz)}/s`;
-  referenceDetectedRate.title = measuredReferenceCalibration
-    ? `Stored detector baseline: ${formatRate(measuredReferenceCalibration.detectedOnsetRateHz)}/s`
-    : "Detected in the local ten-second analysis window";
-  referenceTotalRate.textContent = measuredReferenceCalibration?.isTotalCalibrated
-    ? `${formatRate(measuredReferenceCalibration.equivalentTotalRateHz)}/s`
-    : "Uncalibrated";
+  farnellDetectedRate.textContent = farnellReferenceOnsets
+    ? `${formatRate(farnellReferenceOnsets.rateHz)}/s`
+    : "—";
+  generatedWindowDistance.textContent = `${generatedDiagnostics.representativeField.spectrumDistanceDb.toFixed(1)} dB`;
+}
+
+function renderImpactMicroscope(waveform, spectrogram, label, impact, color) {
+  if (!impact) {
+    renderEmptySignal(waveform, "Impact microscope loading");
+    renderEmptySignal(spectrogram, "Aligned spectrogram will appear here");
+    label.textContent = "Waiting for complete profile…";
+    return;
+  }
+  const durationSeconds = impact.samples.length / impact.analysis.sampleRate;
+  const markerFraction = durationSeconds > 0
+    ? impact.onsetOffsetSeconds / durationSeconds
+    : 0;
+  const marker = { markerFraction, markerLabel: "onset" };
+  renderSignalWaveform(waveform, impact.samples, color, marker);
+  renderSignalSpectrogram(spectrogram, impact.analysis, marker);
+  const peakDelayMilliseconds = Math.max(
+    0,
+    (impact.peakSeconds - impact.onsetSeconds) * 1_000,
+  );
+  label.textContent = `${impact.alignmentKind === "detected-onset" ? "Detected onset" : "Peak fallback"} ${impact.onsetSeconds.toFixed(3)} s · peak +${peakDelayMilliseconds.toFixed(1)} ms`;
 }
 
 function renderAnalysisComparison() {
   renderSignalWaveform(generatedAnalysisWaveform, generatedReferenceSamples, "#d9ff86");
   renderSignalSpectrogram(generatedAnalysisSpectrogram, generatedReferenceAnalysis);
+  renderImpactMicroscope(
+    generatedImpactWaveform,
+    generatedImpactSpectrogram,
+    generatedImpactLabel,
+    generatedImpact,
+    "#d9ff86",
+  );
   setAnalysisMetrics(generatedProfileAnalysis, {
     centroid: generatedCentroid,
     highBand: generatedHighBand,
@@ -609,11 +687,13 @@ function renderAnalysisComparison() {
     analysis: generatedProfileAnalysis,
     color: "#d9ff86",
   }];
+  const residualSeries = [];
 
   if (
     measuredReferenceSamples &&
     measuredReferenceAnalysis &&
-    measuredReferenceProfileAnalysis
+    measuredReferenceProfileAnalysis &&
+    measuredReferenceDiagnostics
   ) {
     renderSignalWaveform(referenceAnalysisWaveform, measuredReferenceSamples, "#54dce3");
     renderSignalSpectrogram(referenceAnalysisSpectrogram, measuredReferenceAnalysis);
@@ -632,12 +712,98 @@ function renderAnalysisComparison() {
       analysis: measuredReferenceProfileAnalysis,
       color: "#54dce3",
     });
+    const comparison = compareRainFieldDiagnostics(
+      generatedDiagnostics,
+      measuredReferenceDiagnostics,
+    );
+    residualSeries.push({ comparison, color: "#54dce3" });
+    referenceSpectrumDistance.textContent = `${comparison.profileDistanceDb.toFixed(1)} dB`;
+    referenceWindowDistance.textContent = `${measuredReferenceDiagnostics.representativeField.spectrumDistanceDb.toFixed(1)} dB`;
+    selectedDistributionDistance.textContent = `${comparison.distributionDistanceDb.toFixed(1)} dB`;
+    renderDistributionResidual(selectedDistributionResidual, comparison);
+    renderImpactMicroscope(
+      referenceImpactWaveform,
+      referenceImpactSpectrogram,
+      referenceImpactLabel,
+      measuredReferenceImpact,
+      "#54dce3",
+    );
   } else {
     renderEmptySignal(referenceAnalysisWaveform, "Loading selected Rain Reference");
-    renderEmptySignal(referenceAnalysisSpectrogram, "Measured impact will appear here");
+    renderEmptySignal(referenceAnalysisSpectrogram, "Representative Field will appear here");
+    referenceSpectrumDistance.textContent = "—";
+    referenceWindowDistance.textContent = "—";
+    selectedDistributionDistance.textContent = "—";
+    renderEmptySignal(selectedDistributionResidual, "Selected distribution loading");
+    renderImpactMicroscope(
+      referenceImpactWaveform,
+      referenceImpactSpectrogram,
+      referenceImpactLabel,
+      null,
+      "#54dce3",
+    );
   }
 
+  if (
+    farnellReferenceSamples
+    && farnellReferenceAnalysis
+    && farnellReferenceProfileAnalysis
+    && farnellReferenceDiagnostics
+  ) {
+    renderSignalWaveform(farnellAnalysisWaveform, farnellReferenceSamples, "#ff9d72");
+    renderSignalSpectrogram(farnellAnalysisSpectrogram, farnellReferenceAnalysis);
+    setAnalysisMetrics(farnellReferenceProfileAnalysis, {
+      centroid: farnellCentroid,
+      highBand: farnellHighBand,
+      flatness: farnellFlatness,
+      crest: farnellCrest,
+      envelopeVariation: farnellEnvelopeVariation,
+      envelopeFloor: farnellEnvelopeFloor,
+      bandCorrelation: farnellBandCorrelation,
+      kurtosis: farnellKurtosis,
+      envelope100: farnellEnvelope100,
+    });
+    spectrumSeries.push({
+      analysis: farnellReferenceProfileAnalysis,
+      color: "#ff9d72",
+    });
+    const comparison = compareRainFieldDiagnostics(
+      generatedDiagnostics,
+      farnellReferenceDiagnostics,
+    );
+    residualSeries.push({ comparison, color: "#ff9d72" });
+    farnellSpectrumDistance.textContent = `${comparison.profileDistanceDb.toFixed(1)} dB`;
+    farnellWindowDistance.textContent = `${farnellReferenceDiagnostics.representativeField.spectrumDistanceDb.toFixed(1)} dB`;
+    farnellDistributionDistance.textContent = `${comparison.distributionDistanceDb.toFixed(1)} dB`;
+    renderDistributionResidual(farnellDistributionResidual, comparison);
+    renderImpactMicroscope(
+      farnellImpactWaveform,
+      farnellImpactSpectrogram,
+      farnellImpactLabel,
+      farnellReferenceImpact,
+      "#ff9d72",
+    );
+  } else {
+    renderEmptySignal(farnellAnalysisWaveform, "Loading Farnell procedural reference");
+    renderEmptySignal(farnellAnalysisSpectrogram, "Representative Field will appear here");
+    farnellSpectrumDistance.textContent = "—";
+    farnellWindowDistance.textContent = "—";
+    farnellDistributionDistance.textContent = "—";
+    renderEmptySignal(farnellDistributionResidual, "Farnell distribution loading");
+    renderImpactMicroscope(
+      farnellImpactWaveform,
+      farnellImpactSpectrogram,
+      farnellImpactLabel,
+      null,
+      "#ff9d72",
+    );
+  }
+
+  selectedSpectrumLabel.textContent = selectedReferenceProfile.shortTitle;
+  selectedResidualLabel.textContent = selectedReferenceProfile.shortTitle;
+  selectedDistributionTitle.textContent = `Generated − ${selectedReferenceProfile.shortTitle} distribution`;
   renderSpectrumComparison(comparisonSpectrum, spectrumSeries);
+  renderProfileResidual(profileResidual, residualSeries);
 }
 
 async function decodeReferenceAudio(arrayBuffer) {
@@ -653,12 +819,14 @@ async function decodeReferenceAudio(arrayBuffer) {
 }
 
 function applyPreparedRainReference(prepared, filename, status, calibration = null) {
+  measuredReferenceDiagnostics = prepared.rainDiagnostics;
   measuredReferenceSamples = prepared.samples;
   measuredReferenceAnalysis = prepared.analysis;
   measuredReferenceProfileAnalysis = prepared.profileAnalysis;
   measuredReferenceOnsets = prepared.prominentOnsets;
+  measuredReferenceImpact = prepared.impactMicroscope;
   measuredReferenceCalibration = calibration;
-  referenceFilename.textContent = filename;
+  referenceFilename.textContent = `${filename} · representative @ ${prepared.fieldWindowCenterSeconds.toFixed(2)} s`;
   referenceStatus.dataset.state = "ready";
   referenceStatus.textContent = status;
   renderAnalysisComparison();
@@ -669,7 +837,9 @@ function renderReferenceProvenance(reference) {
   const source = document.createElement("a");
   source.href = reference.sourceUrl ?? reference.datasetUrl;
   source.textContent = reference.creator
-    ? `${reference.creator} on Freesound`
+    ? reference.id === "redwood-ground"
+      ? `${reference.creator} on Freesound`
+      : `${reference.creator} · source example`
     : "Xavier et al. Amazon rainfall dataset";
   const license = document.createElement("a");
   license.href = reference.licenseUrl;
@@ -677,19 +847,50 @@ function renderReferenceProvenance(reference) {
   referenceProvenance.append(
     "Selected: ",
     source,
-    ` · ${reference.intensity} on ${reference.surface} · ${reference.playbackFormat} · `,
+    ` · ${reference.intensity} · ${reference.surface} · ${reference.playbackFormat} · `,
     license,
     ". The selector controls analysis and Reference Playback; a local file remains a silent visual override.",
   );
 }
 
+function describePreparedField(prepared) {
+  return `Representative one-second Field centered at ${prepared.fieldWindowCenterSeconds.toFixed(2)} s (${prepared.fieldWindowDistanceDb.toFixed(1)} dB from its complete profile); Impact Microscope onset ${prepared.impactMicroscope.onsetSeconds.toFixed(3)} s`;
+}
+
+async function analyzeFarnellRainReference() {
+  farnellCard.setAttribute("aria-busy", "true");
+  farnellFilename.textContent = "Loading 14–24 s profile…";
+  renderAnalysisComparison();
+
+  try {
+    const prepared = await loadRainReference(FARNELL_RAIN_REFERENCE, {
+      decodeAudioData: decodeReferenceAudio,
+    });
+    farnellReferenceDiagnostics = prepared.rainDiagnostics;
+    farnellReferenceSamples = prepared.samples;
+    farnellReferenceAnalysis = prepared.analysis;
+    farnellReferenceProfileAnalysis = prepared.profileAnalysis;
+    farnellReferenceOnsets = prepared.prominentOnsets;
+    farnellReferenceImpact = prepared.impactMicroscope;
+    farnellFilename.textContent = `14–24 s profile · representative @ ${prepared.fieldWindowCenterSeconds.toFixed(2)} s`;
+  } catch (error) {
+    farnellFilename.textContent = "Farnell procedural reference unavailable";
+    console.error(error);
+  } finally {
+    farnellCard.setAttribute("aria-busy", "false");
+    renderAnalysisComparison();
+  }
+}
+
 async function analyzeSelectedRainReference() {
   const request = ++referenceLoadRequest;
   selectedReferenceReady = false;
+  measuredReferenceDiagnostics = null;
   measuredReferenceSamples = null;
   measuredReferenceAnalysis = null;
   measuredReferenceProfileAnalysis = null;
   measuredReferenceOnsets = null;
+  measuredReferenceImpact = null;
   measuredReferenceCalibration = null;
   sourceMixInput.disabled = true;
   stopReferencePlayback();
@@ -712,14 +913,14 @@ async function analyzeSelectedRainReference() {
       prepared,
       selectedReferenceProfile.title,
       selectedReferenceCalibration.isTotalCalibrated
-        ? `${selectedReferenceProfile.shortTitle} reference: ${selectedReferenceCalibration.detectedOnsetRateHz.toFixed(1)} detected onsets/s; provisional ${selectedReferenceCalibration.equivalentTotalRateHz.toFixed(0)} total Arrivals/s. Current window detects ${prepared.prominentOnsets.rateHz.toFixed(1)}/s. Strongest impact at ${prepared.peakSeconds.toFixed(3)} s.`
-        : `${selectedReferenceProfile.shortTitle} reference: ${selectedReferenceCalibration.detectedOnsetRateHz.toFixed(1)} detected onsets/s; total Arrival rate uncalibrated. Current window detects ${prepared.prominentOnsets.rateHz.toFixed(1)}/s. Strongest impact at ${prepared.peakSeconds.toFixed(3)} s.`,
+        ? `${selectedReferenceProfile.shortTitle} reference: ${selectedReferenceCalibration.detectedOnsetRateHz.toFixed(1)} detected onsets/s; provisional ${selectedReferenceCalibration.equivalentTotalRateHz.toFixed(0)} total Arrivals/s. Current window detects ${prepared.prominentOnsets.rateHz.toFixed(1)}/s. ${describePreparedField(prepared)}.`
+        : `${selectedReferenceProfile.shortTitle} reference: ${selectedReferenceCalibration.detectedOnsetRateHz.toFixed(1)} detected onsets/s; total Arrival rate uncalibrated. Current window detects ${prepared.prominentOnsets.rateHz.toFixed(1)}/s. ${describePreparedField(prepared)}.`,
       selectedReferenceCalibration,
     );
   } catch (error) {
     if (request !== referenceLoadRequest) return;
     referenceStatus.dataset.state = "error";
-    referenceStatus.textContent = "The selected reference could not be loaded. Choose the other profile or a local recording.";
+    referenceStatus.textContent = "The selected reference could not be loaded. Choose another profile or a local recording.";
     console.error(error);
   } finally {
     if (request === referenceLoadRequest) {
@@ -732,7 +933,7 @@ async function analyzeRainReference(file) {
   const request = ++referenceLoadRequest;
   referenceCard.setAttribute("aria-busy", "true");
   referenceStatus.dataset.state = "loading";
-  referenceStatus.textContent = "Decoding and locating the strongest impact…";
+  referenceStatus.textContent = "Decoding, selecting a representative Field, and aligning the strongest onset…";
 
   try {
     if (file.size > REFERENCE_FILE_LIMIT_BYTES) {
@@ -744,7 +945,7 @@ async function analyzeRainReference(file) {
     applyPreparedRainReference(
       prepared,
       file.name,
-      `Local override ready at ${prepared.prominentOnsets.rateHz.toFixed(1)} detected onsets/s; total Arrival rate is uncalibrated. Strongest impact found at ${prepared.peakSeconds.toFixed(3)} s; the file remains local and silent.`,
+      `Local override ready at ${prepared.prominentOnsets.rateHz.toFixed(1)} detected onsets/s; total Arrival rate is uncalibrated. ${describePreparedField(prepared)}. The file remains local and silent.`,
     );
   } catch (error) {
     if (request !== referenceLoadRequest) return;
@@ -849,6 +1050,7 @@ function renderWaveform() {
 }
 
 function renderFrame(now) {
+  constrainReferencePlaybackToProfile();
   while (scheduledArrivals[0]?.startedAt <= now) {
     const scheduled = scheduledArrivals.shift();
     activateArrival(scheduled.event, scheduled.startedAt);
@@ -893,8 +1095,9 @@ async function ensureAudio() {
     });
   rainAudioBufferCache = new WeakMap();
   referenceMedia = enablePitchPreservation(new Audio());
-  referenceMedia.loop = true;
   referenceMedia.preload = "auto";
+  referenceMedia.addEventListener("loadedmetadata", constrainReferencePlaybackToProfile);
+  referenceMedia.addEventListener("timeupdate", constrainReferencePlaybackToProfile);
   referenceMediaSource = audioContext.createMediaElementSource(referenceMedia);
   referenceMediaSource.connect(referenceGain);
   syncReferenceMediaProfile();
@@ -1147,3 +1350,4 @@ seedOutput.textContent = seed;
 renderAnalysisComparison();
 renderLoop.wake();
 void analyzeSelectedRainReference();
+void analyzeFarnellRainReference();

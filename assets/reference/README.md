@@ -45,16 +45,41 @@ Commons Attribution 4.0 International license:
 - MD5: `8a2351b76dcb0145f24705596ab32665`
 - Original download: <https://dataverse.ird.fr/api/access/datafile/39504>
 
+## Andy Farnell procedural rain example
+
+`designing-sound-rain.wav` is the rendered procedural-audio example from Andy
+Farnell’s *Designing Sound* Practical 15: Rain:
+<https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/8375/designing_sound.zip/practical15.html>.
+
+The source page publishes the Pure Data patches that generate the moving rain
+mixture and describes the render as successive Gaussian-distributed parabolic
+pulses, noise-band excitation, bubble droplets, and glass-lamina excitation.
+Pwason bundles the complete render for traceable evaluation and optional
+playback, but analyzes only 14.000–24.000 seconds. The displayed one-second
+Representative Field Window is selected by the same normalized-spectrum scan
+used for every source, and a separate 120 ms Impact Microscope aligns a detected
+acoustic onset for contact inspection. The file never supplies samples, grains, filters,
+or response waveforms to generated audio.
+
+- Original filename: `rain.wav`
+- Bundled filename: `designing-sound-rain.wav`
+- Format: stereo 44.1 kHz, 16-bit PCM WAV
+- Duration: `47.219909` seconds
+- Size: `8,329,714` bytes
+- SHA-256: `2c0a72cf7561aba40a8af4510d7372cdd605216307e5b28985905bb354fe20a1`
+- Original download: <https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/8375/designing_sound.zip/p15/rain.wav>
+- Rights note: the source page does not state separate license terms for the WAV
+
 ## Playback calibration
 
-Pwason Light analyzes the selected recording and can play it as an optional
-looping comparison through Source Mix. Neither file is used as source material
+Pwason Light analyzes the selected reference and can play it as an optional
+looping comparison through Source Mix. None of the three files is used as source material
 by the rain synthesizer or participates in Poisson Arrival generation.
 
 To align the recording's audible activity with the generated Speed control,
-the profiles store onset-density calibrations of 23.1 onsets/s for Redwood and
-15.8 onsets/s for Amazon. These are comparison estimates, not physical drop
-counts. Both use the same detector over 20 seconds after a 5-second lead-in:
+the profiles store onset-density calibrations of 38.5 onsets/s for Redwood,
+15.8 onsets/s for Amazon, and 43.4 onsets/s for Farnell’s 14–24 second interval.
+These are comparison estimates, not physical drop counts. All use the same detector:
 256-sample RMS windows, 128-sample hops at 48 kHz, positive log-energy flux
 above its 85th percentile, local maxima, and a 10 ms refractory interval.
 Reference Playback uses `Speed / calibrated onset density` as its playback

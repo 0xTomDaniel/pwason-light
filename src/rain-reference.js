@@ -1,8 +1,6 @@
 import {
-  analyzeSignal,
-  detectProminentOnsets,
-  extractProminentImpact,
-} from "./signal-analysis.js";
+  analyzeRainField,
+} from "./rain-diagnostics.js";
 
 const MAX_ANALYSIS_SECONDS = 10;
 
@@ -54,9 +52,35 @@ export const AMAZON_RAIN_REFERENCE = Object.freeze({
   calibrationKind: "detected-onsets-only",
 });
 
+export const FARNELL_RAIN_REFERENCE = Object.freeze({
+  id: "farnell-procedural",
+  filename: "designing-sound-rain.wav",
+  assetUrl: new URL(
+    "../assets/reference/designing-sound-rain.wav",
+    import.meta.url,
+  ).href,
+  title: "Designing Sound · procedural rain",
+  shortTitle: "Farnell",
+  intensity: "moving procedural rain mixture",
+  surface: "synthesized pulses and noise-band surfaces",
+  sourceUrl: "https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/8375/designing_sound.zip/practical15.html",
+  creator: "Andy Farnell",
+  license: "Source terms not stated",
+  licenseUrl: "https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/8375/designing_sound.zip/practical15.html",
+  playbackFormat: "44.1 kHz, 16-bit stereo PCM WAV",
+  sha256: "2c0a72cf7561aba40a8af4510d7372cdd605216307e5b28985905bb354fe20a1",
+  analysisStartSeconds: 14,
+  analysisDurationSeconds: 10,
+  detectedOnsetRateHz: 43.4,
+  equivalentTotalRateHz: null,
+  prominenceFraction: null,
+  calibrationKind: "detected-onsets-only",
+});
+
 export const RAIN_REFERENCE_PROFILES = Object.freeze([
   REDWOOD_GROUND_REFERENCE,
   AMAZON_RAIN_REFERENCE,
+  FARNELL_RAIN_REFERENCE,
 ]);
 
 export const DEFAULT_RAIN_REFERENCE_PROFILE = REDWOOD_GROUND_REFERENCE;
@@ -89,28 +113,69 @@ export function resolveReferenceCalibration(reference) {
   });
 }
 
-export function prepareRainReference(decodedAudio) {
-  const sampleCount = Math.min(
+export function prepareRainReference(decodedAudio, {
+  analysisStartSeconds = 0,
+  analysisDurationSeconds = MAX_ANALYSIS_SECONDS,
+} = {}) {
+  const requestedStart = Number(analysisStartSeconds);
+  const boundedStartSeconds = Number.isFinite(requestedStart)
+    ? Math.max(0, requestedStart)
+    : 0;
+  const requestedDuration = Number(analysisDurationSeconds);
+  const boundedDurationSeconds = Number.isFinite(requestedDuration)
+    && requestedDuration > 0
+    ? requestedDuration
+    : MAX_ANALYSIS_SECONDS;
+  const startSample = Math.max(0, Math.min(
     decodedAudio.length,
-    Math.round(decodedAudio.sampleRate * MAX_ANALYSIS_SECONDS),
+    Math.round(decodedAudio.sampleRate * boundedStartSeconds),
+  ));
+  const sampleCount = Math.min(
+    decodedAudio.length - startSample,
+    Math.round(decodedAudio.sampleRate * boundedDurationSeconds),
   );
   const monoSamples = new Float32Array(sampleCount);
 
   for (let channel = 0; channel < decodedAudio.numberOfChannels; channel += 1) {
     const channelSamples = decodedAudio.getChannelData(channel);
     for (let index = 0; index < sampleCount; index += 1) {
-      monoSamples[index] += channelSamples[index] / decodedAudio.numberOfChannels;
+      monoSamples[index] += channelSamples[startSample + index]
+        / decodedAudio.numberOfChannels;
     }
   }
 
-  const impact = extractProminentImpact(monoSamples, decodedAudio.sampleRate);
+  const analysisStart = startSample / decodedAudio.sampleRate;
+  const analysisEnd = analysisStart + sampleCount / decodedAudio.sampleRate;
+  const diagnostics = analyzeRainField(monoSamples, decodedAudio.sampleRate);
+  const representativeField = Object.freeze({
+    ...diagnostics.representativeField,
+    startSeconds: analysisStart + diagnostics.representativeField.startSeconds,
+    centerSeconds: analysisStart + diagnostics.representativeField.centerSeconds,
+  });
+  const impactMicroscope = Object.freeze({
+    ...diagnostics.impactMicroscope,
+    startSeconds: analysisStart + diagnostics.impactMicroscope.startSeconds,
+    onsetSeconds: analysisStart + diagnostics.impactMicroscope.onsetSeconds,
+    peakSeconds: analysisStart + diagnostics.impactMicroscope.peakSeconds,
+  });
   return {
-    ...impact,
-    analysis: analyzeSignal(impact.samples, decodedAudio.sampleRate),
-    profileAnalysis: analyzeSignal(monoSamples, decodedAudio.sampleRate, {
-      includeSpectrogram: false,
+    samples: representativeField.samples,
+    startSeconds: representativeField.startSeconds,
+    analysisStartSeconds: analysisStart,
+    analysisEndSeconds: analysisEnd,
+    fieldWindowCenterSeconds: representativeField.centerSeconds,
+    fieldWindowKind: "spectrally-representative",
+    fieldWindowDistanceDb: representativeField.spectrumDistanceDb,
+    analysis: representativeField.analysis,
+    profileAnalysis: diagnostics.profileAnalysis,
+    spectralDistribution: diagnostics.spectralDistribution,
+    impactMicroscope,
+    prominentOnsets: diagnostics.prominentOnsets,
+    rainDiagnostics: Object.freeze({
+      ...diagnostics,
+      representativeField,
+      impactMicroscope,
     }),
-    prominentOnsets: detectProminentOnsets(monoSamples, decodedAudio.sampleRate),
   };
 }
 
@@ -131,6 +196,6 @@ export async function loadRainReference(reference, {
   return {
     reference,
     decodedAudio,
-    ...prepareRainReference(decodedAudio),
+    ...prepareRainReference(decodedAudio, reference),
   };
 }

@@ -3,9 +3,31 @@ import test from "node:test";
 
 import {
   analyzeSignal,
+  compareNormalizedSpectra,
   detectProminentOnsets,
-  extractProminentImpact,
 } from "../src/signal-analysis.js";
+
+test("normalized spectral distance ignores level while exposing tonal mismatch", () => {
+  const sampleRate = 48_000;
+  const tone = frequencyHz => Float32Array.from(
+    { length: sampleRate },
+    (_, index) => Math.sin(2 * Math.PI * frequencyHz * index / sampleRate),
+  );
+  const oneKilohertz = analyzeSignal(tone(1_000), sampleRate, {
+    includeSpectrogram: false,
+  });
+  const scaledOneKilohertz = analyzeSignal(
+    Float32Array.from(tone(1_000), sample => sample * 0.1),
+    sampleRate,
+    { includeSpectrogram: false },
+  );
+  const eightKilohertz = analyzeSignal(tone(8_000), sampleRate, {
+    includeSpectrogram: false,
+  });
+
+  assert.ok(compareNormalizedSpectra(oneKilohertz, scaledOneKilohertz) < 0.001);
+  assert.ok(compareNormalizedSpectra(oneKilohertz, eightKilohertz) > 10);
+});
 
 test("Signal Analysis identifies the frequency shape of a known tone", () => {
   const sampleRate = 48_000;
@@ -102,20 +124,6 @@ test("Signal Analysis measures whether frequency-region envelopes move together"
 
   assert.ok(together.bandEnvelopeCorrelation > 0.75);
   assert.ok(apart.bandEnvelopeCorrelation < 0.3);
-});
-
-test("a Rain Reference comparison isolates its strongest 120 millisecond impact", () => {
-  const sampleRate = 48_000;
-  const samples = new Float32Array(sampleRate);
-  samples[24_000] = -0.9;
-  samples[36_000] = 0.4;
-
-  const impact = extractProminentImpact(samples, sampleRate);
-
-  assert.equal(impact.samples.length, 5_760);
-  assert.equal(impact.peakSeconds, 0.5);
-  assert.equal(impact.startSeconds, 0.495);
-  assert.ok(Math.abs(impact.samples[240] + 0.9) < 0.000001);
 });
 
 test("Signal Analysis exposes impulsiveness and multiscale envelope structure", () => {

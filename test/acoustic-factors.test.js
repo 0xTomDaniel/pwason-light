@@ -49,7 +49,7 @@ test("the default preset favors soft leaf and ground splats over hard impacts", 
   assert.deepEqual(defaults.impactSoftness, { enabled: true, amount: 0.9 });
   assert.deepEqual(defaults.highTexture, { enabled: true, amount: 0.32 });
   assert.deepEqual(defaults.spectralSparsity, { enabled: true, amount: 0.78 });
-  assert.deepEqual(defaults.wetMicrotexture, { enabled: true, amount: 0.35 });
+  assert.deepEqual(defaults.wetMicrotexture, { enabled: true, amount: 0.45 });
   assert.deepEqual(defaults.microSplashes, { enabled: false, amount: 0.2 });
   assert.deepEqual(defaults.woodSurface, { enabled: false, amount: 0.2 });
 });

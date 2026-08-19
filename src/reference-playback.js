@@ -24,6 +24,21 @@ export function calculateReferenceTimeStretch(speedHz, comparisonRateHz) {
   };
 }
 
+export function resolveReferencePlaybackWindow(reference) {
+  const start = Number(reference?.analysisStartSeconds);
+  const duration = Number(reference?.analysisDurationSeconds);
+  const isBounded = Number.isFinite(start)
+    && start >= 0
+    && Number.isFinite(duration)
+    && duration > 0;
+
+  return Object.freeze({
+    startSeconds: isBounded ? start : 0,
+    endSeconds: isBounded ? start + duration : null,
+    isBounded,
+  });
+}
+
 export function enablePitchPreservation(mediaElement) {
   for (const property of [
     "preservesPitch",

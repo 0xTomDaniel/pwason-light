@@ -4,7 +4,24 @@ import test from "node:test";
 import {
   calculateReferenceTimeStretch,
   enablePitchPreservation,
+  resolveReferencePlaybackWindow,
 } from "../src/reference-playback.js";
+
+test("Reference Playback honors a profile-declared source interval", () => {
+  assert.deepEqual(resolveReferencePlaybackWindow({
+    analysisStartSeconds: 14,
+    analysisDurationSeconds: 10,
+  }), {
+    startSeconds: 14,
+    endSeconds: 24,
+    isBounded: true,
+  });
+  assert.deepEqual(resolveReferencePlaybackWindow({}), {
+    startSeconds: 0,
+    endSeconds: null,
+    isBounded: false,
+  });
+});
 
 test("Reference Playback follows Speed relative to its explicit comparison rate", () => {
   assert.deepEqual(calculateReferenceTimeStretch(120, 120), {

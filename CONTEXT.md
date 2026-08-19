@@ -73,7 +73,7 @@ A quieter delayed secondary contact generated inside one Rain Impact Waveform. I
 _Avoid_: Secondary Poisson event, extra drop stream
 
 **Acoustic Target Profile**:
-A measured aggregate spectral and temporal shape used to constrain generated rain texture. Pwason's current Acoustic Target Profile includes independently normalized nine-band broad and thirteen-band fine contours from the default Redwood Rain Reference but contains no recording samples or response waveforms.
+A measured aggregate spectral and temporal shape used to constrain generated rain texture. Pwason's current enforceable Acoustic Target Profile includes independently normalized nine-band broad and thirteen-band fine contours from the default Redwood Rain Reference but contains no recording samples or response waveforms. Farnell remains a separate diagnostic Procedural Rain Reference because its much brighter, more impulsive profile conflicts with Redwood and must not be silently averaged into a fictitious target.
 _Avoid_: Sample synthesis, spectral note, selected playback profile
 
 **Generated Rain Renderer**:
@@ -81,16 +81,28 @@ The Module that maps caller-owned Arrivals and the selected Drop Population to c
 _Avoid_: Poisson engine, recorded-rain player
 
 **Rain Reference**:
-A measured rain recording used to evaluate the generated Rain Impact Waveform. A designer may temporarily replace the visual comparison with a local recording. A Rain Reference never participates in Arrival generation.
-_Avoid_: Sample bank, recorded waveform generator
+A traceable audible comparison source used to evaluate generated rain, either a Measured Rain Reference or a Procedural Rain Reference. A designer may temporarily replace the selected visual comparison with a local recording. A Rain Reference never participates in Arrival generation.
+_Avoid_: Sample bank, synthesis input, generated waveform source
+
+**Measured Rain Reference**:
+A field recording of physical rainfall used only for analysis and optional Reference Playback.
+_Avoid_: Procedural example, generated target waveform
+
+**Procedural Rain Reference**:
+A published pure-synthesis rain render used only for analysis and optional Reference Playback. Pwason may compare its aggregate behavior with the render but never copies its samples, patches, or extracted waveforms into generated audio.
+_Avoid_: Measured rainfall, synthesis input, implementation template
 
 **Reference Library**:
-The two bundled Rain References available for traceable analysis and playback: the default CC0 Redwood leaves-and-ground recording and the retained scientific Amazon recording.
+The three bundled Rain References available for traceable analysis and playback: the default CC0 Redwood leaves-and-ground recording, the retained scientific Amazon recording, and Andy Farnell’s MIT-hosted procedural rain example.
 _Avoid_: Sample bank, synthesis corpus
 
 **Reference Profile**:
-One Reference Library entry: its recording, provenance, surface, format, checksum, detected prominent-onset rate, and optional equivalent total-Arrival calibration. Selecting a profile controls both visual analysis and Reference Playback.
+One Reference Library entry: its source asset, provenance, surface or synthesis character, format, checksum, detected prominent-onset rate, optional equivalent total-Arrival calibration, and optional fixed analysis interval. Selecting a profile controls both visual analysis and Reference Playback.
 _Avoid_: Audio Channel, spectral profile
+
+**Normalized Profile Distance**:
+The level-independent RMS dB difference between two complete-profile spectra sampled on the same logarithmic frequency grid after each is normalized to its own peak. It measures aggregate tonal mismatch, not time-aligned spectrogram similarity or perceptual quality.
+_Avoid_: Loudness difference, waveform error, fit score
 
 **Prominent Onset Rate**:
 The rate of foreground energy increases found by the shared onset detector in generated or recorded audio. It observes only detectable contacts and is not the total physical Arrival rate.
@@ -123,6 +135,22 @@ _Avoid_: Spectral field, Channel bank
 **Field Window**:
 A fixed-duration excerpt from an active generated or measured rain field containing every overlapping contact audible during that interval. It is comparison evidence for the rain population, not an isolated Rain Impact Waveform.
 _Avoid_: Single drop, Arrival Response, isolated contact
+
+**Representative Field Window**:
+A one-second Field Window selected by the same level-independent rule for every source: its normalized spectrum is closest to that source's complete analysis profile. It illustrates typical local texture without claiming event alignment or replacing complete-profile evidence.
+_Avoid_: Strongest contact, fixed favorite moment, aligned drop
+
+**Impact Microscope**:
+A 120-millisecond excerpt centered around one prominent acoustic onset, with that detected onset placed at the same visible offset for every source. It compares contact morphology and reports detector-bounded alignment rather than claiming knowledge of an exact physical impact time inside a recording.
+_Avoid_: Representative Field Window, physical-drop timestamp, strongest sample
+
+**Spectral Profile Residual**:
+The signed, level-independent dB difference between two complete-profile spectra. Positive values mean generated rain has excess normalized energy at that frequency; negative values mean generated rain is missing energy.
+_Avoid_: Time-aligned spectrogram subtraction, loudness difference
+
+**Spectral Distribution Residual**:
+The signed dB difference between matching quiet-to-loud percentiles of short-time spectral energy from two complete profiles. It discards frame order so independent stochastic rain realizations can be compared without treating different Arrival times as synthesis errors.
+_Avoid_: Pixel-aligned spectrogram difference, event correspondence
 
 **Acoustic Propagation**:
 The distance loss, high-frequency air damping, and left-right direction applied between an Impact Position and the listener. At the accepted 70% setting, distance pressure follows the free-field h/d law; the factor varies that law's exponent without creating a stationary background or second clock.

@@ -5,6 +5,7 @@ import test from "node:test";
 
 import {
   AMAZON_RAIN_REFERENCE,
+  FARNELL_RAIN_REFERENCE,
   RAIN_REFERENCE_PROFILES,
   getRainReferenceProfile,
   loadRainReference,
@@ -25,10 +26,10 @@ test("the bundled Rain Reference is the cited Amazon light-rain research recordi
   );
 });
 
-test("the Reference Library keeps Amazon and adds the CC0 leaf-and-ground recording", async () => {
+test("the Reference Library includes the two recordings and Farnell procedural rain", async () => {
   assert.deepEqual(
     RAIN_REFERENCE_PROFILES.map(reference => reference.id),
-    ["redwood-ground", "amazon-forest"],
+    ["redwood-ground", "amazon-forest", "farnell-procedural"],
   );
 
   const clean = getRainReferenceProfile("redwood-ground");
@@ -40,6 +41,16 @@ test("the Reference Library keeps Amazon and adds the CC0 leaf-and-ground record
   assert.equal(
     createHash("sha256").update(recording).digest("hex"),
     clean.sha256,
+  );
+
+  const procedural = await readFile(new URL(FARNELL_RAIN_REFERENCE.assetUrl));
+  assert.equal(FARNELL_RAIN_REFERENCE.creator, "Andy Farnell");
+  assert.equal(FARNELL_RAIN_REFERENCE.analysisStartSeconds, 14);
+  assert.equal(FARNELL_RAIN_REFERENCE.analysisDurationSeconds, 10);
+  assert.equal(FARNELL_RAIN_REFERENCE.fieldWindowCenterSeconds, undefined);
+  assert.equal(
+    createHash("sha256").update(procedural).digest("hex"),
+    "2c0a72cf7561aba40a8af4510d7372cdd605216307e5b28985905bb354fe20a1",
   );
 });
 
@@ -82,7 +93,7 @@ test("unknown Reference Profile ids are rejected", () => {
   );
 });
 
-test("Rain Reference preparation downmixes browser audio and isolates one impact", () => {
+test("Rain Reference preparation returns one representative Field and one aligned Impact Microscope", () => {
   const sampleRate = 48_000;
   const left = new Float32Array(sampleRate);
   const right = new Float32Array(sampleRate);
@@ -96,14 +107,42 @@ test("Rain Reference preparation downmixes browser audio and isolates one impact
     getChannelData: channel => [left, right][channel],
   });
 
-  assert.equal(prepared.samples.length, 5_760);
-  assert.equal(prepared.peakSeconds, 0.5);
-  assert.ok(Math.abs(prepared.samples[240] + 0.6) < 0.000001);
+  assert.equal(prepared.samples.length, sampleRate);
+  assert.equal(prepared.fieldWindowKind, "spectrally-representative");
+  assert.equal(prepared.fieldWindowCenterSeconds, 0.5);
+  assert.equal(prepared.impactMicroscope.samples.length, 5_760);
+  assert.ok(Math.abs(prepared.impactMicroscope.peakSeconds - 0.5) < 0.01);
   assert.equal(prepared.analysis.sampleRate, sampleRate);
   assert.equal(prepared.profileAnalysis.durationSeconds, 1);
   assert.equal(prepared.profileAnalysis.spectrogram.length, 0);
   assert.equal(prepared.prominentOnsets.count, 1);
   assert.equal(prepared.prominentOnsets.rateHz, 1);
+});
+
+test("Rain Reference preparation selects within its declared analysis interval", () => {
+  const sampleRate = 48_000;
+  const samples = new Float32Array(sampleRate * 2);
+  samples[Math.round(0.74 * sampleRate)] = 0.6;
+  samples[Math.round(1.75 * sampleRate)] = 1;
+
+  const prepared = prepareRainReference({
+    length: samples.length,
+    numberOfChannels: 1,
+    sampleRate,
+    getChannelData: () => samples,
+  }, {
+    analysisStartSeconds: 0.5,
+    analysisDurationSeconds: 1,
+  });
+
+  assert.equal(prepared.profileAnalysis.durationSeconds, 1);
+  assert.equal(prepared.analysisStartSeconds, 0.5);
+  assert.equal(prepared.analysisEndSeconds, 1.5);
+  assert.equal(prepared.fieldWindowCenterSeconds, 1);
+  assert.equal(prepared.fieldWindowKind, "spectrally-representative");
+  assert.equal(prepared.samples.length, sampleRate);
+  assert.ok(prepared.samples.some(sample => Math.abs(sample - 0.6) < 0.000001));
+  assert.ok(!prepared.samples.some(sample => Math.abs(sample - 1) < 0.000001));
 });
 
 test("the Rain Reference loader fetches and prepares a selected profile", async () => {
@@ -135,5 +174,5 @@ test("the Rain Reference loader fetches and prepares a selected profile", async 
   assert.deepEqual(requestedUrls, [AMAZON_RAIN_REFERENCE.assetUrl]);
   assert.equal(loaded.reference, AMAZON_RAIN_REFERENCE);
   assert.equal(loaded.decodedAudio, decodedAudio);
-  assert.equal(loaded.peakSeconds, 0.25);
+  assert.ok(Math.abs(loaded.impactMicroscope.peakSeconds - 0.25) < 0.01);
 });

@@ -32,8 +32,8 @@ never begins automatically.
 | Link Speed + Drop Population | Bidirectionally aligns both normalized slider positions; switching it off preserves their current values. |
 | Channel Coupling | Moves a fixed total Arrival rate between private Channel events and events shared by all eight Channels. |
 | Output level | Controls the complete post-output-stage browser signal. |
-| Reference profile | Selects the cleaner Redwood leaves-and-ground field recording or the scientific Amazon forest recording for both playback and visual analysis. |
-| Source Mix | Crossfades between generated rain and the selected recording. Generated is 0%, the equal-power blend is 50%, and Reference-only is 100%. |
+| Reference profile | Selects the Redwood or Amazon field recording, or Andy Farnell’s procedural rain example, for playback and selected-reference analysis. |
+| Source Mix | Crossfades between generated rain and the selected Rain Reference. Generated is 0%, the equal-power blend is 50%, and Reference-only is 100%. |
 | Audio response | Enables or mutes both generated audio and Reference Playback. |
 | New weather seed | Starts a new reproducible realization without changing the controls. |
 
@@ -44,7 +44,7 @@ and wood prevalence, analytic surface excitation and sustain, Wet Microtexture,
 low/mid/high texture, Spectral Sparsity, delayed secondary contacts, field depth
 and propagation, high-rate density compensation, and optional compression.
 **Reset all factors** restores the current listening baseline: 70% Distance
-Loss, 20% Mid Texture, 35% Wet Microtexture, 60% Distance Air Damping, Micro-splashes off, Wood
+Loss, 20% Mid Texture, 45% Wet Microtexture, 60% Distance Air Damping, Micro-splashes off, Wood
 Surface off, and Compression off. These controls never alter Reference Playback.
 
 At 100% Reference, the simulator continues producing light Arrivals but skips
@@ -140,18 +140,29 @@ The selector also retains the exact light-rainfall recording from Xavier et
 al., “Measuring Amazon Rainfall Intensity With Sound Recorders.” The study
 recorded rainfall in Central Amazon forest using a recorder fixed to a tree.
 
+The third profile is Andy Farnell’s pure-synthesis rain example from
+*Designing Sound*. Its complete WAV is bundled for traceable comparison, but
+the Reference lab analyzes only 14–24 seconds, the portion selected for its wet
+noise-band texture. The source
+page does not state separate license terms for the example file, so the project
+does not represent it as permissively licensed.
+
 - Cleaner recording: <https://freesound.org/s/464334/>
 - Cleaner recording license: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
 - Dataset: <https://doi.org/10.23708/I0QYNM>
 - Research paper: <https://doi.org/10.1029/2024GL108210>
 - Amazon recording license: [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)
+- Farnell source and Pure Data patches: <https://mitp-content-server.mit.edu/books/content/sectbyfn/books_pres_0/8375/designing_sound.zip/practical15.html>
 - Local provenance and checksum: [`assets/reference/README.md`](assets/reference/README.md)
 
-The Rain Reference lab shows matched 120 ms Field Windows centered on the
-strongest contact in the eight-second generated field and the first ten seconds
-of the selected recording. Each window contains every overlapping nearby and
-distant contact; neither is presented as an isolated measured drop. A 1,024-point
-Hann STFT at 1 ms hops feeds a continuously interpolated, log-frequency,
+The Rain Reference lab places the normalized complete-profile spectrum and
+signed residual diagnostics first, then stacks three full-width one-second
+Representative Field Windows: generated rain, the selected Reference Profile,
+and Farnell procedural rain. Every source uses the same 10 ms scan and selects
+the window whose level-normalized spectrum is closest to its own complete
+profile. Each window contains every overlapping nearby and distant contact and
+is not event-aligned. A 1,024-point Hann STFT at 4 ms hops feeds a continuously
+interpolated, log-frequency,
 70 dB spectrogram rather than an enlarged low-resolution heatmap. The waveform
 above each spectrogram is a visual-only, robustly normalized min/max envelope:
 every horizontal pixel retains its local extrema, so quiet field detail remains
@@ -159,9 +170,32 @@ visible without changing playback gain. For the steady texture it displays norma
 spectral centroid, high-frequency energy, spectral flatness, crest factor,
 sample kurtosis, multiscale envelope variation, background-floor ratio,
 cross-band envelope correlation, generated total Arrival rate, and prominent
-onsets detected from both sources by the same algorithm.
+onsets detected from every source by the same algorithm. Separate 120 ms Impact
+Microscopes select the strongest detected acoustic onset by post-onset energy,
+place it 20 ms into every excerpt, and draw the same marker on waveform and
+spectrogram. Their alignment is limited by the detector's approximately 2.7 ms
+hop and is not a claim about unknowable physical impact time in a recording.
 
-The selected recording can also loop as Reference Playback through Source Mix.
+Each reference also shows a level-independent Normalized Profile Distance and
+signed Spectral Profile Residual from the current synth. Spectral Distribution
+Residual heatmaps compare q10, q25, q50, q75, and q90 energy at each frequency
+after discarding frame order, revealing background-floor and foreground-impact
+mismatch without pretending independent stochastic spectrogram pixels align.
+The displayed Window Δ reports each Representative Field Window's distance from
+its complete profile, which remains authoritative.
+
+The two references are intentionally not averaged into one target. In-browser
+analysis puts Redwood near 3.98 kHz centroid and 22.5% energy above 8 kHz, while
+Farnell’s 14–24 second interval is near 8.07 kHz and 51.2%. The current 45% Wet
+Microtexture baseline is near 4.15 kHz and 22.3%. On the shared 80 Hz–20 kHz
+Rain Diagnostics grid, the current profiles report approximately 6.4 dB to
+Redwood and 5.8 dB to Farnell, with
+6.2 dB and 9.9 dB Spectral Distribution Residuals respectively. Redwood remains
+the enforceable tonal target; Farnell is the separate wet-texture diagnostic.
+
+The selected Rain Reference can also loop as Reference Playback through Source Mix.
+Farnell playback is restricted to the same 14–24 second profile interval rather
+than looping the complete demonstration render.
 Detected foreground onsets are not treated as the physical drop count: Redwood
 stores a 38.5 onsets/s detector baseline and a separate provisional
 field-continuity match of 1,000 total Arrivals/s. Reference Playback is therefore
@@ -169,7 +203,8 @@ field-continuity match of 1,000 total Arrivals/s. Reference Playback is therefor
 Arrivals/s. The Speed–Population Link starts off so this denser field does not
 silently force the independently selected 69% Drop Population to its endpoint.
 Amazon stores 15.8 detected onsets/s but remains explicitly uncalibrated rather
-than inheriting Redwood's multiplier. Profiles without a total-rate calibration
+than inheriting Redwood's multiplier. Farnell’s 14–24 second interval measures
+43.4 detected onsets/s and is likewise uncalibrated. Profiles without a total-rate calibration
 visibly fall back to their detected-onset rate for comparison.
 Because steady rain is statistically stationary, transport-rate changes can
 be difficult to hear and are not event-level resynthesis. The clean range is
@@ -207,8 +242,9 @@ per-impact spectral occupancy, high-passed Wet Microtexture contrast and full
 bypass, broad non-extreme leaf/litter signatures, the
 nine- and thirteen-band Redwood tonal targets, independent texture-region
 decay, response-bank identity, exact block-partition invariance, the shared
-live/offline Generated Rain Renderer, multiscale temporal texture, both
-reference-file manifests and preparation, pitch-preserving time-stretch policy,
+live/offline Generated Rain Renderer, multiscale temporal texture, all three
+reference-file manifests, fixed analysis-interval preparation, normalized
+spectral-distance analysis, pitch-preserving time-stretch policy,
 the bounded Render Loop, signal analysis, and Source Mix invariants.
 
 ## Repository map
