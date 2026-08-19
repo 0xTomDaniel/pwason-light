@@ -21,8 +21,12 @@ A homogeneous Poisson arrival process with one constant total lamp rate selected
 _Avoid_: Living rate, Cox process, weather modulation
 
 **Rain Mark**:
-The audio-only physical interpretation assigned to an Arrival by the Generated Rain Renderer. It coherently relates a synthesized impact's drop-size class, velocity, surface response, level, duration, and broad spectral focus without changing the light event.
+The audio-only physical interpretation assigned to an Arrival by the Generated Rain Renderer. It coherently relates a synthesized impact's drop-size class, velocity, surface response, level, duration, and broad spectral focus without changing the light event. Every default mark retains a low/mid Surface Body. Upper-frequency Surface Detail may occur on any mark, but its energy allowance tightens when a source response becomes foreground-prominent so one contact cannot carry the complete field's high-frequency compensation.
 _Avoid_: Arrival, LED mark, recorded grain
+
+**Surface Detail**:
+The optional finite upper-frequency component of one Rain Impact Waveform. Its candidate-region balance is calibrated in expected stochastic output energy, including filter bandwidth, and remains nonzero on foreground-prominent marks. Foreground allowance is material-specific: litter retains a broader noisy contact than leaf or wood while the complete field remains constrained by the Redwood Acoustic Target Profile. It is part of the parent Arrival rather than a second event, stationary bed, drop-size class, or LED spectrum.
+_Avoid_: Fine-drop layer, background hiss, spectral Channel
 
 **Drop Population**:
 A continuously adjustable probability distribution from fine-dominant rain through mixed rain to large-drop-rich rain. It changes Rain Marks without changing the steady Poisson rate unless explicitly linked to Speed.
@@ -137,7 +141,7 @@ A one-second Field Window selected by the same level-independent rule for every 
 _Avoid_: Strongest contact, fixed favorite moment, aligned drop
 
 **Impact Microscope**:
-A selectable 120-millisecond excerpt centered around one prominent acoustic onset, with that detected onset placed at the same visible offset for every source. Each source offers non-overlapping Strong, Typical, and Soft choices ranked by post-onset energy when enough distinct contacts exist.
+A selectable 120-millisecond excerpt centered around one prominent acoustic onset, with that detected onset placed at the same visible offset for every source. Each source offers non-overlapping Strong, Typical, and Soft choices at the 90th, 50th, and 25th percentiles of post-onset energy when enough distinct contacts exist. Strong deliberately excludes the absolute maximum so a rare contact cannot define normal rain morphology.
 _Avoid_: Representative Field Window, physical-drop timestamp, strongest sample
 
 **Microscope Scaling**:

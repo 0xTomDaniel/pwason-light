@@ -15,7 +15,7 @@ const DEFINITIONS = [
   { id: "distanceLoss", group: "Space", label: "Distance loss", description: "Fades pressure with source distance", defaultAmount: 0.70 },
   { id: "fieldDepth", group: "Space", label: "Field depth", description: "Sets how far impact positions extend around the listener", defaultAmount: 0.44 },
   { id: "stereoSpread", group: "Space", label: "Stereo spread", description: "Places impacts continuously across stereo", defaultAmount: 0.86 },
-  { id: "airDamping", group: "Space", label: "Distance air damping", description: "Softens distant high frequencies", defaultAmount: 0.70 },
+  { id: "airDamping", group: "Space", label: "Distance air damping", description: "Softens distant high frequencies", defaultAmount: 0.45 },
   { id: "densityCompensation", group: "Output", label: "Density compensation", description: "Reduces each impact as Speed creates more overlap", defaultAmount: 1 },
   { id: "compression", group: "Output", label: "Compression", description: "Controls dense-overlap peaks", defaultAmount: 0.45, defaultEnabled: false },
 ];

@@ -52,16 +52,14 @@ test("Rain Diagnostics aligns every Impact Microscope to a detected acoustic ons
   ) < 1 / sampleRate);
 });
 
-test("Rain Diagnostics offers strong, typical, and soft non-overlapping impacts", () => {
+test("Rain Diagnostics offers q90 strong, typical, and soft non-overlapping impacts", () => {
   const sampleRate = 48_000;
-  const samples = new Float32Array(sampleRate * 3);
-  for (const [timeSeconds, amplitude] of [
-    [0.35, 0.2],
-    [0.75, 0.4],
-    [1.15, 0.6],
-    [1.55, 0.8],
-    [1.95, 1],
-  ]) {
+  const samples = new Float32Array(sampleRate * 3.4);
+  const contacts = Array.from({ length: 10 }, (_, index) => [
+    0.3 + index * 0.3,
+    0.28 + index * 0.08,
+  ]);
+  for (const [timeSeconds, amplitude] of contacts) {
     const onset = Math.round(timeSeconds * sampleRate);
     for (let offset = 0; offset < sampleRate * 0.025; offset += 1) {
       samples[onset + offset] += amplitude
@@ -76,9 +74,10 @@ test("Rain Diagnostics offers strong, typical, and soft non-overlapping impacts"
     microscopes.map(microscope => microscope.selectionKind),
     ["strong", "typical", "soft"],
   );
-  assert.ok(Math.abs(microscopes[0].onsetSeconds - 1.95) < 0.01);
-  assert.ok(Math.abs(microscopes[1].onsetSeconds - 1.15) < 0.01);
-  assert.ok(Math.abs(microscopes[2].onsetSeconds - 0.75) < 0.01);
+  assert.ok(Math.abs(microscopes[0].onsetSeconds - 2.7) < 0.01);
+  assert.ok(Math.abs(microscopes[1].onsetSeconds - 1.8) < 0.01);
+  assert.ok(Math.abs(microscopes[2].onsetSeconds - 0.9) < 0.01);
+  assert.ok(Math.abs(microscopes[0].onsetSeconds - 3) > 0.1);
   for (let index = 0; index < microscopes.length; index += 1) {
     for (let other = index + 1; other < microscopes.length; other += 1) {
       assert.ok(Math.abs(

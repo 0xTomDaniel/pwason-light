@@ -1146,7 +1146,7 @@ async function analyzeRainReference(file) {
   const request = ++referenceLoadRequest;
   referenceCard.setAttribute("aria-busy", "true");
   referenceStatus.dataset.state = "loading";
-  referenceStatus.textContent = "Decoding, selecting a representative Field, and aligning the strongest onset…";
+  referenceStatus.textContent = "Decoding, selecting a representative Field, and aligning the q90 strong onset…";
 
   try {
     if (file.size > REFERENCE_FILE_LIMIT_BYTES) {

@@ -48,7 +48,7 @@ showed that they did not materially affect the field. Surface duration remains
 an internal property of each Rain Mark and surface response. **Reset all
 factors** restores the Redwood-first listening baseline: 8% Impact Body, 90%
 Low Texture, 20% Mid Texture, 98% Band Independence, 92% Spectral Sparsity,
-45% Wet Microtexture, 70% Distance Loss, 70% Distance Air Damping, Wood Surface
+45% Wet Microtexture, 70% Distance Loss, 45% Distance Air Damping, Wood Surface
 on at 20%, and Compression off. These controls never alter Reference Playback.
 
 At 100% Reference, the simulator continues producing light Arrivals but skips
@@ -79,18 +79,28 @@ probability distribution over drop diameter; the same mark coherently derives a
 velocity proxy, impact level, contact duration, surface damping, target surface,
 and broad spectral focus. Initial surfaces are
 leaf, litter/soil, and wood. Liquid impacts and bubbles are deliberately
-excluded.
+excluded. Every default response retains a low/mid Surface Body. Optional
+upper-frequency Surface Detail may occur on any Rain Mark; it is not assigned
+to a drop-size class. Its balance is calculated in expected stochastic output
+energy, including filter bandwidth, and its allowance tightens only when a
+source response becomes foreground-prominent. This keeps one loud contact from
+inheriting the complete field's high-frequency compensation while the Poisson
+population retains diffuse detail. That foreground allowance follows the
+receiving material: litter keeps a somewhat broader noisy contact than leaf or
+wood without adding another layer or changing the aggregate Redwood target.
 
 The renderer creates a restrained sub-millisecond signed Direct Contact plus a
 brief analytic Surface Response. Eight overlapping ERB-derived regions from
 roughly 100 Hz–18.5 kHz are candidates, but a default Rain Mark selects only
-about three. A compact parabolic/quartic leaf window or Gaussian-like litter
+two: at least one body region and one optional detail region when that group is
+enabled. A compact parabolic/quartic leaf window or Gaussian-like litter
 window drives those regions with analytically generated noise; once the window
 closes, their filters receive zero input and only their short residual state
 decays. Spectral Sparsity controls the selected-region count. Leaf remains
 broadly papery and bright rather than becoming high-only; litter remains darker
 while retaining upper detail. Band Independence controls how strongly selected
-regions diverge without turning them into notes. Low, Mid, and High Texture
+regions diverge through independent noise and finite within-contact envelope
+motion without turning them into notes. Low, Mid, and High Texture
 scale groups without forcing one shared envelope. Wood is enabled at a
 restrained 20% in the default Redwood-first baseline.
 
@@ -176,8 +186,9 @@ sample kurtosis, multiscale envelope variation, background-floor ratio,
 cross-band envelope correlation, generated total Arrival rate, and prominent
 onsets detected from every source by the same algorithm. Separate 120 ms Impact
 Microscopes suppress overlapping onset windows and offer three energy-ranked
-choices per source: Strong is the highest-energy distinct contact, Typical is
-nearest the median, and Soft is nearest the 25th percentile. Every choice places
+choices per source: Strong is nearest the 90th percentile, Typical is nearest
+the median, and Soft is nearest the 25th percentile. The absolute maximum is
+deliberately excluded so a rare contact cannot define normal rain morphology. Every choice places
 its detected onset 20 ms into the excerpt and draws the same marker on waveform
 and spectrogram. Alignment is limited by the detector's approximately 2.7 ms
 hop and is not a claim about unknowable physical impact time in a recording.
@@ -209,9 +220,9 @@ its complete profile, which remains authoritative.
 The two references are intentionally not averaged into one target. Current
 native-rate analysis puts Redwood near 4.22 kHz centroid and 23.9% energy above
 8 kHz, while Farnell’s 14–24 second interval is near 9.10 kHz and 55.5%. The
-Wood-enabled Redwood-first generated baseline is near 4.82 kHz and 25.6%. On the shared
-Rain Diagnostics grid, it reports approximately 6.4 dB Spectral Profile and
-6.0 dB Spectral Distribution distance to Redwood, versus 5.8 dB and 9.0 dB to
+Wood-enabled Redwood-first generated baseline is near 3.66 kHz and 20.0%. On the shared
+Rain Diagnostics grid, it reports approximately 6.0 dB Spectral Profile and
+5.8 dB Spectral Distribution distance to Redwood, versus 6.4 dB and 8.7 dB to
 Farnell. Redwood is the sole enforceable target; Farnell is retained only as a
 secondary wet-texture and architecture diagnostic.
 

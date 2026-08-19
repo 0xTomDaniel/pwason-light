@@ -214,7 +214,7 @@ function selectImpactMicroscopes(samples, sampleRate, prominentOnsets) {
   const usedIndices = new Set();
   const selections = [];
   for (const [selectionKind, percentile] of [
-    ["strong", 1],
+    ["strong", 0.9],
     ["typical", 0.5],
     ["soft", 0.25],
   ]) {

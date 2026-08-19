@@ -13,6 +13,15 @@ function rms(samples) {
   return Math.sqrt(energy / Math.max(1, samples.length));
 }
 
+function firstDifferenceRoughness(samples) {
+  let energy = 0;
+  for (let index = 1; index < samples.length; index += 1) {
+    energy += (samples[index] - samples[index - 1]) ** 2;
+  }
+  return Math.sqrt(energy / Math.max(1, samples.length - 1))
+    / Math.max(1e-12, rms(samples));
+}
+
 function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
@@ -255,6 +264,64 @@ test("a default Rain Impact population spans dark and papery high-frequency mark
   assert.ok(average(highBandRatios) > 0.12);
   assert.ok(quantile(centroids, 0.1) < 4_000);
   assert.ok(quantile(centroids, 0.9) > 5_000);
+});
+
+test("prominent large Rain Marks retain detail without becoming upper-band spikes", () => {
+  // Seeds 116 and 127 are deterministic response-bank variants exposed by the
+  // earlier maximum-energy microscope audit. Their
+  // isolated responses expose the per-impact failure independently of timing,
+  // overlap, propagation, or microscope normalization.
+  const analyses = [116, 127].map(seed => {
+    const factors = createDefaultAcousticFactors();
+    const mark = createRainMark({
+      seed,
+      dropPopulation: 0.693,
+      factors,
+    });
+    return {
+      mark,
+      samples: createRainImpact({
+        sampleRate: 48_000,
+        seed,
+        factors,
+        dropPopulation: 0.693,
+        mark,
+      }),
+    };
+  });
+
+  for (const analysis of analyses) {
+    analysis.signal = analyzeSignal(
+      analysis.samples,
+      48_000,
+      { includeSpectrogram: false },
+    );
+  }
+
+  assert.ok(analyses.every(({ mark }) => mark.sizeClass === "large"));
+  assert.ok(analyses.every(({ mark }) => mark.impactLevel > 0.44));
+  assert.ok(analyses.every(
+    ({ signal }) => signal.spectralCentroidHz < 10_000,
+  ));
+  assert.ok(analyses.every(
+    ({ signal }) => signal.highBandEnergyRatio < 0.55,
+  ));
+  assert.ok(analyses.every(
+    ({ samples }) => firstDifferenceRoughness(samples.subarray(0, 1_920)) < 0.45,
+  ));
+});
+
+test("default Rain Impacts retain a body beneath optional upper detail", () => {
+  const highBandRatios = Array.from({ length: 192 }, (_, index) => (
+    analyzeSignal(createRainImpact({
+      sampleRate: 48_000,
+      seed: index + 1,
+      dropPopulation: 0.693,
+    }), 48_000, { includeSpectrogram: false }).highBandEnergyRatio
+  ));
+
+  assert.ok(quantile(highBandRatios, 0.95) < 0.9);
+  assert.ok(Math.max(...highBandRatios) < 0.95);
 });
 
 test("Spectral Sparsity reduces one impact's broad-region occupancy", () => {

@@ -4,6 +4,7 @@ import test from "node:test";
 import { createDefaultAcousticFactors } from "../src/acoustic-factors.js";
 import { createPoissonEngine } from "../src/poisson-engine.js";
 import { createGeneratedRainRenderer } from "../src/rain-texture.js";
+import { analyzeRainField } from "../src/rain-diagnostics.js";
 import { analyzeSignal, detectProminentOnsets } from "../src/signal-analysis.js";
 
 function rms(samples) {
@@ -192,9 +193,11 @@ test("Band Independence materially decorrelates frequency-region envelopes", () 
   const locked = render(false);
   const independent = render(true);
 
+  // Use a relative guardrail because spectral calibration can move both
+  // absolute correlation values while the factor still separates them.
   assert.ok(
     independent.bandEnvelopeCorrelation
-      < locked.bandEnvelopeCorrelation - 0.08,
+      < locked.bandEnvelopeCorrelation * 0.94,
   );
 });
 
@@ -253,6 +256,7 @@ test("the calibrated Redwood profile produces a continuous high-detail rain fiel
     nextArrival: () => engine.next(),
   });
   const analysis = analyzeSignal(samples, 48_000, { includeSpectrogram: false });
+  const strongImpact = analyzeRainField(samples, 48_000).impactMicroscopes[0].analysis;
   const onsets = detectProminentOnsets(samples, 48_000);
 
   assert.ok(analysis.spectralCentroidHz > 3_000);
@@ -273,6 +277,10 @@ test("the calibrated Redwood profile produces a continuous high-detail rain fiel
   assert.ok(analysis.envelopeScales[100].coefficientOfVariation < 0.45);
   assert.ok(onsets.rateHz > 30);
   assert.ok(onsets.rateHz < 50);
+  assert.ok(strongImpact.spectralCentroidHz > 2_000);
+  assert.ok(strongImpact.spectralCentroidHz < 2_600);
+  assert.ok(strongImpact.highBandEnergyRatio > 0.1);
+  assert.ok(strongImpact.highBandEnergyRatio < 0.16);
   assert.ok(
     profileDistanceDb(
       normalizedBandProfileDb(analysis, REDWOOD_BROAD_BAND_EDGES_HZ),

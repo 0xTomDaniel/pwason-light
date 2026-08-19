@@ -52,7 +52,7 @@ test("the synthesis baseline preserves the rain-like listening checkpoint", () =
 
   assert.deepEqual(defaults.distanceLoss, { enabled: true, amount: 0.7 });
   assert.deepEqual(defaults.midTexture, { enabled: true, amount: 0.2 });
-  assert.deepEqual(defaults.airDamping, { enabled: true, amount: 0.7 });
+  assert.deepEqual(defaults.airDamping, { enabled: true, amount: 0.45 });
   assert.deepEqual(defaults.compression, { enabled: false, amount: 0.45 });
 });
 
