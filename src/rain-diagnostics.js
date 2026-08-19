@@ -126,37 +126,18 @@ function selectRepresentativeField(samples, sampleRate, spectralFrames) {
   });
 }
 
-function selectImpactMicroscope(samples, sampleRate, prominentOnsets) {
+function createImpactMicroscope(
+  samples,
+  sampleRate,
+  onsetIndex,
+  selectionKind,
+  alignmentKind = "detected-onset",
+) {
   const impactSampleCount = Math.min(
     samples.length,
     Math.round(sampleRate * IMPACT_DURATION_SECONDS),
   );
   const prerollSamples = Math.round(sampleRate * IMPACT_PREROLL_SECONDS);
-  const scoringSamples = Math.round(sampleRate * 0.04);
-  let onsetIndex = 0;
-  let alignmentKind = "detected-onset";
-  let strongestScore = Number.NEGATIVE_INFINITY;
-
-  for (const onsetSeconds of prominentOnsets.timesSeconds) {
-    const candidateIndex = Math.round(onsetSeconds * sampleRate);
-    let score = 0;
-    const end = Math.min(samples.length, candidateIndex + scoringSamples);
-    for (let index = candidateIndex; index < end; index += 1) {
-      score += samples[index] ** 2;
-    }
-    if (score > strongestScore) {
-      strongestScore = score;
-      onsetIndex = candidateIndex;
-    }
-  }
-
-  if (prominentOnsets.timesSeconds.length === 0) {
-    alignmentKind = "peak-fallback";
-    for (let index = 1; index < samples.length; index += 1) {
-      if (Math.abs(samples[index]) > Math.abs(samples[onsetIndex])) onsetIndex = index;
-    }
-  }
-
   const latestStart = Math.max(0, samples.length - impactSampleCount);
   const startIndex = Math.min(latestStart, Math.max(0, onsetIndex - prerollSamples));
   const impactSamples = new Float32Array(impactSampleCount);
@@ -175,7 +156,86 @@ function selectImpactMicroscope(samples, sampleRate, prominentOnsets) {
     onsetOffsetSeconds: (onsetIndex - startIndex) / sampleRate,
     peakSeconds: peakIndex / sampleRate,
     alignmentKind,
+    selectionKind,
   });
+}
+
+function selectImpactMicroscopes(samples, sampleRate, prominentOnsets) {
+  const impactSampleCount = Math.min(
+    samples.length,
+    Math.round(sampleRate * IMPACT_DURATION_SECONDS),
+  );
+  const prerollSamples = Math.round(sampleRate * IMPACT_PREROLL_SECONDS);
+  const postrollSamples = Math.max(0, impactSampleCount - prerollSamples);
+  const scoringSamples = Math.round(sampleRate * 0.04);
+  const candidates = prominentOnsets.timesSeconds.flatMap(onsetSeconds => {
+    const onsetIndex = Math.round(onsetSeconds * sampleRate);
+    if (
+      onsetIndex < prerollSamples
+      || onsetIndex + postrollSamples > samples.length
+    ) return [];
+    let score = 0;
+    const end = Math.min(samples.length, onsetIndex + scoringSamples);
+    for (let index = onsetIndex; index < end; index += 1) {
+      score += samples[index] ** 2;
+    }
+    return [{ onsetIndex, score }];
+  });
+
+  if (candidates.length === 0) {
+    let peakIndex = 0;
+    for (let index = 1; index < samples.length; index += 1) {
+      if (Math.abs(samples[index]) > Math.abs(samples[peakIndex])) peakIndex = index;
+    }
+    return Object.freeze([
+      createImpactMicroscope(
+        samples,
+        sampleRate,
+        peakIndex,
+        "fallback",
+        "peak-fallback",
+      ),
+    ]);
+  }
+
+  const distinctCandidates = [];
+  for (const candidate of [...candidates].sort(
+    (left, right) => right.score - left.score || left.onsetIndex - right.onsetIndex,
+  )) {
+    if (distinctCandidates.every(existing => (
+      Math.abs(existing.onsetIndex - candidate.onsetIndex) >= impactSampleCount
+    ))) {
+      distinctCandidates.push(candidate);
+    }
+  }
+  const byEnergy = distinctCandidates.sort(
+    (left, right) => left.score - right.score || left.onsetIndex - right.onsetIndex,
+  );
+  const usedIndices = new Set();
+  const selections = [];
+  for (const [selectionKind, percentile] of [
+    ["strong", 1],
+    ["typical", 0.5],
+    ["soft", 0.25],
+  ]) {
+    const targetIndex = Math.round(percentile * (byEnergy.length - 1));
+    const candidateIndex = byEnergy.reduce((best, _, index) => {
+      if (usedIndices.has(index)) return best;
+      if (best === -1) return index;
+      return Math.abs(index - targetIndex) < Math.abs(best - targetIndex)
+        ? index
+        : best;
+    }, -1);
+    if (candidateIndex === -1) continue;
+    usedIndices.add(candidateIndex);
+    selections.push(createImpactMicroscope(
+      samples,
+      sampleRate,
+      byEnergy[candidateIndex].onsetIndex,
+      selectionKind,
+    ));
+  }
+  return Object.freeze(selections);
 }
 
 function selectPopulationOnsets(timesSeconds) {
@@ -296,6 +356,12 @@ export function analyzeRainField(samples, sampleRate) {
 
   const prominentOnsets = detectProminentOnsets(samples, sampleRate);
 
+  const impactMicroscopes = selectImpactMicroscopes(
+    samples,
+    profileAnalysis.sampleRate,
+    prominentOnsets,
+  );
+
   return Object.freeze({
     profileAnalysis,
     prominentOnsets,
@@ -305,11 +371,7 @@ export function analyzeRainField(samples, sampleRate) {
       profileAnalysis.sampleRate,
       spectralFrames,
     ),
-    impactMicroscope: selectImpactMicroscope(
-      samples,
-      profileAnalysis.sampleRate,
-      prominentOnsets,
-    ),
+    impactMicroscopes,
     onsetPopulation: createOnsetPopulation(
       samples,
       profileAnalysis.sampleRate,

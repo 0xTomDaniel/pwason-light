@@ -93,7 +93,7 @@ test("unknown Reference Profile ids are rejected", () => {
   );
 });
 
-test("Rain Reference preparation returns representative, impact, and onset-population views", () => {
+test("Rain Reference preparation returns representative, impact-choice, and onset-population views", () => {
   const sampleRate = 48_000;
   const left = new Float32Array(sampleRate);
   const right = new Float32Array(sampleRate);
@@ -110,8 +110,9 @@ test("Rain Reference preparation returns representative, impact, and onset-popul
   assert.equal(prepared.samples.length, sampleRate);
   assert.equal(prepared.fieldWindowKind, "spectrally-representative");
   assert.equal(prepared.fieldWindowCenterSeconds, 0.5);
-  assert.equal(prepared.impactMicroscope.samples.length, 5_760);
-  assert.ok(Math.abs(prepared.impactMicroscope.peakSeconds - 0.5) < 0.01);
+  assert.equal(prepared.impactMicroscopes.length, 1);
+  assert.equal(prepared.impactMicroscopes[0].samples.length, 5_760);
+  assert.ok(Math.abs(prepared.impactMicroscopes[0].peakSeconds - 0.5) < 0.01);
   assert.equal(prepared.rainDiagnostics.onsetPopulation.count, 1);
   assert.equal(
     prepared.rainDiagnostics.onsetPopulation.envelopeQuantiles[1].length,
@@ -179,5 +180,5 @@ test("the Rain Reference loader fetches and prepares a selected profile", async 
   assert.deepEqual(requestedUrls, [AMAZON_RAIN_REFERENCE.assetUrl]);
   assert.equal(loaded.reference, AMAZON_RAIN_REFERENCE);
   assert.equal(loaded.decodedAudio, decodedAudio);
-  assert.ok(Math.abs(loaded.impactMicroscope.peakSeconds - 0.25) < 0.01);
+  assert.ok(Math.abs(loaded.impactMicroscopes[0].peakSeconds - 0.25) < 0.01);
 });

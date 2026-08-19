@@ -2,6 +2,7 @@ import { createPoissonEngine } from "./poisson-engine.js";
 import { createRainControls } from "./rain-controls.js";
 import { sampleLedOutput } from "./led-renderer.js";
 import { createGeneratedRainRenderer } from "./rain-texture.js";
+import { prepareImpactAudition } from "./impact-playback.js";
 import {
   ACOUSTIC_FACTOR_DEFINITIONS,
   createDefaultAcousticFactors,
@@ -148,12 +149,18 @@ const farnellDistributionDistance = document.querySelector("#farnell-distributio
 const generatedImpactWaveform = document.querySelector("#generated-impact-waveform");
 const generatedImpactSpectrogram = document.querySelector("#generated-impact-spectrogram");
 const generatedImpactLabel = document.querySelector("#generated-impact-label");
+const generatedImpactPlayButton = document.querySelector("#generated-impact-play");
+const generatedImpactChoiceButtons = [...document.querySelectorAll('[data-impact-source="generated"]')];
 const referenceImpactWaveform = document.querySelector("#reference-impact-waveform");
 const referenceImpactSpectrogram = document.querySelector("#reference-impact-spectrogram");
 const referenceImpactLabel = document.querySelector("#reference-impact-label");
+const referenceImpactPlayButton = document.querySelector("#reference-impact-play");
+const referenceImpactChoiceButtons = [...document.querySelectorAll('[data-impact-source="reference"]')];
 const farnellImpactWaveform = document.querySelector("#farnell-impact-waveform");
 const farnellImpactSpectrogram = document.querySelector("#farnell-impact-spectrogram");
 const farnellImpactLabel = document.querySelector("#farnell-impact-label");
+const farnellImpactPlayButton = document.querySelector("#farnell-impact-play");
+const farnellImpactChoiceButtons = [...document.querySelectorAll('[data-impact-source="farnell"]')];
 const generatedOnsetPopulation = document.querySelector("#generated-onset-population");
 const generatedOnsetPopulationLabel = document.querySelector("#generated-onset-population-label");
 const referenceOnsetPopulation = document.querySelector("#reference-onset-population");
@@ -184,6 +191,8 @@ let waveformBuffer = null;
 let liveRainRenderer = null;
 let rainAudioBufferCache = new WeakMap();
 let rainWorkletNode = null;
+let activeImpactAuditionSource = null;
+let activeImpactAuditionButton = null;
 let acousticFactors = createDefaultAcousticFactors();
 const rainControls = createRainControls({
   speedLog: rateInput.value,
@@ -210,20 +219,23 @@ let generatedReferenceSamples = generatedDiagnostics.representativeField.samples
 let generatedReferenceAnalysis = generatedDiagnostics.representativeField.analysis;
 let generatedProfileAnalysis = generatedDiagnostics.profileAnalysis;
 let generatedProfileOnsets = generatedDiagnostics.prominentOnsets;
-let generatedImpact = generatedDiagnostics.impactMicroscope;
+let generatedImpacts = generatedDiagnostics.impactMicroscopes;
+let generatedImpactSelection = 0;
 let measuredReferenceDiagnostics = null;
 let measuredReferenceSamples = null;
 let measuredReferenceAnalysis = null;
 let measuredReferenceProfileAnalysis = null;
 let measuredReferenceOnsets = null;
 let measuredReferenceCalibration = null;
-let measuredReferenceImpact = null;
+let measuredReferenceImpacts = [];
+let measuredReferenceImpactSelection = 0;
 let farnellReferenceDiagnostics = null;
 let farnellReferenceSamples = null;
 let farnellReferenceAnalysis = null;
 let farnellReferenceProfileAnalysis = null;
 let farnellReferenceOnsets = null;
-let farnellReferenceImpact = null;
+let farnellReferenceImpacts = [];
+let farnellReferenceImpactSelection = 0;
 let comparisonResizeTimer = null;
 let acousticRegenerationTimer = null;
 let acousticWaveformRebuildPending = false;
@@ -386,7 +398,11 @@ function regenerateAcousticAssets(rebuildRenderer) {
   generatedReferenceAnalysis = generatedDiagnostics.representativeField.analysis;
   generatedProfileAnalysis = generatedDiagnostics.profileAnalysis;
   generatedProfileOnsets = generatedDiagnostics.prominentOnsets;
-  generatedImpact = generatedDiagnostics.impactMicroscope;
+  generatedImpacts = generatedDiagnostics.impactMicroscopes;
+  generatedImpactSelection = Math.min(
+    generatedImpactSelection,
+    Math.max(0, generatedImpacts.length - 1),
+  );
   if (rebuildRenderer && audioContext) {
     liveRainRenderer = audioContext.sampleRate === ANALYSIS_SAMPLE_RATE
       ? analysisRainRenderer
@@ -646,7 +662,29 @@ function renderRateCalibration() {
   generatedWindowDistance.textContent = `${generatedDiagnostics.representativeField.spectrumDistanceDb.toFixed(1)} dB`;
 }
 
-function renderImpactMicroscope(waveform, spectrogram, label, impact, color) {
+function selectedImpact(impacts, selectedIndex) {
+  return impacts?.[selectedIndex] ?? impacts?.[0] ?? null;
+}
+
+function renderImpactMicroscope(
+  waveform,
+  spectrogram,
+  label,
+  playButton,
+  choiceButtons,
+  impacts,
+  selectedIndex,
+  color,
+) {
+  const impact = selectedImpact(impacts, selectedIndex);
+  playButton.disabled = !impact;
+  choiceButtons.forEach((button, index) => {
+    button.disabled = !impacts?.[index];
+    button.setAttribute("aria-pressed", String(Boolean(impact && index === selectedIndex)));
+  });
+  if (playButton.dataset.playing !== "true") {
+    playButton.textContent = impact ? "▶ Play 120 ms" : "Loading impact…";
+  }
   if (!impact) {
     renderEmptySignal(waveform, "Impact microscope loading");
     renderEmptySignal(spectrogram, "Aligned spectrogram will appear here");
@@ -664,7 +702,64 @@ function renderImpactMicroscope(waveform, spectrogram, label, impact, color) {
     0,
     (impact.peakSeconds - impact.onsetSeconds) * 1_000,
   );
-  label.textContent = `${impact.alignmentKind === "detected-onset" ? "Detected onset" : "Peak fallback"} ${impact.onsetSeconds.toFixed(3)} s · peak +${peakDelayMilliseconds.toFixed(1)} ms`;
+  const selectionLabel = impact.selectionKind === "fallback"
+    ? "Fallback"
+    : `${impact.selectionKind[0].toUpperCase()}${impact.selectionKind.slice(1)}`;
+  label.textContent = `${selectionLabel} · ${impact.alignmentKind === "detected-onset" ? "detected onset" : "peak fallback"} ${impact.onsetSeconds.toFixed(3)} s · peak +${peakDelayMilliseconds.toFixed(1)} ms`;
+}
+
+async function playImpactMicroscope(impact, button) {
+  if (!impact) return;
+  await ensureAudio();
+  if (!audioContext || !outputGain) {
+    button.disabled = true;
+    button.textContent = "Audio unavailable";
+    return;
+  }
+  if (audioContext.state === "suspended") await audioContext.resume();
+
+  if (activeImpactAuditionSource) {
+    activeImpactAuditionButton.dataset.playing = "false";
+    activeImpactAuditionButton.textContent = "▶ Play 120 ms";
+    try {
+      activeImpactAuditionSource.stop();
+    } catch {
+      // The previous 120 ms source may already have ended.
+    }
+  }
+
+  const audition = prepareImpactAudition(impact.samples, {
+    sampleRate: impact.analysis.sampleRate,
+  });
+  const buffer = audioContext.createBuffer(
+    1,
+    audition.samples.length,
+    audition.sampleRate,
+  );
+  buffer.copyToChannel(audition.samples, 0);
+  const source = audioContext.createBufferSource();
+  source.buffer = buffer;
+  source.connect(outputGain);
+  activeImpactAuditionSource = source;
+  activeImpactAuditionButton = button;
+  button.dataset.playing = "true";
+  button.textContent = "Playing 120 ms";
+  source.addEventListener("ended", () => {
+    if (activeImpactAuditionSource !== source) return;
+    activeImpactAuditionSource = null;
+    activeImpactAuditionButton = null;
+    button.dataset.playing = "false";
+    button.textContent = "▶ Play 120 ms";
+  }, { once: true });
+  source.start();
+}
+
+function requestImpactAudition(impact, button) {
+  void playImpactMicroscope(impact, button).catch(error => {
+    button.dataset.playing = "false";
+    button.textContent = "Playback failed";
+    console.error(error);
+  });
 }
 
 function renderOnsetPopulationPanel(canvas, label, population, color) {
@@ -685,7 +780,10 @@ function renderAnalysisComparison() {
     generatedImpactWaveform,
     generatedImpactSpectrogram,
     generatedImpactLabel,
-    generatedImpact,
+    generatedImpactPlayButton,
+    generatedImpactChoiceButtons,
+    generatedImpacts,
+    generatedImpactSelection,
     "#d9ff86",
   );
   renderOnsetPopulationPanel(
@@ -749,7 +847,10 @@ function renderAnalysisComparison() {
       referenceImpactWaveform,
       referenceImpactSpectrogram,
       referenceImpactLabel,
-      measuredReferenceImpact,
+      referenceImpactPlayButton,
+      referenceImpactChoiceButtons,
+      measuredReferenceImpacts,
+      measuredReferenceImpactSelection,
       "#54dce3",
     );
     renderOnsetPopulationPanel(
@@ -769,7 +870,10 @@ function renderAnalysisComparison() {
       referenceImpactWaveform,
       referenceImpactSpectrogram,
       referenceImpactLabel,
-      null,
+      referenceImpactPlayButton,
+      referenceImpactChoiceButtons,
+      [],
+      measuredReferenceImpactSelection,
       "#54dce3",
     );
     renderOnsetPopulationPanel(
@@ -816,7 +920,10 @@ function renderAnalysisComparison() {
       farnellImpactWaveform,
       farnellImpactSpectrogram,
       farnellImpactLabel,
-      farnellReferenceImpact,
+      farnellImpactPlayButton,
+      farnellImpactChoiceButtons,
+      farnellReferenceImpacts,
+      farnellReferenceImpactSelection,
       "#ff9d72",
     );
     renderOnsetPopulationPanel(
@@ -836,7 +943,10 @@ function renderAnalysisComparison() {
       farnellImpactWaveform,
       farnellImpactSpectrogram,
       farnellImpactLabel,
-      null,
+      farnellImpactPlayButton,
+      farnellImpactChoiceButtons,
+      [],
+      farnellReferenceImpactSelection,
       "#ff9d72",
     );
     renderOnsetPopulationPanel(
@@ -872,7 +982,8 @@ function applyPreparedRainReference(prepared, filename, status, calibration = nu
   measuredReferenceAnalysis = prepared.analysis;
   measuredReferenceProfileAnalysis = prepared.profileAnalysis;
   measuredReferenceOnsets = prepared.prominentOnsets;
-  measuredReferenceImpact = prepared.impactMicroscope;
+  measuredReferenceImpacts = prepared.impactMicroscopes;
+  measuredReferenceImpactSelection = 0;
   measuredReferenceCalibration = calibration;
   referenceFilename.textContent = `${filename} · representative @ ${prepared.fieldWindowCenterSeconds.toFixed(2)} s`;
   referenceStatus.dataset.state = "ready";
@@ -902,7 +1013,7 @@ function renderReferenceProvenance(reference) {
 }
 
 function describePreparedField(prepared) {
-  return `Representative one-second Field centered at ${prepared.fieldWindowCenterSeconds.toFixed(2)} s (${prepared.fieldWindowDistanceDb.toFixed(1)} dB from its complete profile); Impact Microscope onset ${prepared.impactMicroscope.onsetSeconds.toFixed(3)} s`;
+  return `Representative one-second Field centered at ${prepared.fieldWindowCenterSeconds.toFixed(2)} s (${prepared.fieldWindowDistanceDb.toFixed(1)} dB from its complete profile); Strong Impact Microscope onset ${prepared.impactMicroscopes[0].onsetSeconds.toFixed(3)} s`;
 }
 
 async function analyzeFarnellRainReference() {
@@ -919,7 +1030,8 @@ async function analyzeFarnellRainReference() {
     farnellReferenceAnalysis = prepared.analysis;
     farnellReferenceProfileAnalysis = prepared.profileAnalysis;
     farnellReferenceOnsets = prepared.prominentOnsets;
-    farnellReferenceImpact = prepared.impactMicroscope;
+    farnellReferenceImpacts = prepared.impactMicroscopes;
+    farnellReferenceImpactSelection = 0;
     farnellFilename.textContent = `14–24 s profile · representative @ ${prepared.fieldWindowCenterSeconds.toFixed(2)} s`;
   } catch (error) {
     farnellFilename.textContent = "Farnell procedural reference unavailable";
@@ -938,7 +1050,8 @@ async function analyzeSelectedRainReference() {
   measuredReferenceAnalysis = null;
   measuredReferenceProfileAnalysis = null;
   measuredReferenceOnsets = null;
-  measuredReferenceImpact = null;
+  measuredReferenceImpacts = [];
+  measuredReferenceImpactSelection = 0;
   measuredReferenceCalibration = null;
   sourceMixInput.disabled = true;
   stopReferencePlayback();
@@ -1379,6 +1492,42 @@ referenceInput.addEventListener("change", () => {
   if (file) analyzeRainReference(file);
 });
 resetAcousticFactorsButton.addEventListener("click", resetAcousticFactors);
+generatedImpactPlayButton.addEventListener("click", () => {
+  requestImpactAudition(
+    selectedImpact(generatedImpacts, generatedImpactSelection),
+    generatedImpactPlayButton,
+  );
+});
+referenceImpactPlayButton.addEventListener("click", () => {
+  requestImpactAudition(
+    selectedImpact(measuredReferenceImpacts, measuredReferenceImpactSelection),
+    referenceImpactPlayButton,
+  );
+});
+farnellImpactPlayButton.addEventListener("click", () => {
+  requestImpactAudition(
+    selectedImpact(farnellReferenceImpacts, farnellReferenceImpactSelection),
+    farnellImpactPlayButton,
+  );
+});
+generatedImpactChoiceButtons.forEach((button, index) => {
+  button.addEventListener("click", () => {
+    generatedImpactSelection = index;
+    renderAnalysisComparison();
+  });
+});
+referenceImpactChoiceButtons.forEach((button, index) => {
+  button.addEventListener("click", () => {
+    measuredReferenceImpactSelection = index;
+    renderAnalysisComparison();
+  });
+});
+farnellImpactChoiceButtons.forEach((button, index) => {
+  button.addEventListener("click", () => {
+    farnellReferenceImpactSelection = index;
+    renderAnalysisComparison();
+  });
+});
 window.addEventListener("resize", () => {
   clearTimeout(comparisonResizeTimer);
   comparisonResizeTimer = window.setTimeout(renderAnalysisComparison, 120);

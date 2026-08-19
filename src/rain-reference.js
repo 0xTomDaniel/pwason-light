@@ -152,12 +152,14 @@ export function prepareRainReference(decodedAudio, {
     startSeconds: analysisStart + diagnostics.representativeField.startSeconds,
     centerSeconds: analysisStart + diagnostics.representativeField.centerSeconds,
   });
-  const impactMicroscope = Object.freeze({
-    ...diagnostics.impactMicroscope,
-    startSeconds: analysisStart + diagnostics.impactMicroscope.startSeconds,
-    onsetSeconds: analysisStart + diagnostics.impactMicroscope.onsetSeconds,
-    peakSeconds: analysisStart + diagnostics.impactMicroscope.peakSeconds,
-  });
+  const impactMicroscopes = Object.freeze(diagnostics.impactMicroscopes.map(
+    microscope => Object.freeze({
+      ...microscope,
+      startSeconds: analysisStart + microscope.startSeconds,
+      onsetSeconds: analysisStart + microscope.onsetSeconds,
+      peakSeconds: analysisStart + microscope.peakSeconds,
+    }),
+  ));
   return {
     samples: representativeField.samples,
     startSeconds: representativeField.startSeconds,
@@ -169,12 +171,12 @@ export function prepareRainReference(decodedAudio, {
     analysis: representativeField.analysis,
     profileAnalysis: diagnostics.profileAnalysis,
     spectralDistribution: diagnostics.spectralDistribution,
-    impactMicroscope,
+    impactMicroscopes,
     prominentOnsets: diagnostics.prominentOnsets,
     rainDiagnostics: Object.freeze({
       ...diagnostics,
       representativeField,
-      impactMicroscope,
+      impactMicroscopes,
     }),
   };
 }

@@ -7,7 +7,7 @@ const DEFINITIONS = [
   { id: "highTexture", group: "Surface texture", label: "High texture", description: "Independent high-frequency spray energy", defaultAmount: 0.32 },
   { id: "leafSurface", group: "Surface texture", label: "Leaf surface", description: "Prevalence of flexible leaf responses", defaultAmount: 0.80 },
   { id: "litterSurface", group: "Surface texture", label: "Litter / soil", description: "Prevalence of damped ground responses", defaultAmount: 0.60 },
-  { id: "woodSurface", group: "Surface texture", label: "Wood surface", description: "Prevalence of short woody responses", defaultAmount: 0.20, defaultEnabled: false },
+  { id: "woodSurface", group: "Surface texture", label: "Wood surface", description: "Prevalence of short woody responses", defaultAmount: 0.20 },
   { id: "bandIndependence", group: "Surface texture", label: "Band independence", description: "Decouples low, mid, and high envelopes", defaultAmount: 0.98 },
   { id: "spectralSparsity", group: "Surface texture", label: "Spectral sparsity", description: "Reduces how many broad audio regions one impact excites", defaultAmount: 0.92 },
   { id: "wetMicrotexture", group: "Surface texture", label: "Wet microtexture", description: "Adds brief nonlinear high-frequency cusps inside each contact", defaultAmount: 0.45 },

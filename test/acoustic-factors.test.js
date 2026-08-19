@@ -56,7 +56,7 @@ test("the synthesis baseline preserves the rain-like listening checkpoint", () =
   assert.deepEqual(defaults.compression, { enabled: false, amount: 0.45 });
 });
 
-test("the default preset favors soft leaf and ground splats over hard impacts", () => {
+test("the default preset favors soft mixed surfaces over hard impacts", () => {
   const defaults = createDefaultAcousticFactors();
 
   assert.deepEqual(defaults.impactBody, { enabled: true, amount: 0.08 });
@@ -66,5 +66,5 @@ test("the default preset favors soft leaf and ground splats over hard impacts", 
   assert.deepEqual(defaults.bandIndependence, { enabled: true, amount: 0.98 });
   assert.deepEqual(defaults.spectralSparsity, { enabled: true, amount: 0.92 });
   assert.deepEqual(defaults.wetMicrotexture, { enabled: true, amount: 0.45 });
-  assert.deepEqual(defaults.woodSurface, { enabled: false, amount: 0.2 });
+  assert.deepEqual(defaults.woodSurface, { enabled: true, amount: 0.2 });
 });
