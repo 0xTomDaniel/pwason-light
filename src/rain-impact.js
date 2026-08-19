@@ -65,6 +65,25 @@ function frequencyAtErbRate(rate) {
   return (10 ** (rate / 21.4) - 1) / 0.00437;
 }
 
+function createBandpassFilter(sampleRate, centerFrequency, q) {
+  const omega = 2 * Math.PI * centerFrequency / sampleRate;
+  const alpha = Math.sin(omega) / (2 * q);
+  const a0 = 1 + alpha;
+  const b0 = alpha / a0;
+  const b2 = -alpha / a0;
+  const a1 = -2 * Math.cos(omega) / a0;
+  const a2 = (1 - alpha) / a0;
+  let state1 = 0;
+  let state2 = 0;
+
+  return input => {
+    const output = b0 * input + state1;
+    state1 = -a1 * output + state2;
+    state2 = b2 * input - a2 * output;
+    return output;
+  };
+}
+
 function createErbBandpassFilters(sampleRate) {
   const minimumFrequency = 180;
   const maximumFrequency = Math.min(18_500, sampleRate * 0.42);
@@ -91,22 +110,7 @@ function createErbBandpassFilters(sampleRate) {
       0.8,
       centerFrequency / bandwidth * REDWOOD_TARGET_Q_SCALES[index],
     );
-    const omega = 2 * Math.PI * centerFrequency / sampleRate;
-    const alpha = Math.sin(omega) / (2 * q);
-    const a0 = 1 + alpha;
-    const b0 = alpha / a0;
-    const b2 = -alpha / a0;
-    const a1 = -2 * Math.cos(omega) / a0;
-    const a2 = (1 - alpha) / a0;
-    let state1 = 0;
-    let state2 = 0;
-
-    return input => {
-      const output = b0 * input + state1;
-      state1 = -a1 * output + state2;
-      state2 = b2 * input - a2 * output;
-      return output;
-    };
+    return createBandpassFilter(sampleRate, centerFrequency, q);
   });
 }
 
@@ -154,6 +158,50 @@ function compactSurfaceWindow(surface, progress) {
   const peakProgress = 1 / (1 + decayPower);
   const normalization = peakProgress * (1 - peakProgress) ** decayPower;
   return progress * (1 - progress) ** decayPower / normalization;
+}
+
+function createWetMicrotexture({
+  sampleRate,
+  seed,
+  amount,
+  highTexture,
+  surfaceLevel,
+  textureScale,
+  impactLevel,
+}) {
+  const random = createRandom((Number(seed) >>> 0) ^ 0x71e7c95d);
+  const wetCenterFrequency = (random() < 0.65 ? 8_500 : 15_500)
+    * (0.9 + random() * 0.2);
+  const wetFilter = createBandpassFilter(
+    sampleRate,
+    Math.min(sampleRate * 0.42, wetCenterFrequency),
+    0.8,
+  );
+  const controlCoefficient = 1 - Math.exp(-2 * Math.PI * 750 / sampleRate);
+  const controlRms = Math.sqrt(
+    controlCoefficient / (2 - controlCoefficient),
+  );
+  const highpassCoefficient = 1 - Math.exp(-2 * Math.PI * 2_000 / sampleRate);
+  const gain = amount
+    * Math.sqrt(highTexture)
+    * surfaceLevel
+    * textureScale
+    * (1.2 + 10.56 * impactLevel);
+  let controlState = 0;
+  let lowpassState = 0;
+
+  return contactWindow => {
+    if (gain === 0) return 0;
+    const gaussianNoise = (
+      random() + random() + random() + random() - 2
+    ) * Math.sqrt(3);
+    controlState += controlCoefficient * (gaussianNoise - controlState);
+    const normalizedControl = controlState / Math.max(0.0001, controlRms);
+    const excess = Math.max(0, normalizedControl - 1.35);
+    const cusp = Math.min(1, excess / 1.4) ** 2 * contactWindow;
+    lowpassState += highpassCoefficient * (cusp - lowpassState);
+    return wetFilter(cusp - lowpassState) * gain * 0.24;
+  };
 }
 
 export function createRainMark({ seed, dropPopulation = 0.5, factors } = {}) {
@@ -331,6 +379,15 @@ export function createRainImpact({
   const textureLevel = surface.textureScale
     * surfaceLevel
     * (0.035 + 0.38 * rainMark.impactLevel ** 1.8);
+  const wetMicrotexture = createWetMicrotexture({
+    sampleRate: rate,
+    seed,
+    amount: amount("wetMicrotexture"),
+    highTexture: amount("highTexture"),
+    surfaceLevel,
+    textureScale: surface.textureScale,
+    impactLevel: rainMark.impactLevel,
+  });
   const bands = filters.map((filter, index) => {
     const position = index / (ERB_BAND_COUNT - 1);
     const highFrequencySoftening = 1 - 0.08 * softness * position ** 1.4;
@@ -422,6 +479,11 @@ export function createRainImpact({
         * band.gain
         * 0.7;
     }
+    const wetContactWindow = compactSurfaceWindow(
+      rainMark.surface,
+      time / surfaceContactDuration,
+    );
+    const wetSurfaceResponse = wetMicrotexture(wetContactWindow);
 
     let fragments = 0;
     for (const contact of secondaryContacts) {
@@ -437,7 +499,7 @@ export function createRainImpact({
 
     const fadeOut = Math.min(1, (samples.length - 1 - index) / fadeOutSamples);
     samples[index] = clamp(
-      (directContact + surfaceResponse + fragments) * fadeOut,
+      (directContact + surfaceResponse + wetSurfaceResponse + fragments) * fadeOut,
       -0.98,
       0.98,
     );

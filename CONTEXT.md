@@ -33,7 +33,7 @@ The optional bidirectional relationship that keeps the normalized Speed and Drop
 _Avoid_: Channel Coupling, Spectral Coupling, Cox modulation
 
 **Rain Impact Waveform**:
-A complete pure-synthesis, band-limited, signed pressure-like response derived from one Rain Mark and used identically for Arrivals from every Channel. It contains a sub-millisecond Direct Contact followed by a compact rounded leaf/ground Surface Response and may contain delayed Micro-splashes, but has no bubble contribution, stable note, stationary background, or relationship to LED wavelength.
+A complete pure-synthesis, band-limited, signed pressure-like response derived from one Rain Mark and used identically for Arrivals from every Channel. It contains a sub-millisecond Direct Contact followed by a compact rounded leaf/ground Surface Response, may contain finite Wet Microtexture and delayed Micro-splashes, but has no bubble contribution, stable note, stationary background, or relationship to LED wavelength.
 _Avoid_: Note, tone, spectral voice
 
 **Direct Contact**:
@@ -41,8 +41,12 @@ The quiet, sub-millisecond signed pressure response at the start of one Rain Imp
 _Avoid_: Mandatory onset peak, snare transient
 
 **Surface Response**:
-The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. One compact surface-shaped window drives an event-selected sparse subset of eight candidate, partially independent ERB-spaced audio regions with analytically generated noise. Fresh excitation becomes literal zero when the contact window closes; only short filter state remains. Every surface stays broadband as a population rather than making every individual impact broadband. It has no free-running resonator, recording, sustained stochastic tail, or liquid-bubble model.
+The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. One compact surface-shaped window drives an event-selected sparse subset of eight candidate, partially independent ERB-spaced audio regions with analytically generated noise. Fresh excitation becomes literal zero when the contact window closes; only short filter state remains. Every surface stays broadband as a population rather than making every individual impact broadband. Wet Microtexture may add finite nonlinear microtransients inside that same window. It has no free-running resonator, recording, sustained stochastic tail, or liquid-bubble model.
 _Avoid_: Diffuse Response, recorded impulse response, bubble tone
+
+**Wet Microtexture**:
+Finite nonlinear surface detail inside one Rain Impact Waveform. Correlated analytic noise is thresholded, rectified, power-shaped, high-pass filtered, and routed through a short seed-varied band-pass wavelet while the parent contact window is open. It never creates an Arrival, Micro-splash, independent clock, stationary bed, recorded grain, or bubble response.
+_Avoid_: Bubble layer, second event process, generic noise bed
 
 **Spectral Sparsity**:
 The Acoustic Factor that controls how many of the eight candidate audio-frequency regions one Rain Impact Waveform excites. It changes per-impact occupancy without changing the eight LED Channels, LED wavelength, or Poisson timing.
@@ -115,6 +119,10 @@ _Avoid_: Distance Channel, audio Channel
 **Listening Field**:
 The finite physical area around the listener over which Arrivals are positioned for sound reproduction. Its radius is controlled by the Field Depth Acoustic Factor.
 _Avoid_: Spectral field, Channel bank
+
+**Field Window**:
+A fixed-duration excerpt from an active generated or measured rain field containing every overlapping contact audible during that interval. It is comparison evidence for the rain population, not an isolated Rain Impact Waveform.
+_Avoid_: Single drop, Arrival Response, isolated contact
 
 **Acoustic Propagation**:
 The distance loss, high-frequency air damping, and left-right direction applied between an Impact Position and the listener.

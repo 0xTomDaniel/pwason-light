@@ -8,7 +8,11 @@ import {
   effectiveAcousticFactor,
 } from "./acoustic-factors.js";
 import { createRenderLoop } from "./render-loop.js";
-import { analyzeSignal, detectProminentOnsets } from "./signal-analysis.js";
+import {
+  analyzeSignal,
+  detectProminentOnsets,
+  extractProminentImpact,
+} from "./signal-analysis.js";
 import { calculateSourceMix } from "./source-mix.js";
 import {
   DEFAULT_RAIN_REFERENCE_PROFILE,
@@ -46,7 +50,6 @@ const MAX_EVENT_MARKS_PER_SECOND = 30;
 const MAX_LISTENING_FIELD_RADIUS_METERS = 30;
 const EAR_HEIGHT_METERS = 1.5;
 const ANALYSIS_SAMPLE_RATE = 48_000;
-const ANALYSIS_IMPACT_SECONDS = 0.12;
 const GENERATED_PROFILE_SECONDS = 8;
 const REFERENCE_FILE_LIMIT_BYTES = 25 * 1024 * 1024;
 
@@ -152,21 +155,15 @@ let analysisRainRenderer = createGeneratedRainRenderer({
   earHeightMeters: EAR_HEIGHT_METERS,
   dropPopulation: rainControls.snapshot().dropPopulation,
 });
-let generatedReferenceResponse = analysisRainRenderer.prepareArrival({
-  id: 42,
-  rateHz: selectedReferenceCalibration.comparisonRateHz,
-  amplitude: 0.5,
-  position: { radialDistanceMeters: 0, azimuthRadians: 0 },
-}).response;
-let generatedReferenceSamples = generatedReferenceResponse.slice(
-  0,
-  Math.round(ANALYSIS_SAMPLE_RATE * ANALYSIS_IMPACT_SECONDS),
-);
+let generatedProfileSamples = createCurrentGeneratedProfileSamples();
+let generatedReferenceSamples = extractProminentImpact(
+  generatedProfileSamples,
+  ANALYSIS_SAMPLE_RATE,
+).samples;
 let generatedReferenceAnalysis = analyzeSignal(
   generatedReferenceSamples,
   ANALYSIS_SAMPLE_RATE,
 );
-let generatedProfileSamples = createCurrentGeneratedProfileSamples();
 let generatedProfileAnalysis = analyzeSignal(
   generatedProfileSamples,
   ANALYSIS_SAMPLE_RATE,
@@ -213,7 +210,7 @@ function listeningFieldRadiusMeters() {
 function createCurrentGeneratedProfileSamples() {
   const profileEngine = createPoissonEngine({
     seed: `${selectedReferenceProfile.id}-generated-profile`,
-    rateHz: selectedReferenceCalibration.comparisonRateHz,
+    rateHz: selectedRateHz(),
     coupling: 0,
     fieldRadiusMeters: listeningFieldRadiusMeters(),
   });
@@ -333,22 +330,16 @@ function regenerateAcousticAssets(rebuildRenderer) {
       earHeightMeters: EAR_HEIGHT_METERS,
       dropPopulation: rainControls.snapshot().dropPopulation,
     });
-    generatedReferenceResponse = analysisRainRenderer.prepareArrival({
-      id: 42,
-      rateHz: selectedReferenceCalibration.comparisonRateHz,
-      amplitude: 0.5,
-      position: { radialDistanceMeters: 0, azimuthRadians: 0 },
-    }).response;
-    generatedReferenceSamples = generatedReferenceResponse.slice(
-      0,
-      Math.round(ANALYSIS_SAMPLE_RATE * ANALYSIS_IMPACT_SECONDS),
-    );
   }
+  generatedProfileSamples = createCurrentGeneratedProfileSamples();
+  generatedReferenceSamples = extractProminentImpact(
+    generatedProfileSamples,
+    ANALYSIS_SAMPLE_RATE,
+  ).samples;
   generatedReferenceAnalysis = analyzeSignal(
     generatedReferenceSamples,
     ANALYSIS_SAMPLE_RATE,
   );
-  generatedProfileSamples = createCurrentGeneratedProfileSamples();
   generatedProfileAnalysis = analyzeSignal(
     generatedProfileSamples,
     ANALYSIS_SAMPLE_RATE,
@@ -460,9 +451,9 @@ function updateRate() {
   rainControls.setSpeedLog(rateInput.value);
   updateControlReadouts();
   restartEngine();
-  if (rainControls.snapshot().linked) {
-    scheduleAcousticRegeneration({ rebuildRenderer: true });
-  }
+  scheduleAcousticRegeneration({
+    rebuildRenderer: rainControls.snapshot().linked,
+  });
 }
 
 function updateDropPopulation() {
@@ -577,14 +568,10 @@ function setAnalysisMetrics(analysis, elements) {
 
 function renderRateCalibration() {
   const calibration = selectedReferenceCalibration;
-  const generatedRateLabel = `${formatRate(calibration.comparisonRateHz)}/s`;
-  generatedProfileLabel.textContent = calibration.isTotalCalibrated
-    ? `120 ms contact · 8 s at ${generatedRateLabel} total`
-    : `120 ms contact · 8 s at ${generatedRateLabel} onset-rate fallback`;
+  const generatedRateLabel = `${formatRate(selectedRateHz())}/s`;
+  generatedProfileLabel.textContent = `120 ms field · 8 s at ${generatedRateLabel} selected Speed`;
   generatedTotalRate.textContent = generatedRateLabel;
-  generatedTotalRate.title = calibration.isTotalCalibrated
-    ? "Equivalent total Poisson Arrival rate"
-    : "No total-rate calibration; using detected-onset density visibly as a fallback";
+  generatedTotalRate.title = "Selected total Poisson Arrival rate";
   generatedDetectedRate.textContent = `${formatRate(generatedProfileOnsets.rateHz)}/s`;
 
   if (!measuredReferenceOnsets) {

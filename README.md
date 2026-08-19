@@ -39,12 +39,12 @@ never begins automatically.
 
 The separate **Acoustic Factors** panel exposes every audible parameter in the
 generated model with both an on/off switch and a continuous amount slider. Its
-22 controls cover Direct Contact shape, individually switchable leaf, litter,
-and wood prevalence, analytic surface excitation and sustain,
+23 controls cover Direct Contact shape, individually switchable leaf, litter,
+and wood prevalence, analytic surface excitation and sustain, Wet Microtexture,
 low/mid/high texture, Spectral Sparsity, delayed secondary contacts, field depth
 and propagation, high-rate density compensation, and optional compression.
 **Reset all factors** restores the current listening baseline: 70% Distance
-Loss, 20% Mid Texture, 60% Distance Air Damping, Micro-splashes off, Wood
+Loss, 20% Mid Texture, 35% Wet Microtexture, 60% Distance Air Damping, Micro-splashes off, Wood
 Surface off, and Compression off. These controls never alter Reference Playback.
 
 At 100% Reference, the simulator continues producing light Arrivals but skips
@@ -86,6 +86,14 @@ while retaining upper detail. Band Independence controls how strongly selected
 regions diverge without turning them into notes. Low, Mid, and High Texture
 scale groups without forcing one shared envelope. Wood and Micro-splashes are
 disabled in the default single-drop baseline.
+
+Wet Microtexture adds restrained spray and occasional high-frequency cusps while the
+same compact surface window is open. Correlated analytic noise is thresholded,
+rectified, quadratically shaped, high-pass filtered, and sent through a short,
+seed-varied band-pass wavelet. It ends with its parent response and has no
+independent event clock. It is not a bubble model, recorded grain, sustained
+hiss, or stationary noise bed. The switch and amount slider make its
+contribution directly comparable at identical Arrivals.
 
 Across the complete default response bank, 90% of impacts peak within their
 first 25 ms, the median response delivers 90% of its energy within 35 ms, and
@@ -136,9 +144,12 @@ recorded rainfall in Central Amazon forest using a recorder fixed to a tree.
 - Amazon recording license: [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/)
 - Local provenance and checksum: [`assets/reference/README.md`](assets/reference/README.md)
 
-The Rain Reference lab shows the first 120 ms of one complete variable-length generated
-response beside the strongest 120 ms contact found during the first ten seconds
-of the selected recording. For the steady texture it displays normalized spectra,
+The Rain Reference lab shows matched 120 ms Field Windows centered on the
+strongest contact in the eight-second generated field and the first ten seconds
+of the selected recording. Each window contains every overlapping nearby and
+distant contact; neither is presented as an isolated measured drop. A 1,024-point
+Hann STFT at 1 ms hops feeds a continuously interpolated, log-frequency,
+70 dB spectrogram rather than an enlarged low-resolution heatmap. For the steady texture it displays normalized spectra,
 spectral centroid, high-frequency energy, spectral flatness, crest factor,
 sample kurtosis, multiscale envelope variation, background-floor ratio,
 cross-band envelope correlation, generated total Arrival rate, and prominent
@@ -184,7 +195,8 @@ The tests cover seeded Poisson behavior, total-rate coupling, linked and unlinke
 Drop Population controls, coherent Rain Marks, spatial propagation, Acoustic
 Factor normalization and bypass behavior, LED envelopes, compact-window peak
 and cumulative-energy waveform behavior, rounded temporal-energy shape,
-per-impact spectral occupancy, broad non-extreme leaf/litter signatures, the
+per-impact spectral occupancy, high-passed Wet Microtexture contrast and full
+bypass, broad non-extreme leaf/litter signatures, the
 nine- and thirteen-band Redwood tonal targets, independent texture-region
 decay, response-bank identity, exact block-partition invariance, the shared
 live/offline Generated Rain Renderer, multiscale temporal texture, both

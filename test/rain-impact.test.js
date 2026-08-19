@@ -57,6 +57,21 @@ function temporalEnergySkewness(samples, sampleRate) {
   return thirdMoment / variance ** 1.5;
 }
 
+function highPass(samples, sampleRate, cutoffHz = 2_000) {
+  const decay = Math.exp(-2 * Math.PI * cutoffHz / sampleRate);
+  const filtered = new Float32Array(samples.length);
+  let previousInput = 0;
+  let previousOutput = 0;
+  for (let index = 0; index < samples.length; index += 1) {
+    const output = decay
+      * (previousOutput + samples[index] - previousInput);
+    filtered[index] = output;
+    previousInput = samples[index];
+    previousOutput = output;
+  }
+  return filtered;
+}
+
 function correlation(left, right) {
   const leftMean = average(left);
   const rightMean = average(right);
@@ -270,6 +285,53 @@ test("Spectral Sparsity reduces one impact's broad-region occupancy", () => {
   );
 });
 
+test("Wet Microtexture adds high-frequency cusp contrast inside one Rain Impact", () => {
+  const wetFactors = createDefaultAcousticFactors();
+  const dryFactors = createDefaultAcousticFactors();
+  wetFactors.wetMicrotexture.amount = 1;
+  dryFactors.wetMicrotexture.enabled = false;
+  for (const factors of [wetFactors, dryFactors]) {
+    factors.impactBody.enabled = false;
+    factors.microSplashes.enabled = false;
+  }
+  const contrast = factors => Array.from({ length: 96 }, (_, index) => (
+    analyzeSignal(
+      highPass(createRainImpact({
+        sampleRate: 48_000,
+        seed: index + 1,
+        factors,
+        dropPopulation: 0.693,
+      }), 48_000),
+      48_000,
+      { includeSpectrogram: false },
+    ).sampleKurtosis
+  ));
+  const wetContrast = contrast(wetFactors);
+  const dryContrast = contrast(dryFactors);
+
+  assert.ok(quantile(wetContrast, 0.5) > quantile(dryContrast, 0.5) * 1.35);
+});
+
+test("default Wet Microtexture stays cushioned by the Surface Response", () => {
+  const wetFactors = createDefaultAcousticFactors();
+  const dryFactors = createDefaultAcousticFactors();
+  dryFactors.wetMicrotexture.enabled = false;
+  const crestPopulation = factors => Array.from({ length: 96 }, (_, index) => {
+    const impact = createRainImpact({
+      sampleRate: 48_000,
+      seed: index + 1,
+      factors,
+      dropPopulation: 0.693,
+    });
+    return Math.max(...impact.map(Math.abs)) / rms(impact);
+  });
+  const wetCrest = quantile(crestPopulation(wetFactors), 0.5);
+  const dryCrest = quantile(crestPopulation(dryFactors), 0.5);
+
+  assert.ok(wetCrest > dryCrest);
+  assert.ok(wetCrest < dryCrest * 1.35);
+});
+
 test("low and high texture regions retain distinct but overlapping decay scales", () => {
   const energyTimes = {};
   for (const selected of ["lowTexture", "highTexture"]) {
@@ -300,6 +362,7 @@ test("no hidden resonator remains when every explicit excitation is switched off
     "lowTexture",
     "midTexture",
     "highTexture",
+    "wetMicrotexture",
     "microSplashes",
   ]) {
     factors[id].enabled = false;

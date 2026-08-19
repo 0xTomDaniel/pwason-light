@@ -23,6 +23,28 @@ test("Signal Analysis identifies the frequency shape of a known tone", () => {
   assert.ok(analysis.spectralFlatness < 0.01);
 });
 
+test("Signal Analysis preserves useful time-frequency detail across 120 milliseconds", () => {
+  const sampleRate = 48_000;
+  const samples = Float32Array.from(
+    { length: Math.round(sampleRate * 0.12) },
+    (_, index) => {
+      const progress = index / (sampleRate * 0.12);
+      const frequencyHz = 300 * (12_000 / 300) ** progress;
+      return Math.sin(2 * Math.PI * frequencyHz * index / sampleRate) * 0.2;
+    },
+  );
+
+  const analysis = analyzeSignal(samples, sampleRate);
+
+  assert.ok(analysis.spectrogramFftSize >= 1_024);
+  assert.ok(analysis.spectrogramHopSize <= sampleRate * 0.0015);
+  assert.ok(analysis.spectrogram.length >= 80);
+  assert.equal(
+    analysis.spectrogram[0].length,
+    analysis.spectrogramFftSize / 2 + 1,
+  );
+});
+
 test("Signal Analysis distinguishes a continuous texture from isolated percussive bursts", () => {
   const sampleRate = 48_000;
   const continuous = Float32Array.from(

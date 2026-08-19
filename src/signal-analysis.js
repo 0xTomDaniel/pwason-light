@@ -1,4 +1,6 @@
 const DEFAULT_FFT_SIZE = 512;
+const SPECTROGRAM_FFT_SIZE = 1_024;
+const SPECTROGRAM_HOP_SECONDS = 0.001;
 const HIGH_BAND_START_HZ = 8_000;
 const IMPACT_DURATION_SECONDS = 0.12;
 const IMPACT_PREROLL_SECONDS = 0.005;
@@ -265,6 +267,34 @@ function transform(real, imaginary) {
   }
 }
 
+function createSpectrogram(samples, sampleRate) {
+  const size = SPECTROGRAM_FFT_SIZE;
+  const hopSize = Math.max(1, Math.round(sampleRate * SPECTROGRAM_HOP_SECONDS));
+  const binCount = size / 2 + 1;
+  const frameCount = Math.max(1, Math.ceil(samples.length / hopSize));
+  const frames = [];
+
+  for (let frame = 0; frame < frameCount; frame += 1) {
+    const center = frame * hopSize + Math.floor(hopSize / 2);
+    const start = center - Math.floor(size / 2);
+    const real = new Float64Array(size);
+    const imaginary = new Float64Array(size);
+    for (let index = 0; index < size; index += 1) {
+      const window = 0.5 - 0.5 * Math.cos(2 * Math.PI * index / (size - 1));
+      real[index] = (samples[start + index] || 0) * window;
+    }
+    transform(real, imaginary);
+
+    const frameSpectrum = new Float64Array(binCount);
+    for (let bin = 0; bin < binCount; bin += 1) {
+      frameSpectrum[bin] = real[bin] ** 2 + imaginary[bin] ** 2;
+    }
+    frames.push(frameSpectrum);
+  }
+
+  return { frames, fftSize: size, hopSize };
+}
+
 export function analyzeSignal(samples, sampleRate, {
   fftSize = DEFAULT_FFT_SIZE,
   includeSpectrogram = true,
@@ -274,7 +304,6 @@ export function analyzeSignal(samples, sampleRate, {
   const hopSize = size / 4;
   const binCount = size / 2 + 1;
   const spectrum = new Float64Array(binCount);
-  const spectrogram = [];
   const frameStarts = samples.length <= size
     ? [0]
     : Array.from(
@@ -291,14 +320,15 @@ export function analyzeSignal(samples, sampleRate, {
     }
     transform(real, imaginary);
 
-    const frameSpectrum = includeSpectrogram ? new Float64Array(binCount) : null;
     for (let bin = 0; bin < binCount; bin += 1) {
       const power = real[bin] ** 2 + imaginary[bin] ** 2;
-      if (frameSpectrum) frameSpectrum[bin] = power;
       spectrum[bin] += power;
     }
-    if (frameSpectrum) spectrogram.push(frameSpectrum);
   }
+
+  const spectrogramAnalysis = includeSpectrogram
+    ? createSpectrogram(samples, rate)
+    : { frames: [], fftSize: SPECTROGRAM_FFT_SIZE, hopSize: Math.round(rate * SPECTROGRAM_HOP_SECONDS) };
 
   let totalEnergy = 0;
   let weightedFrequency = 0;
@@ -323,7 +353,9 @@ export function analyzeSignal(samples, sampleRate, {
     fftSize: size,
     hopSize,
     spectrum,
-    spectrogram,
+    spectrogram: spectrogramAnalysis.frames,
+    spectrogramFftSize: spectrogramAnalysis.fftSize,
+    spectrogramHopSize: spectrogramAnalysis.hopSize,
     spectralCentroidHz: totalEnergy > 0 ? weightedFrequency / totalEnergy : 0,
     highBandEnergyRatio: totalEnergy > 0 ? highBandEnergy / totalEnergy : 0,
     spectralFlatness: arithmeticMean > 0 ? geometricMean / arithmeticMean : 0,

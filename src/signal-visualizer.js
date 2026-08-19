@@ -45,17 +45,34 @@ export function renderSignalWaveform(canvas, samples, color) {
   context.stroke();
 }
 
+const SPECTROGRAM_COLORS = Object.freeze([
+  Object.freeze([7, 9, 8]),
+  Object.freeze([42, 39, 83]),
+  Object.freeze([33, 145, 140]),
+  Object.freeze([94, 201, 98]),
+  Object.freeze([253, 231, 37]),
+]);
+
 function heatColor(intensity) {
   const value = Math.max(0, Math.min(1, intensity));
-  const red = Math.round(12 + value * 205);
-  const green = Math.round(18 + value * 220);
-  const blue = Math.round(15 + value * 95);
-  return `rgb(${red} ${green} ${blue})`;
+  const position = value * (SPECTROGRAM_COLORS.length - 1);
+  const lowerIndex = Math.min(
+    SPECTROGRAM_COLORS.length - 2,
+    Math.floor(position),
+  );
+  const mix = position - lowerIndex;
+  return SPECTROGRAM_COLORS[lowerIndex].map((channel, index) => Math.round(
+    channel + (SPECTROGRAM_COLORS[lowerIndex + 1][index] - channel) * mix,
+  ));
 }
 
 export function renderSignalSpectrogram(canvas, analysis) {
   const { context, width, height } = prepareCanvas(canvas);
   const frames = analysis.spectrogram;
+  if (frames.length === 0) {
+    renderEmptySignal(canvas, "No time-frequency data");
+    return;
+  }
   let peakPower = 0;
   for (const frame of frames) {
     for (const power of frame) peakPower = Math.max(peakPower, power);
@@ -63,29 +80,66 @@ export function renderSignalSpectrogram(canvas, analysis) {
   peakPower = Math.max(peakPower, 1e-20);
   const minimumFrequency = 80;
   const maximumFrequency = analysis.sampleRate / 2;
-  const frameWidth = width / frames.length;
+  const imageWidth = canvas.width;
+  const imageHeight = canvas.height;
+  const pixels = context.createImageData(imageWidth, imageHeight);
+  const fftSize = analysis.spectrogramFftSize ?? analysis.fftSize;
 
-  for (let frameIndex = 0; frameIndex < frames.length; frameIndex += 1) {
-    const frame = frames[frameIndex];
-    for (let y = 0; y < height; y += 1) {
-      const vertical = 1 - y / Math.max(1, height - 1);
-      const frequency = minimumFrequency * (
-        maximumFrequency / minimumFrequency
-      ) ** vertical;
-      const bin = Math.min(
-        frame.length - 1,
-        Math.round(frequency * analysis.fftSize / analysis.sampleRate),
-      );
-      const decibels = 10 * Math.log10(Math.max(frame[bin] / peakPower, 1e-6));
-      context.fillStyle = heatColor((decibels + 60) / 60);
-      context.fillRect(frameIndex * frameWidth, y, Math.ceil(frameWidth + 0.5), 1);
+  for (let y = 0; y < imageHeight; y += 1) {
+    const vertical = 1 - y / Math.max(1, imageHeight - 1);
+    const frequency = minimumFrequency * (
+      maximumFrequency / minimumFrequency
+    ) ** vertical;
+    const binPosition = Math.min(
+      frames[0].length - 1,
+      frequency * fftSize / analysis.sampleRate,
+    );
+    const lowerBin = Math.floor(binPosition);
+    const upperBin = Math.min(frames[0].length - 1, lowerBin + 1);
+    const frequencyMix = binPosition - lowerBin;
+
+    for (let x = 0; x < imageWidth; x += 1) {
+      const framePosition = x * (frames.length - 1) / Math.max(1, imageWidth - 1);
+      const lowerFrame = Math.floor(framePosition);
+      const upperFrame = Math.min(frames.length - 1, lowerFrame + 1);
+      const timeMix = framePosition - lowerFrame;
+      const lowerPower = frames[lowerFrame][lowerBin]
+        + (frames[lowerFrame][upperBin] - frames[lowerFrame][lowerBin]) * frequencyMix;
+      const upperPower = frames[upperFrame][lowerBin]
+        + (frames[upperFrame][upperBin] - frames[upperFrame][lowerBin]) * frequencyMix;
+      const power = lowerPower + (upperPower - lowerPower) * timeMix;
+      const decibels = 10 * Math.log10(Math.max(power / peakPower, 1e-7));
+      const color = heatColor(((decibels + 70) / 70) ** 0.9);
+      const pixel = (y * imageWidth + x) * 4;
+      pixels.data[pixel] = color[0];
+      pixels.data[pixel + 1] = color[1];
+      pixels.data[pixel + 2] = color[2];
+      pixels.data[pixel + 3] = 255;
     }
   }
+  context.putImageData(pixels, 0, 0);
 
-  context.fillStyle = "rgba(229, 236, 217, 0.7)";
+  context.strokeStyle = "rgba(229, 236, 217, 0.14)";
+  context.lineWidth = 1;
+  context.beginPath();
+  for (const fraction of [0.25, 0.5, 0.75]) {
+    context.moveTo(width * fraction, 0);
+    context.lineTo(width * fraction, height);
+  }
+  for (const frequency of [1_000, 8_000]) {
+    const y = height * (1 - Math.log(frequency / minimumFrequency)
+      / Math.log(maximumFrequency / minimumFrequency));
+    context.moveTo(0, y);
+    context.lineTo(width, y);
+  }
+  context.stroke();
+
+  context.fillStyle = "rgba(245, 248, 237, 0.82)";
   context.font = "9px IBM Plex Mono, monospace";
   context.fillText("24k", 7, 12);
-  context.fillText("1k", 7, height * 0.58);
+  const oneKilohertzY = height * (1 - Math.log(1_000 / minimumFrequency)
+    / Math.log(maximumFrequency / minimumFrequency));
+  context.fillText("1k", 7, oneKilohertzY - 4);
   context.fillText("80 Hz", 7, height - 7);
 }
 

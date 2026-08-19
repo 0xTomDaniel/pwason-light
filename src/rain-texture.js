@@ -36,7 +36,7 @@ function eventRendering(event, factors, earHeightMeters) {
   const eventVariation = effectiveAcousticFactor(factors, "eventVariation");
   const amplitude = Math.max(0, finiteNumber(event.amplitude, 0.5));
   const eventLevel = GENERATED_EVENT_LEVEL
-    * (1 + (amplitude - 0.5) * eventVariation * 1.65);
+    * (1 + (amplitude - 0.5) * eventVariation * 2);
 
   return {
     gain: eventLevel * densityNormalization * propagation.relativePressure,
