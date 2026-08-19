@@ -30,3 +30,21 @@ test("Signal Visualization keeps silence finite", () => {
   assert.deepEqual([...prepared.minimums], Array(8).fill(0));
   assert.deepEqual([...prepared.maximums], Array(8).fill(0));
 });
+
+test("Signal Visualization honors a shared waveform gain", () => {
+  const prepared = prepareWaveformEnvelope(
+    Float32Array.from([0, 1, -2, 4]),
+    2,
+    { normalizationGain: 0.2 },
+  );
+
+  assert.equal(prepared.normalizationGain, 0.2);
+  assert.deepEqual(
+    [...prepared.minimums].map(value => Number(value.toFixed(3))),
+    [0, -0.4],
+  );
+  assert.deepEqual(
+    [...prepared.maximums].map(value => Number(value.toFixed(3))),
+    [0.2, 0.8],
+  );
+});

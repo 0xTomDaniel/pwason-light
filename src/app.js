@@ -3,6 +3,7 @@ import { createRainControls } from "./rain-controls.js";
 import { sampleLedOutput } from "./led-renderer.js";
 import { createGeneratedRainRenderer } from "./rain-texture.js";
 import { prepareImpactAudition } from "./impact-playback.js";
+import { prepareMicroscopeScaling } from "./microscope-scaling.js";
 import {
   ACOUSTIC_FACTOR_DEFINITIONS,
   createDefaultAcousticFactors,
@@ -161,6 +162,8 @@ const farnellImpactSpectrogram = document.querySelector("#farnell-impact-spectro
 const farnellImpactLabel = document.querySelector("#farnell-impact-label");
 const farnellImpactPlayButton = document.querySelector("#farnell-impact-play");
 const farnellImpactChoiceButtons = [...document.querySelectorAll('[data-impact-source="farnell"]')];
+const microscopeScalingInputs = [...document.querySelectorAll('[name="microscope-scaling"]')];
+const microscopeScalingNote = document.querySelector("#microscope-scaling-note");
 const generatedOnsetPopulation = document.querySelector("#generated-onset-population");
 const generatedOnsetPopulationLabel = document.querySelector("#generated-onset-population-label");
 const referenceOnsetPopulation = document.querySelector("#reference-onset-population");
@@ -193,6 +196,8 @@ let rainAudioBufferCache = new WeakMap();
 let rainWorkletNode = null;
 let activeImpactAuditionSource = null;
 let activeImpactAuditionButton = null;
+let microscopeScalingMode = microscopeScalingInputs.find(input => input.checked)?.value
+  ?? "profile-matched";
 let acousticFactors = createDefaultAcousticFactors();
 const rainControls = createRainControls({
   speedLog: rateInput.value,
@@ -666,6 +671,32 @@ function selectedImpact(impacts, selectedIndex) {
   return impacts?.[selectedIndex] ?? impacts?.[0] ?? null;
 }
 
+function currentMicroscopeScaling() {
+  return prepareMicroscopeScaling([
+    {
+      id: "generated",
+      profileRms: generatedProfileAnalysis?.rms,
+      microscopes: generatedImpacts,
+    },
+    {
+      id: "reference",
+      profileRms: measuredReferenceProfileAnalysis?.rms,
+      microscopes: measuredReferenceImpacts,
+    },
+    {
+      id: "farnell",
+      profileRms: farnellReferenceProfileAnalysis?.rms,
+      microscopes: farnellReferenceImpacts,
+    },
+  ], { mode: microscopeScalingMode });
+}
+
+function renderMicroscopeScalingNote() {
+  microscopeScalingNote.textContent = microscopeScalingMode === "profile-matched"
+    ? "Profile-matched · complete profiles share one RMS baseline; all available impacts retain one common waveform and spectrogram scale. Display only."
+    : "Shape · every selected impact is independently normalized to expose quiet morphology. Display only.";
+}
+
 function renderImpactMicroscope(
   waveform,
   spectrogram,
@@ -675,6 +706,8 @@ function renderImpactMicroscope(
   impacts,
   selectedIndex,
   color,
+  scaling,
+  sharedSpectrogramPeakPower,
 ) {
   const impact = selectedImpact(impacts, selectedIndex);
   playButton.disabled = !impact;
@@ -696,8 +729,15 @@ function renderImpactMicroscope(
     ? impact.onsetOffsetSeconds / durationSeconds
     : 0;
   const marker = { markerFraction, markerLabel: "onset" };
-  renderSignalWaveform(waveform, impact.samples, color, marker);
-  renderSignalSpectrogram(spectrogram, impact.analysis, marker);
+  renderSignalWaveform(waveform, impact.samples, color, {
+    ...marker,
+    normalizationGain: scaling?.waveformGain ?? null,
+  });
+  renderSignalSpectrogram(spectrogram, impact.analysis, {
+    ...marker,
+    powerGain: scaling?.spectrogramPowerGain ?? 1,
+    peakPower: sharedSpectrogramPeakPower,
+  });
   const peakDelayMilliseconds = Math.max(
     0,
     (impact.peakSeconds - impact.onsetSeconds) * 1_000,
@@ -774,6 +814,8 @@ function renderOnsetPopulationPanel(canvas, label, population, color) {
 }
 
 function renderAnalysisComparison() {
+  const microscopeScaling = currentMicroscopeScaling();
+  renderMicroscopeScalingNote();
   renderSignalWaveform(generatedAnalysisWaveform, generatedReferenceSamples, "#d9ff86");
   renderSignalSpectrogram(generatedAnalysisSpectrogram, generatedReferenceAnalysis);
   renderImpactMicroscope(
@@ -785,6 +827,8 @@ function renderAnalysisComparison() {
     generatedImpacts,
     generatedImpactSelection,
     "#d9ff86",
+    microscopeScaling.bySource.generated,
+    microscopeScaling.sharedSpectrogramPeakPower,
   );
   renderOnsetPopulationPanel(
     generatedOnsetPopulation,
@@ -852,6 +896,8 @@ function renderAnalysisComparison() {
       measuredReferenceImpacts,
       measuredReferenceImpactSelection,
       "#54dce3",
+      microscopeScaling.bySource.reference,
+      microscopeScaling.sharedSpectrogramPeakPower,
     );
     renderOnsetPopulationPanel(
       referenceOnsetPopulation,
@@ -875,6 +921,8 @@ function renderAnalysisComparison() {
       [],
       measuredReferenceImpactSelection,
       "#54dce3",
+      microscopeScaling.bySource.reference,
+      microscopeScaling.sharedSpectrogramPeakPower,
     );
     renderOnsetPopulationPanel(
       referenceOnsetPopulation,
@@ -925,6 +973,8 @@ function renderAnalysisComparison() {
       farnellReferenceImpacts,
       farnellReferenceImpactSelection,
       "#ff9d72",
+      microscopeScaling.bySource.farnell,
+      microscopeScaling.sharedSpectrogramPeakPower,
     );
     renderOnsetPopulationPanel(
       farnellOnsetPopulation,
@@ -948,6 +998,8 @@ function renderAnalysisComparison() {
       [],
       farnellReferenceImpactSelection,
       "#ff9d72",
+      microscopeScaling.bySource.farnell,
+      microscopeScaling.sharedSpectrogramPeakPower,
     );
     renderOnsetPopulationPanel(
       farnellOnsetPopulation,
@@ -1525,6 +1577,13 @@ referenceImpactChoiceButtons.forEach((button, index) => {
 farnellImpactChoiceButtons.forEach((button, index) => {
   button.addEventListener("click", () => {
     farnellReferenceImpactSelection = index;
+    renderAnalysisComparison();
+  });
+});
+microscopeScalingInputs.forEach(input => {
+  input.addEventListener("change", () => {
+    if (!input.checked) return;
+    microscopeScalingMode = input.value;
     renderAnalysisComparison();
   });
 });

@@ -34,7 +34,11 @@ function clamp(value, minimum, maximum) {
 export function prepareWaveformEnvelope(
   samples,
   columnCount,
-  { targetPeak = 0.84, peakPercentile = 0.995 } = {},
+  {
+    targetPeak = 0.84,
+    peakPercentile = 0.995,
+    normalizationGain = null,
+  } = {},
 ) {
   const columns = Math.max(1, Math.round(Number(columnCount) || 1));
   const input = samples ?? [];
@@ -55,9 +59,14 @@ export function prepareWaveformEnvelope(
     ? absoluteSamples[quantileIndex]
     : 0;
   const boundedTarget = clamp(Number(targetPeak) || 0.84, 0.05, 1);
-  const normalizationGain = normalizationPeak > 1e-12
-    ? boundedTarget / normalizationPeak
-    : 1;
+  const requestedGain = Number.isFinite(normalizationGain)
+    ? Math.max(0, normalizationGain)
+    : null;
+  const resolvedNormalizationGain = requestedGain ?? (
+    normalizationPeak > 1e-12
+      ? boundedTarget / normalizationPeak
+      : 1
+  );
 
   for (let column = 0; column < columns; column += 1) {
     const start = Math.floor(column * input.length / columns);
@@ -68,7 +77,7 @@ export function prepareWaveformEnvelope(
     let minimum = 0;
     let maximum = 0;
     for (let index = start; index < Math.min(input.length, end); index += 1) {
-      const value = (Number(input[index]) || 0) * normalizationGain;
+      const value = (Number(input[index]) || 0) * resolvedNormalizationGain;
       minimum = Math.min(minimum, value);
       maximum = Math.max(maximum, value);
     }
@@ -76,7 +85,11 @@ export function prepareWaveformEnvelope(
     maximums[column] = clamp(maximum, -1, 1);
   }
 
-  return Object.freeze({ minimums, maximums, normalizationGain });
+  return Object.freeze({
+    minimums,
+    maximums,
+    normalizationGain: resolvedNormalizationGain,
+  });
 }
 
 function drawTimeMarker(context, width, height, markerFraction, label) {
@@ -102,10 +115,13 @@ function drawTimeMarker(context, width, height, markerFraction, label) {
 export function renderSignalWaveform(canvas, samples, color, {
   markerFraction = null,
   markerLabel = "",
+  normalizationGain = null,
 } = {}) {
   const { context, width, height } = prepareCanvas(canvas);
   drawGrid(context, width, height);
-  const envelope = prepareWaveformEnvelope(samples, Math.round(width));
+  const envelope = prepareWaveformEnvelope(samples, Math.round(width), {
+    normalizationGain,
+  });
 
   context.strokeStyle = color;
   context.lineWidth = 1;
@@ -211,6 +227,8 @@ function heatColor(intensity) {
 export function renderSignalSpectrogram(canvas, analysis, {
   markerFraction = null,
   markerLabel = "",
+  powerGain = 1,
+  peakPower = null,
 } = {}) {
   const { context, width, height } = prepareCanvas(canvas);
   const frames = analysis.spectrogram;
@@ -218,11 +236,18 @@ export function renderSignalSpectrogram(canvas, analysis, {
     renderEmptySignal(canvas, "No time-frequency data");
     return;
   }
-  let peakPower = 0;
+  const resolvedPowerGain = Number.isFinite(powerGain)
+    ? Math.max(0, powerGain)
+    : 1;
+  let localPeakPower = 0;
   for (const frame of frames) {
-    for (const power of frame) peakPower = Math.max(peakPower, power);
+    for (const power of frame) {
+      localPeakPower = Math.max(localPeakPower, power * resolvedPowerGain);
+    }
   }
-  peakPower = Math.max(peakPower, 1e-20);
+  const resolvedPeakPower = Number.isFinite(peakPower) && peakPower > 0
+    ? peakPower
+    : Math.max(localPeakPower, 1e-20);
   const minimumFrequency = 80;
   const maximumFrequency = analysis.sampleRate / 2;
   const imageWidth = canvas.width;
@@ -252,8 +277,10 @@ export function renderSignalSpectrogram(canvas, analysis, {
         + (frames[lowerFrame][upperBin] - frames[lowerFrame][lowerBin]) * frequencyMix;
       const upperPower = frames[upperFrame][lowerBin]
         + (frames[upperFrame][upperBin] - frames[upperFrame][lowerBin]) * frequencyMix;
-      const power = lowerPower + (upperPower - lowerPower) * timeMix;
-      const decibels = 10 * Math.log10(Math.max(power / peakPower, 1e-7));
+      const power = (
+        lowerPower + (upperPower - lowerPower) * timeMix
+      ) * resolvedPowerGain;
+      const decibels = 10 * Math.log10(Math.max(power / resolvedPeakPower, 1e-7));
       const color = heatColor(((decibels + 70) / 70) ** 0.9);
       const pixel = (y * imageWidth + x) * 4;
       pixels.data[pixel] = color[0];

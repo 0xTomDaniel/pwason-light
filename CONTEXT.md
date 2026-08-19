@@ -140,6 +140,10 @@ _Avoid_: Strongest contact, fixed favorite moment, aligned drop
 A selectable 120-millisecond excerpt centered around one prominent acoustic onset, with that detected onset placed at the same visible offset for every source. Each source offers non-overlapping Strong, Typical, and Soft choices ranked by post-onset energy when enough distinct contacts exist.
 _Avoid_: Representative Field Window, physical-drop timestamp, strongest sample
 
+**Microscope Scaling**:
+The display-only viewing policy for Impact Microscopes. Shape independently normalizes each excerpt to expose morphology; Profile-matched places every source on one complete-profile level baseline and one shared visual scale so relative Strong, Typical, and Soft behavior remains comparable without treating raw recording gain as calibrated pressure.
+_Avoid_: Raw amplitude comparison, audio normalization, synthesis gain
+
 **Impact Audition**:
 Explicit, level-matched playback of one Impact Microscope through the current Output Level. It is diagnostic listening only and never supplies samples to generated rain or changes Reference Playback.
 _Avoid_: Rain Reference playback, synthesis input, full-field playback

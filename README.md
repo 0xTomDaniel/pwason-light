@@ -181,6 +181,14 @@ nearest the median, and Soft is nearest the 25th percentile. Every choice places
 its detected onset 20 ms into the excerpt and draws the same marker on waveform
 and spectrogram. Alignment is limited by the detector's approximately 2.7 ms
 hop and is not a claim about unknowable physical impact time in a recording.
+One global Microscope Scaling control defaults to **Profile-matched**. It gives
+each source one fixed gain from its complete-profile RMS, reuses that gain for
+Strong, Typical, and Soft, and renders every available microscope against one
+shared robust waveform reference and one shared STFT power reference. This
+preserves relative impact strength without pretending raw microphone gain is
+calibrated pressure. **Shape** restores independent per-excerpt normalization
+when quiet morphology is the question. Both modes are visual only and leave
+samples, metrics, synthesis, Reference Playback, and Impact Audition unchanged.
 Each microscope has an Impact Audition button that peak-matches its selected excerpt,
 adds only four-millisecond edge fades, and plays the complete 120 ms segment
 through the current Output Level without entering Source Mix or synthesis.
