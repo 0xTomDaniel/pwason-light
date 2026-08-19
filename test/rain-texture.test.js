@@ -33,6 +33,20 @@ const REDWOOD_FINE_BAND_PROFILE_DB = Object.freeze([
   -12.1, -11.1, -7.3, -10.8, -8.1, -3.3,
 ]);
 
+const REDWOOD_PERCEPTUAL_CENTERS_HZ = Object.freeze([
+  100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1_000, 1_250,
+  1_600, 2_000, 2_500, 3_150, 4_000, 5_000, 6_300, 8_000, 10_000,
+  12_500, 16_000,
+]);
+
+// One-third-octave Gaussian smoothing of the first ten seconds of Redwood's
+// reliable 80 Hz–18 kHz MP3 passband, normalized to its strongest center.
+const REDWOOD_PERCEPTUAL_PROFILE_DB = Object.freeze([
+  -0.85, 0, -1.52, -2.94, -2.89, -2.52, -0.58, -1.37, -2.54, -4.11,
+  -8.72, -11.43, -11.9, -14.56, -15.72, -18.37, -20.46, -20.05,
+  -18.28, -20.03, -17.5, -20.27, -16.69,
+]);
+
 function normalizedBandProfileDb(analysis, edges) {
   const energies = edges.slice(0, -1).map(
     (lowerFrequency, bandIndex) => {
@@ -57,6 +71,30 @@ function profileDistanceDb(actual, target) {
     0,
   );
   return Math.sqrt(squaredError / actual.length);
+}
+
+function perceptualProfileDb(distribution) {
+  const sigmaOctaves = (1 / 3) / (2 * Math.sqrt(2 * Math.log(2)));
+  const relativePowers = [...distribution.profileDecibels].map(
+    decibels => 10 ** (decibels / 10),
+  );
+  const smoothedPowers = REDWOOD_PERCEPTUAL_CENTERS_HZ.map(center => {
+    let weightedPower = 0;
+    let weightTotal = 0;
+    for (let index = 0; index < distribution.frequenciesHz.length; index += 1) {
+      const octaveDistance = Math.log2(
+        distribution.frequenciesHz[index] / center,
+      );
+      const weight = Math.exp(-0.5 * (octaveDistance / sigmaOctaves) ** 2);
+      weightedPower += weight * relativePowers[index];
+      weightTotal += weight;
+    }
+    return weightedPower / weightTotal;
+  });
+  const peak = Math.max(...smoothedPowers, 1e-20);
+  return smoothedPowers.map(
+    power => 10 * Math.log10(Math.max(power / peak, 1e-20)),
+  );
 }
 
 function renderDefaultProfile(factors) {
@@ -256,7 +294,8 @@ test("the calibrated Redwood profile produces a continuous high-detail rain fiel
     nextArrival: () => engine.next(),
   });
   const analysis = analyzeSignal(samples, 48_000, { includeSpectrogram: false });
-  const strongImpact = analyzeRainField(samples, 48_000).impactMicroscopes[0].analysis;
+  const diagnostics = analyzeRainField(samples, 48_000);
+  const strongImpact = diagnostics.impactMicroscopes[0].analysis;
   const onsets = detectProminentOnsets(samples, 48_000);
 
   assert.ok(analysis.spectralCentroidHz > 3_000);
@@ -292,5 +331,11 @@ test("the calibrated Redwood profile produces a continuous high-detail rain fiel
       normalizedBandProfileDb(analysis, REDWOOD_FINE_BAND_EDGES_HZ),
       REDWOOD_FINE_BAND_PROFILE_DB,
     ) < 2,
+  );
+  assert.ok(
+    profileDistanceDb(
+      perceptualProfileDb(diagnostics.spectralDistribution),
+      REDWOOD_PERCEPTUAL_PROFILE_DB,
+    ) < 1.8,
   );
 });

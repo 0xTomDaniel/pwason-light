@@ -13,6 +13,7 @@ const DISTRIBUTION_QUANTILES = Object.freeze([0.1, 0.25, 0.5, 0.75, 0.9]);
 const ONSET_POPULATION_QUANTILES = Object.freeze([0.1, 0.5, 0.9]);
 const ONSET_POPULATION_POINTS = 240;
 const MAX_ONSET_POPULATION_SIZE = 96;
+const PERCEPTUAL_PROFILE_FWHM_OCTAVES = 1 / 3;
 
 function normalizedDecibels(powers, floorDecibels = SPECTRAL_FLOOR_DECIBELS) {
   const peak = Math.max(...powers, 1e-20);
@@ -31,6 +32,25 @@ function rmsDifference(first, second) {
     squaredError += (first[index] - second[index]) ** 2;
   }
   return Math.sqrt(squaredError / Math.max(1, first.length));
+}
+
+function smoothNormalizedDecibels(frequenciesHz, decibels) {
+  const sigmaOctaves = PERCEPTUAL_PROFILE_FWHM_OCTAVES
+    / (2 * Math.sqrt(2 * Math.log(2)));
+  const smoothedPowers = Float64Array.from(frequenciesHz, frequency => {
+    let weightedPower = 0;
+    let weightTotal = 0;
+    for (let index = 0; index < frequenciesHz.length; index += 1) {
+      const octaveDistance = Math.log2(frequenciesHz[index] / frequency);
+      const weight = Math.exp(
+        -0.5 * (octaveDistance / sigmaOctaves) ** 2,
+      );
+      weightedPower += weight * 10 ** (decibels[index] / 10);
+      weightTotal += weight;
+    }
+    return weightedPower / Math.max(weightTotal, 1e-20);
+  });
+  return normalizedDecibels(smoothedPowers);
 }
 
 function quantile(sorted, probability) {
@@ -380,7 +400,9 @@ export function analyzeRainField(samples, sampleRate) {
   });
 }
 
-export function compareRainFieldDiagnostics(first, second) {
+export function compareRainFieldDiagnostics(first, second, {
+  evaluationMaximumFrequencyHz,
+} = {}) {
   const firstDistribution = first?.spectralDistribution;
   const secondDistribution = second?.spectralDistribution;
   if (
@@ -435,6 +457,34 @@ export function compareRainFieldDiagnostics(first, second) {
       frequency,
     ),
   );
+  const firstProfileDecibels = Float64Array.from(
+    frequenciesHz,
+    frequency => interpolate(
+      firstDistribution,
+      firstDistribution.profileDecibels,
+      frequency,
+    ),
+  );
+  const secondProfileDecibels = Float64Array.from(
+    frequenciesHz,
+    frequency => interpolate(
+      secondDistribution,
+      secondDistribution.profileDecibels,
+      frequency,
+    ),
+  );
+  const firstPerceptualProfile = smoothNormalizedDecibels(
+    frequenciesHz,
+    firstProfileDecibels,
+  );
+  const secondPerceptualProfile = smoothNormalizedDecibels(
+    frequenciesHz,
+    secondProfileDecibels,
+  );
+  const perceptualProfileResidualDecibels = Float64Array.from(
+    frequenciesHz,
+    (_, index) => firstPerceptualProfile[index] - secondPerceptualProfile[index],
+  );
   const distributionResidualDecibels = firstDistribution.quantileDecibels.map(
     (values, quantileIndex) => Float64Array.from(
       frequenciesHz,
@@ -449,17 +499,36 @@ export function compareRainFieldDiagnostics(first, second) {
       ),
     ),
   );
+  const requestedMaximum = evaluationMaximumFrequencyHz == null
+    ? Number.NaN
+    : Number(evaluationMaximumFrequencyHz);
+  const evaluatedMaximum = Number.isFinite(requestedMaximum)
+    ? Math.max(minimumFrequency, Math.min(maximumFrequency, requestedMaximum))
+    : maximumFrequency;
+  const evaluatedIndices = [...frequenciesHz]
+    .map((frequency, index) => (frequency <= evaluatedMaximum ? index : -1))
+    .filter(index => index >= 0);
   const distributionValues = distributionResidualDecibels.flatMap(values => (
-    [...values]
+    evaluatedIndices.map(index => values[index])
   ));
+  const evaluatedPerceptualResidual = evaluatedIndices.map(
+    index => perceptualProfileResidualDecibels[index],
+  );
 
   return Object.freeze({
     frequenciesHz,
     quantiles: firstDistribution.quantiles,
     profileResidualDecibels,
-    profileDistanceDb: Math.sqrt(
+    perceptualProfileResidualDecibels,
+    perceptualSmoothingOctaves: PERCEPTUAL_PROFILE_FWHM_OCTAVES,
+    evaluationMaximumFrequencyHz: evaluatedMaximum,
+    rawProfileDistanceDb: Math.sqrt(
       [...profileResidualDecibels].reduce((sum, value) => sum + value ** 2, 0)
         / Math.max(1, profileResidualDecibels.length),
+    ),
+    profileDistanceDb: Math.sqrt(
+      evaluatedPerceptualResidual.reduce((sum, value) => sum + value ** 2, 0)
+        / Math.max(1, evaluatedPerceptualResidual.length),
     ),
     distributionResidualDecibels: Object.freeze(distributionResidualDecibels),
     distributionDistanceDb: Math.sqrt(

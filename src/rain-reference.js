@@ -21,6 +21,7 @@ const REDWOOD_GROUND_REFERENCE = Object.freeze({
   licenseUrl: "https://creativecommons.org/publicdomain/zero/1.0/",
   playbackFormat: "Freesound high-quality MP3 preview",
   originalFormat: "44.1 kHz, 16-bit stereo WAV",
+  evaluationMaximumFrequencyHz: 18_000,
   sha256: "ebf3ab59c140a5d44f939f3f871a58ed205377dcccb02fe6d0147d29535fcadb",
   detectedOnsetRateHz: 38.5,
   equivalentTotalRateHz: 1_000,

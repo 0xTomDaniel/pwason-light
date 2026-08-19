@@ -38,6 +38,7 @@ test("the Reference Library includes the two recordings and Farnell procedural r
   assert.equal(clean.license, "CC0 1.0");
   assert.equal(clean.sourceUrl, "https://freesound.org/s/464334/");
   assert.equal(clean.playbackFormat, "Freesound high-quality MP3 preview");
+  assert.equal(clean.evaluationMaximumFrequencyHz, 18_000);
   assert.equal(
     createHash("sha256").update(recording).digest("hex"),
     clean.sha256,

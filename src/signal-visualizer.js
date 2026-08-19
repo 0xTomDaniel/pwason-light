@@ -31,6 +31,43 @@ function clamp(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, value));
 }
 
+function drawUnscoredTail(
+  context,
+  width,
+  height,
+  minimumFrequency,
+  maximumFrequency,
+  evaluationMaximumFrequency,
+  {
+    fillStyle = "rgba(255, 237, 179, 0.055)",
+    label = true,
+  } = {},
+) {
+  if (
+    !Number.isFinite(evaluationMaximumFrequency)
+    || evaluationMaximumFrequency >= maximumFrequency
+  ) return;
+  const unscoredStart = Math.log(
+    evaluationMaximumFrequency / minimumFrequency,
+  ) / Math.log(maximumFrequency / minimumFrequency);
+  const unscoredX = clamp(unscoredStart, 0, 1) * width;
+  context.fillStyle = fillStyle;
+  context.fillRect(unscoredX, 0, width - unscoredX, height);
+  context.strokeStyle = "rgba(255, 237, 179, 0.4)";
+  context.setLineDash([3, 3]);
+  context.beginPath();
+  context.moveTo(unscoredX, 0);
+  context.lineTo(unscoredX, height);
+  context.stroke();
+  context.setLineDash([]);
+  if (!label) return;
+  context.fillStyle = "rgba(255, 237, 179, 0.62)";
+  context.font = "8px IBM Plex Mono, monospace";
+  context.textAlign = "right";
+  context.fillText("UNSCORED", width - 6, 12);
+  context.textAlign = "start";
+}
+
 export function prepareWaveformEnvelope(
   samples,
   columnCount,
@@ -331,6 +368,20 @@ export function renderSpectrumComparison(canvas, series) {
   const maximumFrequency = Math.min(
     ...series.map(item => item.analysis.sampleRate / 2),
   );
+  const limitedReference = series.find(item => (
+    Number.isFinite(item.evaluationMaximumFrequencyHz)
+      && item.evaluationMaximumFrequencyHz < maximumFrequency
+  ));
+  if (limitedReference) {
+    drawUnscoredTail(
+      context,
+      width,
+      height,
+      minimumFrequency,
+      maximumFrequency,
+      limitedReference.evaluationMaximumFrequencyHz,
+    );
+  }
 
   for (const item of series) {
     let peakPower = 0;
@@ -365,9 +416,17 @@ export function renderProfileResidual(canvas, series) {
     renderEmptySignal(canvas, "Residuals will appear when references are ready");
     return;
   }
-  const magnitudes = series.flatMap(item => (
-    [...item.comparison.profileResidualDecibels].map(value => Math.abs(value))
-  )).sort((left, right) => left - right);
+  const magnitudes = series.flatMap(item => {
+    const comparison = item.comparison;
+    const values = comparison.perceptualProfileResidualDecibels
+      ?? comparison.profileResidualDecibels;
+    return [...values].flatMap((value, index) => (
+      comparison.frequenciesHz[index]
+        <= comparison.evaluationMaximumFrequencyHz
+        ? [Math.abs(value)]
+        : []
+    ));
+  }).sort((left, right) => left - right);
   const robustMagnitude = magnitudes[
     Math.floor((magnitudes.length - 1) * 0.95)
   ] ?? 12;
@@ -377,6 +436,17 @@ export function renderProfileResidual(canvas, series) {
   );
   const centerY = height / 2;
 
+  const selectedComparison = series[0].comparison;
+  const maximumFrequency = selectedComparison.frequenciesHz.at(-1);
+  drawUnscoredTail(
+    context,
+    width,
+    height,
+    selectedComparison.frequenciesHz[0],
+    maximumFrequency,
+    selectedComparison.evaluationMaximumFrequencyHz,
+  );
+
   context.strokeStyle = "rgba(229, 236, 217, 0.34)";
   context.lineWidth = 1;
   context.beginPath();
@@ -385,7 +455,24 @@ export function renderProfileResidual(canvas, series) {
   context.stroke();
 
   for (const item of series) {
-    const values = item.comparison.profileResidualDecibels;
+    const rawValues = item.comparison.profileResidualDecibels;
+    const values = item.comparison.perceptualProfileResidualDecibels
+      ?? rawValues;
+    if (values !== rawValues) {
+      context.strokeStyle = item.color;
+      context.globalAlpha = 0.25;
+      context.lineWidth = 0.75;
+      context.beginPath();
+      for (let index = 0; index < rawValues.length; index += 1) {
+        const x = index * width / Math.max(1, rawValues.length - 1);
+        const bounded = clamp(rawValues[index], -scaleDecibels, scaleDecibels);
+        const y = centerY - bounded / scaleDecibels * height * 0.46;
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.stroke();
+      context.globalAlpha = 1;
+    }
     context.strokeStyle = item.color;
     context.fillStyle = item.fillColor;
     context.lineWidth = 1.6;
@@ -456,6 +543,17 @@ export function renderDistributionResidual(canvas, comparison, {
     }
   }
   context.putImageData(pixels, 0, 0);
+
+  const maximumFrequency = comparison.frequenciesHz.at(-1);
+  drawUnscoredTail(
+    context,
+    width,
+    height,
+    comparison.frequenciesHz[0],
+    maximumFrequency,
+    comparison.evaluationMaximumFrequencyHz,
+    { fillStyle: "rgba(5, 8, 6, 0.72)", label: false },
+  );
 
   context.strokeStyle = "rgba(229, 236, 217, 0.16)";
   context.lineWidth = 1;

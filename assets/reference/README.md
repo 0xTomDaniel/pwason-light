@@ -18,8 +18,14 @@ to contain the lossless original.
 - Bundled format: stereo MP3, 44.1 kHz, approximately 198 kb/s
 - Bundled size: `1,516,654` bytes
 - SHA-256: `ebf3ab59c140a5d44f939f3f871a58ed205377dcccb02fe6d0147d29535fcadb`
+- Scored evaluation passband: `80 Hz–18 kHz`
 - Preview download: <https://cdn.freesound.org/previews/464/464334_1504845-hq.mp3>
 - License: <https://creativecommons.org/publicdomain/zero/1.0/>
+
+The preview's encoder cutoff begins above 18 kHz. Diagnostics retain the
+18–20 kHz evidence as a shaded raw trace, but exclude it from Redwood's scored
+profile and distribution distances so the synthesizer is not tuned to mimic
+MP3 encoding.
 
 ## Central Amazon scientific recording
 

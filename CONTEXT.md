@@ -21,7 +21,7 @@ A homogeneous Poisson arrival process with one constant total lamp rate selected
 _Avoid_: Living rate, Cox process, weather modulation
 
 **Rain Mark**:
-The audio-only physical interpretation assigned to an Arrival by the Generated Rain Renderer. It coherently relates a synthesized impact's drop-size class, velocity, surface response, level, duration, and broad spectral focus without changing the light event. Every default mark retains a low/mid Surface Body. Upper-frequency Surface Detail may occur on any mark, but its energy allowance tightens when a source response becomes foreground-prominent so one contact cannot carry the complete field's high-frequency compensation.
+The audio-only physical interpretation assigned to an Arrival by the Generated Rain Renderer. It coherently relates a synthesized impact's drop-size class, velocity, surface response, level, duration, broad spectral focus, and modest response-region center and bandwidth variation without changing the light event. Every default mark retains a low/mid Surface Body. Upper-frequency Surface Detail may occur on any mark, but its energy allowance tightens when a source response becomes foreground-prominent so one contact cannot carry the complete field's high-frequency compensation.
 _Avoid_: Arrival, LED mark, recorded grain
 
 **Surface Detail**:
@@ -45,7 +45,7 @@ The quiet, sub-millisecond signed pressure response at the start of one Rain Imp
 _Avoid_: Mandatory onset peak, snare transient
 
 **Surface Response**:
-The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. One compact surface-shaped window drives an event-selected sparse subset of eight candidate, partially independent ERB-spaced audio regions with analytically generated noise. Fresh excitation becomes literal zero when the contact window closes; only short filter state remains. Every surface stays broadband as a population rather than making every individual impact broadband. Wet Microtexture may add finite nonlinear microtransients inside that same window. It has no free-running resonator, recording, sustained stochastic tail, or liquid-bubble model.
+The generated, event-specific vibration excited when a Rain Mark contacts leaves, leaf litter, soil, or wood. One compact surface-shaped window drives an event-selected sparse subset of eight nominal, partially independent ERB-spaced audio regions with analytically generated noise. Each Rain Mark applies bounded deterministic center and bandwidth variation so the complete population does not preserve a fixed filter comb. Fresh excitation becomes literal zero when the contact window closes; only short filter state remains. Every surface stays broadband as a population rather than making every individual impact broadband. Wet Microtexture may add finite nonlinear microtransients inside that same window. It has no free-running resonator, recording, sustained stochastic tail, or liquid-bubble model.
 _Avoid_: Diffuse Response, recorded impulse response, bubble tone
 
 **Wet Microtexture**:
@@ -97,12 +97,16 @@ The three bundled Rain References available for traceable analysis and playback:
 _Avoid_: Sample bank, synthesis corpus
 
 **Reference Profile**:
-One Reference Library entry: its source asset, provenance, surface or synthesis character, format, checksum, detected prominent-onset rate, optional equivalent total-Arrival calibration, and optional fixed analysis interval. Selecting a profile controls both visual analysis and Reference Playback.
+One Reference Library entry: its source asset, provenance, surface or synthesis character, format, checksum, detected prominent-onset rate, optional equivalent total-Arrival calibration, optional fixed analysis interval, and optional Reference Evaluation Passband. Selecting a profile controls both visual analysis and Reference Playback.
 _Avoid_: Audio Channel, spectral profile
 
-**Normalized Profile Distance**:
-The level-independent RMS dB difference between two complete-profile spectra sampled on the same logarithmic frequency grid after each is normalized to its own peak. It measures aggregate tonal mismatch, not time-aligned spectrogram similarity or perceptual quality.
-_Avoid_: Loudness difference, waveform error, fit score
+**Reference Evaluation Passband**:
+The frequency range in which a Rain Reference's stored asset is reliable enough to contribute to scored spectral comparisons. Evidence outside it remains visible and explicitly unscored. Redwood ends at 18 kHz because its bundled MP3 preview has an encoder cutoff above that point; generated rain is not required to reproduce the codec.
+_Avoid_: Synthesizer bandwidth, hidden low-pass, display crop
+
+**Perceptual Profile Distance**:
+The level-independent RMS dB difference between two complete-profile spectra after one-third-octave Gaussian smoothing and independent peak normalization, scored only inside the selected Reference Evaluation Passband. It measures aggregate tonal-shape mismatch, not time-aligned spectrogram similarity or perceptual quality by itself.
+_Avoid_: Raw Profile Distance, loudness difference, waveform error
 
 **Prominent Onset Rate**:
 The rate of foreground energy increases found by the shared onset detector in generated or recorded audio. It observes only detectable contacts and is not the total physical Arrival rate.
@@ -157,7 +161,7 @@ A bounded diagnostic population of prominent acoustic onsets, each represented b
 _Avoid_: Average waveform, physical-drop alignment, synthesis layer
 
 **Spectral Profile Residual**:
-The signed, level-independent dB difference between two complete-profile spectra. Positive values mean generated rain has excess normalized energy at that frequency; negative values mean generated rain is missing energy.
+The signed, level-independent dB difference between two complete-profile spectra. The solid trace is one-third-octave smoothed and supplies the Perceptual Profile Distance; a faint raw 96-point trace retains narrow detail. Positive values mean generated rain has excess normalized energy at that frequency; negative values mean generated rain is missing energy. Evidence beyond the selected Reference Evaluation Passband is shaded and unscored.
 _Avoid_: Time-aligned spectrogram subtraction, loudness difference
 
 **Spectral Distribution Residual**:

@@ -90,10 +90,12 @@ receiving material: litter keeps a somewhat broader noisy contact than leaf or
 wood without adding another layer or changing the aggregate Redwood target.
 
 The renderer creates a restrained sub-millisecond signed Direct Contact plus a
-brief analytic Surface Response. Eight overlapping ERB-derived regions from
-roughly 100 Hz–18.5 kHz are candidates, but a default Rain Mark selects only
+brief analytic Surface Response. Eight overlapping nominal ERB-derived regions
+from roughly 100 Hz–18.5 kHz are candidates, but a default Rain Mark selects only
 two: at least one body region and one optional detail region when that group is
-enabled. A compact parabolic/quartic leaf window or Gaussian-like litter
+enabled. Each Rain Mark applies modest seeded center-frequency and bandwidth
+variation, smoothing the complete field without making one impact broadband or
+adding another control. A compact parabolic/quartic leaf window or Gaussian-like litter
 window drives those regions with analytically generated noise; once the window
 closes, their filters receive zero input and only their short residual state
 decays. Spectral Sparsity controls the selected-region count. Leaf remains
@@ -148,7 +150,10 @@ The default is a cleaner CC0 stereo field recording by Andron827 of rain on
 earthen ground, fallen logs, and large leaves in Redwood Shores. Its source
 description lists no stream or flowing water. The bundled asset is Freesound's
 high-quality MP3 preview of the original 44.1 kHz, 16-bit WAV, and is labeled
-as a preview in the interface rather than being represented as lossless.
+as a preview in the interface rather than being represented as lossless. Its
+encoder cutoff makes 18 kHz the upper edge of Redwood's scored Reference
+Evaluation Passband; the 18–20 kHz tail remains visible but is not treated as
+natural-rain evidence.
 
 The selector also retains the exact light-rainfall recording from Xavier et
 al., “Measuring Amazon Rainfall Intensity With Sound Recorders.” The study
@@ -209,8 +214,11 @@ and display a q10–q90 band with a q50 line plus median peak and 90%-energy
 timing. This prevents one exceptional strongest contact from defining the
 canonical response shape.
 
-Each reference also shows a level-independent Normalized Profile Distance and
-signed Spectral Profile Residual from the current synth. Spectral Distribution
+Each reference also shows a level-independent Perceptual Profile Distance and
+signed Spectral Profile Residual from the current synth. Solid profile traces
+use one-third-octave Gaussian smoothing; faint hairlines retain the raw 96-point
+comparison. Scores use the selected Reference Evaluation Passband, while any
+codec-limited tail remains visibly shaded and unscored. Spectral Distribution
 Residual heatmaps compare q10, q25, q50, q75, and q90 energy at each frequency
 after discarding frame order, revealing background-floor and foreground-impact
 mismatch without pretending independent stochastic spectrogram pixels align.
@@ -220,10 +228,12 @@ its complete profile, which remains authoritative.
 The two references are intentionally not averaged into one target. Current
 native-rate analysis puts Redwood near 4.22 kHz centroid and 23.9% energy above
 8 kHz, while Farnell’s 14–24 second interval is near 9.10 kHz and 55.5%. The
-Wood-enabled Redwood-first generated baseline is near 3.66 kHz and 20.0%. On the shared
-Rain Diagnostics grid, it reports approximately 6.0 dB Spectral Profile and
-5.8 dB Spectral Distribution distance to Redwood, versus 6.4 dB and 8.7 dB to
-Farnell. Redwood is the sole enforceable target; Farnell is retained only as a
+Wood-enabled Redwood-first generated baseline is near 3.66 kHz and 19.9%. On the shared
+Rain Diagnostics grid, it reports approximately 1.8 dB Perceptual Profile and
+2.4 dB Spectral Distribution distance to Redwood inside 80 Hz–18 kHz, versus
+5.8 dB and 8.7 dB to Farnell across the complete shared passband. The retained
+raw Redwood trace is approximately 6.0 dB across 80 Hz–20 kHz because its final
+two points expose the preview codec cutoff rather than rain. Redwood is the sole enforceable target; Farnell is retained only as a
 secondary wet-texture and architecture diagnostic.
 
 The selected Rain Reference can also loop as Reference Playback through Source Mix.

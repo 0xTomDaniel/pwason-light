@@ -141,6 +141,7 @@ const farnellWindowDistance = document.querySelector("#farnell-window-distance")
 const generatedWindowDistance = document.querySelector("#generated-window-distance");
 const referenceWindowDistance = document.querySelector("#reference-window-distance");
 const profileResidual = document.querySelector("#profile-residual");
+const profileResidualNote = document.querySelector("#profile-residual-note");
 const selectedResidualLabel = document.querySelector("#selected-residual-label");
 const selectedDistributionTitle = document.querySelector("#selected-distribution-title");
 const selectedDistributionResidual = document.querySelector("#selected-distribution-residual");
@@ -232,6 +233,7 @@ let measuredReferenceAnalysis = null;
 let measuredReferenceProfileAnalysis = null;
 let measuredReferenceOnsets = null;
 let measuredReferenceCalibration = null;
+let measuredReferenceEvaluationMaximumFrequencyHz = null;
 let measuredReferenceImpacts = [];
 let measuredReferenceImpactSelection = 0;
 let farnellReferenceDiagnostics = null;
@@ -877,15 +879,27 @@ function renderAnalysisComparison() {
     spectrumSeries.push({
       analysis: measuredReferenceProfileAnalysis,
       color: "#54dce3",
+      evaluationMaximumFrequencyHz:
+        measuredReferenceEvaluationMaximumFrequencyHz,
     });
     const comparison = compareRainFieldDiagnostics(
       generatedDiagnostics,
       measuredReferenceDiagnostics,
+      {
+        evaluationMaximumFrequencyHz:
+          measuredReferenceEvaluationMaximumFrequencyHz,
+      },
     );
     residualSeries.push({ comparison, color: "#54dce3" });
     referenceSpectrumDistance.textContent = `${comparison.profileDistanceDb.toFixed(1)} dB`;
+    referenceSpectrumDistance.title = `One-third-octave perceptual distance; raw full-grid trace ${comparison.rawProfileDistanceDb.toFixed(1)} dB`;
     referenceWindowDistance.textContent = `${measuredReferenceDiagnostics.representativeField.spectrumDistanceDb.toFixed(1)} dB`;
     selectedDistributionDistance.textContent = `${comparison.distributionDistanceDb.toFixed(1)} dB`;
+    const comparisonMaximum = comparison.frequenciesHz.at(-1);
+    profileResidualNote.textContent = comparison.evaluationMaximumFrequencyHz
+      < comparisonMaximum
+      ? `Solid lines show the one-third-octave perceptual residual; hairlines retain the raw 96-point trace. ${selectedReferenceProfile.shortTitle} is scored through ${Math.round(comparison.evaluationMaximumFrequencyHz / 1_000)} kHz; its codec-limited tail remains visible but shaded and unscored.`
+      : "Solid lines show the one-third-octave perceptual residual; hairlines retain the raw 96-point trace. The complete shared passband is scored.";
     renderDistributionResidual(selectedDistributionResidual, comparison);
     renderImpactMicroscope(
       referenceImpactWaveform,
@@ -908,7 +922,9 @@ function renderAnalysisComparison() {
   } else {
     renderEmptySignal(referenceAnalysisWaveform, "Loading selected Rain Reference");
     renderEmptySignal(referenceAnalysisSpectrogram, "Representative Field will appear here");
+    profileResidualNote.textContent = "Solid lines show the one-third-octave perceptual residual; hairlines retain the raw 96-point trace. Waiting for the selected Reference Evaluation Passband.";
     referenceSpectrumDistance.textContent = "—";
+    referenceSpectrumDistance.title = "";
     referenceWindowDistance.textContent = "—";
     selectedDistributionDistance.textContent = "—";
     renderEmptySignal(selectedDistributionResidual, "Selected distribution loading");
@@ -961,6 +977,7 @@ function renderAnalysisComparison() {
     );
     residualSeries.push({ comparison, color: "#ff9d72" });
     farnellSpectrumDistance.textContent = `${comparison.profileDistanceDb.toFixed(1)} dB`;
+    farnellSpectrumDistance.title = `One-third-octave perceptual distance; raw full-grid trace ${comparison.rawProfileDistanceDb.toFixed(1)} dB`;
     farnellWindowDistance.textContent = `${farnellReferenceDiagnostics.representativeField.spectrumDistanceDb.toFixed(1)} dB`;
     farnellDistributionDistance.textContent = `${comparison.distributionDistanceDb.toFixed(1)} dB`;
     renderDistributionResidual(farnellDistributionResidual, comparison);
@@ -986,6 +1003,7 @@ function renderAnalysisComparison() {
     renderEmptySignal(farnellAnalysisWaveform, "Loading Farnell procedural reference");
     renderEmptySignal(farnellAnalysisSpectrogram, "Representative Field will appear here");
     farnellSpectrumDistance.textContent = "—";
+    farnellSpectrumDistance.title = "";
     farnellWindowDistance.textContent = "—";
     farnellDistributionDistance.textContent = "—";
     renderEmptySignal(farnellDistributionResidual, "Farnell distribution loading");
@@ -1037,6 +1055,8 @@ function applyPreparedRainReference(prepared, filename, status, calibration = nu
   measuredReferenceImpacts = prepared.impactMicroscopes;
   measuredReferenceImpactSelection = 0;
   measuredReferenceCalibration = calibration;
+  measuredReferenceEvaluationMaximumFrequencyHz =
+    prepared.reference?.evaluationMaximumFrequencyHz ?? null;
   referenceFilename.textContent = `${filename} · representative @ ${prepared.fieldWindowCenterSeconds.toFixed(2)} s`;
   referenceStatus.dataset.state = "ready";
   referenceStatus.textContent = status;
@@ -1105,6 +1125,7 @@ async function analyzeSelectedRainReference() {
   measuredReferenceImpacts = [];
   measuredReferenceImpactSelection = 0;
   measuredReferenceCalibration = null;
+  measuredReferenceEvaluationMaximumFrequencyHz = null;
   sourceMixInput.disabled = true;
   stopReferencePlayback();
   syncReferenceMediaProfile();

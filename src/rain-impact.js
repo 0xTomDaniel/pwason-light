@@ -35,12 +35,14 @@ const SURFACES = Object.freeze({
 
 const ERB_BAND_COUNT = 8;
 const BODY_BAND_COUNT = 4;
-const BACKGROUND_DETAIL_TO_BODY_GAIN = 4;
+const BACKGROUND_DETAIL_TO_BODY_GAIN = 3.8;
 const FOREGROUND_DETAIL_TO_BODY_GAIN = 0.4;
 const FOREGROUND_IMPACT_LEVEL = 0.42;
 const FOREGROUND_TRANSITION_WIDTH = 0.035;
 const MATERIAL_DETAIL_IMPACT_LEVEL = 0.46;
 const MATERIAL_DETAIL_TRANSITION_WIDTH = 0.025;
+const RAIN_MARK_CENTER_JITTER_ERB_STEPS = 0.28;
+const RAIN_MARK_BANDWIDTH_VARIATION = 0.18;
 const REDWOOD_TARGET_BAND_GAINS = Object.freeze([
   5.8, 3.6, 2, 2.15, 1.45, 1.15, 2.05, 8,
 ]);
@@ -111,17 +113,25 @@ function createBandpassFilter(sampleRate, centerFrequency, q) {
   };
 }
 
-function createErbBandpassFilters(sampleRate) {
+function createErbBandpassFilters(sampleRate, seed, variation) {
   const minimumFrequency = 180;
   const maximumFrequency = Math.min(18_500, sampleRate * 0.42);
   const minimumErb = erbRate(minimumFrequency);
   const maximumErb = erbRate(maximumFrequency);
   const erbStep = (maximumErb - minimumErb) / (ERB_BAND_COUNT - 1);
+  const frequencyRandom = createRandom(
+    (Number(seed) >>> 0) ^ 0x4f1bbcdc,
+  );
 
   return Array.from({ length: ERB_BAND_COUNT }, (_, index) => {
-    const centerErb = minimumErb + erbStep * index;
+    const centerErb = minimumErb + erbStep * (
+      index
+      + (frequencyRandom() * 2 - 1)
+        * RAIN_MARK_CENTER_JITTER_ERB_STEPS
+        * variation
+    );
     const centerFrequency = Math.min(
-      sampleRate * 0.45,
+      maximumFrequency,
       frequencyAtErbRate(centerErb) * REDWOOD_TARGET_CENTER_SCALES[index],
     );
     const lowerFrequency = Math.max(
@@ -136,6 +146,10 @@ function createErbBandpassFilters(sampleRate) {
     const q = Math.max(
       0.8,
       centerFrequency / bandwidth * REDWOOD_TARGET_Q_SCALES[index],
+    ) * interpolate(
+      1,
+      1 - frequencyRandom() * RAIN_MARK_BANDWIDTH_VARIATION,
+      variation,
     );
     return Object.freeze({
       filter: createBandpassFilter(sampleRate, centerFrequency, q),
@@ -353,7 +367,7 @@ export function createRainImpact({
   const independence = amount("bandIndependence");
   const sharedWeight = Math.sqrt(1 - independence);
   const independentWeight = Math.sqrt(independence);
-  const filterBands = createErbBandpassFilters(rate);
+  const filterBands = createErbBandpassFilters(rate, seed, variation);
   const textureGroups = [
     amount("lowTexture"),
     amount("lowTexture"),

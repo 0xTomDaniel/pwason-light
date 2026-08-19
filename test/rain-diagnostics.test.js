@@ -173,5 +173,47 @@ test("Rain Diagnostics compares different sample rates on one shared frequency g
   );
 
   assert.ok(comparison.frequenciesHz.at(-1) <= 4_000);
+  assert.equal(
+    comparison.evaluationMaximumFrequencyHz,
+    comparison.frequenciesHz.at(-1),
+  );
   assert.ok(Math.abs(comparison.profileResidualDecibels[frequencyIndex]) < 1);
+
+  const nullPassband = compareRainFieldDiagnostics(
+    analyzeRainField(tone(8_000), 8_000),
+    analyzeRainField(tone(48_000), 48_000),
+    { evaluationMaximumFrequencyHz: null },
+  );
+  assert.equal(
+    nullPassband.evaluationMaximumFrequencyHz,
+    nullPassband.frequenciesHz.at(-1),
+  );
+});
+
+test("Rain Diagnostics scores a perceptually smoothed profile only inside the declared evaluation passband", () => {
+  const sampleRate = 8_192;
+  const base = Float32Array.from(
+    { length: sampleRate * 2 },
+    (_, index) => 0.5 * Math.sin(2 * Math.PI * 512 * index / sampleRate),
+  );
+  const codecExtended = Float32Array.from(
+    base,
+    (sample, index) => sample
+      + 0.2 * Math.sin(2 * Math.PI * 3_072 * index / sampleRate),
+  );
+
+  const comparison = compareRainFieldDiagnostics(
+    analyzeRainField(codecExtended, sampleRate),
+    analyzeRainField(base, sampleRate),
+    { evaluationMaximumFrequencyHz: 1_500 },
+  );
+
+  assert.equal(comparison.evaluationMaximumFrequencyHz, 1_500);
+  assert.equal(
+    comparison.perceptualProfileResidualDecibels.length,
+    comparison.profileResidualDecibels.length,
+  );
+  assert.ok(comparison.rawProfileDistanceDb > 5);
+  assert.ok(comparison.profileDistanceDb < 0.5);
+  assert.ok(comparison.distributionDistanceDb < 0.5);
 });
