@@ -24,10 +24,10 @@ const REDWOOD_GROUND_REFERENCE = Object.freeze({
   playbackFormat: "Freesound high-quality MP3 preview",
   originalFormat: "44.1 kHz, 16-bit stereo WAV",
   sha256: "ebf3ab59c140a5d44f939f3f871a58ed205377dcccb02fe6d0147d29535fcadb",
-  detectedOnsetRateHz: 23.1,
-  equivalentTotalRateHz: 120,
-  prominenceFraction: 23.1 / 120,
-  calibrationKind: "operator-tempo-match",
+  detectedOnsetRateHz: 38.5,
+  equivalentTotalRateHz: 1_000,
+  prominenceFraction: 38.5 / 1_000,
+  calibrationKind: "field-continuity-match",
 });
 
 export const AMAZON_RAIN_REFERENCE = Object.freeze({

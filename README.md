@@ -64,8 +64,11 @@ total Arrival rate = Λ
 Each Arrival receives an independent position within a circular Listening
 Field. Field Depth sets its radius, Distance Loss controls relative pressure,
 Distance Air Damping softens remote high frequencies, and Stereo Spread controls
-continuous left-right placement. No additional timing or distance Channels are
-created.
+continuous left-right placement. The default field extends to about 44.6 m.
+At the accepted 70% setting, its distance curve is the ordinary free-field h/d
+pressure law, leaving many remote Arrivals at a very low but nonzero propagated
+level while rare near Arrivals retain contrast. This is one exact Poisson
+population, not an added background-noise clock or statistical field substitute.
 
 Each Arrival receives an audio-only Rain Mark. Drop Population changes the
 probability distribution over drop diameter; the same mark coherently derives a
@@ -149,7 +152,10 @@ strongest contact in the eight-second generated field and the first ten seconds
 of the selected recording. Each window contains every overlapping nearby and
 distant contact; neither is presented as an isolated measured drop. A 1,024-point
 Hann STFT at 1 ms hops feeds a continuously interpolated, log-frequency,
-70 dB spectrogram rather than an enlarged low-resolution heatmap. For the steady texture it displays normalized spectra,
+70 dB spectrogram rather than an enlarged low-resolution heatmap. The waveform
+above each spectrogram is a visual-only, robustly normalized min/max envelope:
+every horizontal pixel retains its local extrema, so quiet field detail remains
+visible without changing playback gain. For the steady texture it displays normalized spectra,
 spectral centroid, high-frequency energy, spectral flatness, crest factor,
 sample kurtosis, multiscale envelope variation, background-floor ratio,
 cross-band envelope correlation, generated total Arrival rate, and prominent
@@ -157,9 +163,11 @@ onsets detected from both sources by the same algorithm.
 
 The selected recording can also loop as Reference Playback through Source Mix.
 Detected foreground onsets are not treated as the physical drop count: Redwood
-stores a 23.1 onsets/s detector baseline and a separate provisional
-operator-tempo match of 120 total Arrivals/s. Reference Playback is therefore
-1× at Speed 120, and the generated comparison also runs at 120 Arrivals/s.
+stores a 38.5 onsets/s detector baseline and a separate provisional
+field-continuity match of 1,000 total Arrivals/s. Reference Playback is therefore
+1× at Speed 1,000, and the default generated comparison also runs at 1,000
+Arrivals/s. The Speed–Population Link starts off so this denser field does not
+silently force the independently selected 69% Drop Population to its endpoint.
 Amazon stores 15.8 detected onsets/s but remains explicitly uncalibrated rather
 than inheriting Redwood's multiplier. Profiles without a total-rate calibration
 visibly fall back to their detected-onset rate for comparison.

@@ -28,14 +28,15 @@ function clamp(value, minimum, maximum) {
 }
 
 function createChannelRoute(random, channelCoupling) {
-  if (random() < channelCoupling) {
+  const shared = random() < channelCoupling;
+  const privateChannel = Math.floor(random() * CHANNEL_COUNT);
+  if (shared) {
     return {
       route: "shared",
       channelWeights: Array(CHANNEL_COUNT).fill(1 / CHANNEL_COUNT),
     };
   }
 
-  const privateChannel = Math.floor(random() * CHANNEL_COUNT);
   return {
     route: "private",
     channelWeights: Array.from(

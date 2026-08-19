@@ -228,9 +228,11 @@ test("leaf and litter controls remain broad surfaces rather than compensating ex
   assert.ok(leaf.highBandEnergyRatio > 0.2);
   assert.ok(leaf.highBandEnergyRatio < 0.6);
   assert.ok(litter.spectralCentroidHz > 1_000);
-  assert.ok(litter.spectralCentroidHz < 4_000);
+  assert.ok(litter.spectralCentroidHz < 5_000);
   assert.ok(litter.highBandEnergyRatio > 0.03);
-  assert.ok(litter.highBandEnergyRatio < 0.25);
+  assert.ok(litter.highBandEnergyRatio < 0.3);
+  assert.ok(leaf.spectralCentroidHz > litter.spectralCentroidHz + 1_000);
+  assert.ok(leaf.highBandEnergyRatio > litter.highBandEnergyRatio + 0.05);
 });
 
 test("the calibrated Redwood profile produces a continuous high-detail rain field", () => {
@@ -242,8 +244,9 @@ test("the calibrated Redwood profile produces a continuous high-detail rain fiel
   });
   const engine = createPoissonEngine({
     seed: "redwood-ground-generated-profile",
-    rateHz: 120,
-    fieldRadiusMeters: 20,
+    rateHz: 1_000,
+    coupling: 0,
+    fieldRadiusMeters: 44.56,
   });
   const samples = renderer.renderProfile({
     durationSeconds: 8,
@@ -260,7 +263,7 @@ test("the calibrated Redwood profile produces a continuous high-detail rain fiel
   assert.ok(analysis.spectralFlatness < 0.16);
   assert.ok(analysis.envelopeCoefficientOfVariation > 0.3);
   assert.ok(analysis.envelopeCoefficientOfVariation < 0.7);
-  assert.ok(analysis.envelopeFloorRatio > 0.35);
+  assert.ok(analysis.envelopeFloorRatio > 0.64);
   assert.ok(analysis.bandEnvelopeCorrelation < 0.8);
   assert.ok(analysis.crestFactor > 8);
   assert.ok(analysis.crestFactor < 18);
@@ -268,7 +271,7 @@ test("the calibrated Redwood profile produces a continuous high-detail rain fiel
   assert.ok(analysis.sampleKurtosis < 16);
   assert.ok(analysis.envelopeScales[100].coefficientOfVariation > 0.18);
   assert.ok(analysis.envelopeScales[100].coefficientOfVariation < 0.45);
-  assert.ok(onsets.rateHz > 20);
+  assert.ok(onsets.rateHz > 30);
   assert.ok(onsets.rateHz < 50);
   assert.ok(
     profileDistanceDb(

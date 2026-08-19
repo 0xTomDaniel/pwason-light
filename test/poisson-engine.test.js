@@ -42,6 +42,32 @@ test("channel coupling endpoints route arrivals privately or share them with uni
   assert.deepEqual(sharedEvent.channelWeights, Array(8).fill(0.125));
 });
 
+test("Channel Coupling changes only light routing for an identical Arrival seed", () => {
+  const privateEngine = createPoissonEngine({
+    seed: "light-routing-only",
+    rateHz: 120,
+    coupling: 0,
+    fieldRadiusMeters: 50,
+  });
+  const sharedEngine = createPoissonEngine({
+    seed: "light-routing-only",
+    rateHz: 120,
+    coupling: 1,
+    fieldRadiusMeters: 50,
+  });
+
+  for (let index = 0; index < 32; index += 1) {
+    const privateArrival = privateEngine.next();
+    const sharedArrival = sharedEngine.next();
+    const withoutLightRoute = ({ route, channelWeights, ...arrival }) => arrival;
+
+    assert.deepEqual(
+      withoutLightRoute(privateArrival),
+      withoutLightRoute(sharedArrival),
+    );
+  }
+});
+
 test("channel coupling divides one total arrival rate into shared and private routes", () => {
   const coupling = 0.25;
   const engine = createPoissonEngine({ seed: "routing", rateHz: 80, coupling });

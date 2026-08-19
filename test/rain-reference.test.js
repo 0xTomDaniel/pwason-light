@@ -47,10 +47,10 @@ test("Reference Profiles separate detected onsets from equivalent total Arrivals
   const redwood = getRainReferenceProfile("redwood-ground");
   const amazon = getRainReferenceProfile("amazon-forest");
 
-  assert.equal(redwood.detectedOnsetRateHz, 23.1);
-  assert.equal(redwood.equivalentTotalRateHz, 120);
-  assert.ok(Math.abs(redwood.prominenceFraction - 0.1925) < 0.000001);
-  assert.equal(redwood.calibrationKind, "operator-tempo-match");
+  assert.equal(redwood.detectedOnsetRateHz, 38.5);
+  assert.equal(redwood.equivalentTotalRateHz, 1000);
+  assert.ok(Math.abs(redwood.prominenceFraction - 0.0385) < 0.000001);
+  assert.equal(redwood.calibrationKind, "field-continuity-match");
 
   assert.equal(amazon.detectedOnsetRateHz, 15.8);
   assert.equal(amazon.equivalentTotalRateHz, null);
@@ -60,10 +60,10 @@ test("Reference Profiles separate detected onsets from equivalent total Arrivals
 
 test("Reference calibration chooses an explicit generation and playback basis", () => {
   assert.deepEqual(resolveReferenceCalibration(getRainReferenceProfile("redwood-ground")), {
-    detectedOnsetRateHz: 23.1,
-    equivalentTotalRateHz: 120,
-    comparisonRateHz: 120,
-    prominenceFraction: 0.1925,
+    detectedOnsetRateHz: 38.5,
+    equivalentTotalRateHz: 1000,
+    comparisonRateHz: 1000,
+    prominenceFraction: 0.0385,
     isTotalCalibrated: true,
   });
   assert.deepEqual(resolveReferenceCalibration(getRainReferenceProfile("amazon-forest")), {

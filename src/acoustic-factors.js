@@ -17,7 +17,7 @@ const DEFINITIONS = [
   { id: "responseDiversity", group: "Surface texture", label: "Surface diversity", description: "Broadens the leaf, litter, and wood surface mixture", defaultAmount: 0.82 },
   { id: "diffuseField", group: "Surface texture", label: "Surface sustain", description: "Extends each finite surface excitation", defaultAmount: 0.24 },
   { id: "distanceLoss", group: "Space", label: "Distance loss", description: "Fades pressure with source distance", defaultAmount: 0.70 },
-  { id: "fieldDepth", group: "Space", label: "Field depth", description: "Sets how far impact positions extend around the listener", defaultAmount: 0.66 },
+  { id: "fieldDepth", group: "Space", label: "Field depth", description: "Sets how far impact positions extend around the listener", defaultAmount: 0.44 },
   { id: "stereoSpread", group: "Space", label: "Stereo spread", description: "Places impacts continuously across stereo", defaultAmount: 0.86 },
   { id: "airDamping", group: "Space", label: "Distance air damping", description: "Softens distant high frequencies", defaultAmount: 0.60 },
   { id: "densityCompensation", group: "Output", label: "Density compensation", description: "Reduces each impact as Speed creates more overlap", defaultAmount: 1 },

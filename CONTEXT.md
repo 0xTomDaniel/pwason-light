@@ -97,7 +97,7 @@ The rate of foreground energy increases found by the shared onset detector in ge
 _Avoid_: Speed, physical drop rate, natural rate
 
 **Equivalent Total-Arrival Rate**:
-An independently identified total Poisson rate used to compare generated rain and Reference Playback at similar perceived density. Redwood's current 120 Arrivals/s value is an operator tempo match, not a measured physical-drop count; an uncalibrated Reference Profile remains visibly uncalibrated.
+An independently identified total Poisson rate used to compare generated rain and Reference Playback at similar foreground-onset density, background continuity, and perceived density. Redwood's current 1,000 Arrivals/s value is a field-continuity calibration, not a measured physical-drop count; an uncalibrated Reference Profile remains visibly uncalibrated.
 _Avoid_: Prominent Onset Rate, exact rainfall intensity
 
 **Reference Playback**:
@@ -117,7 +117,7 @@ The continuous location assigned to an Arrival within the Listening Field. It is
 _Avoid_: Distance Channel, audio Channel
 
 **Listening Field**:
-The finite physical area around the listener over which Arrivals are positioned for sound reproduction. Its radius is controlled by the Field Depth Acoustic Factor.
+The finite physical area around the listener over which Arrivals are positioned for sound reproduction. Its radius is controlled by the Field Depth Acoustic Factor. The field has no separate timing layer: quiet remote contacts and rare near contacts are differently propagated members of the same Arrival population.
 _Avoid_: Spectral field, Channel bank
 
 **Field Window**:
@@ -125,8 +125,12 @@ A fixed-duration excerpt from an active generated or measured rain field contain
 _Avoid_: Single drop, Arrival Response, isolated contact
 
 **Acoustic Propagation**:
-The distance loss, high-frequency air damping, and left-right direction applied between an Impact Position and the listener.
+The distance loss, high-frequency air damping, and left-right direction applied between an Impact Position and the listener. At the accepted 70% setting, distance pressure follows the free-field h/d law; the factor varies that law's exponent without creating a stationary background or second clock.
 _Avoid_: Distance voice, rain layer
+
+**Normalized Waveform Envelope**:
+A visual-only Field Window trace that robustly normalizes each source independently and preserves the minimum and maximum sample in every horizontal pixel column. It exposes shape and microtransients without changing, normalizing, or compressing generated or Reference Playback audio.
+_Avoid_: Audio normalization, loudness match, sample replacement
 
 **Spectral Mapping**:
 The assignment from Channel identity to LED wavelength at the light-output stage. It is not part of Arrival generation or rain-audio generation.

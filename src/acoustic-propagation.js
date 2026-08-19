@@ -33,10 +33,14 @@ export function calculateAcousticPropagation(
     radialDistanceMeters + listenerHeight,
     0.01,
   );
+  // The accepted 70% listening setting is the ordinary free-field 1/d
+  // pressure law. The factor varies its exponent without adding another bed.
+  const distancePower = distanceAmount / 0.7;
+  const distancePressure = fullDistancePressure ** distancePower;
 
   return Object.freeze({
     sourceDistanceMeters,
-    relativePressure: 1 - distanceAmount * (1 - fullDistancePressure),
+    relativePressure: distancePressure,
     stereoPan: Math.max(-1, Math.min(1, fullStereoPan * spreadAmount)),
     airDampingCutoffHz: 20_000 - 17_500 * dampingAmount * distanceFraction,
   });

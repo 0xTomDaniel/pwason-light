@@ -27,22 +27,88 @@ function drawGrid(context, width, height) {
   context.stroke();
 }
 
+function clamp(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+export function prepareWaveformEnvelope(
+  samples,
+  columnCount,
+  { targetPeak = 0.84, peakPercentile = 0.995 } = {},
+) {
+  const columns = Math.max(1, Math.round(Number(columnCount) || 1));
+  const input = samples ?? [];
+  const minimums = new Float32Array(columns);
+  const maximums = new Float32Array(columns);
+  const absoluteSamples = Array.from(
+    input,
+    sample => Math.abs(Number(sample) || 0),
+  ).sort((left, right) => left - right);
+  const quantileIndex = Math.min(
+    absoluteSamples.length - 1,
+    Math.max(
+      0,
+      Math.ceil(clamp(peakPercentile, 0, 1) * (absoluteSamples.length - 1)),
+    ),
+  );
+  const normalizationPeak = absoluteSamples.length > 0
+    ? absoluteSamples[quantileIndex]
+    : 0;
+  const boundedTarget = clamp(Number(targetPeak) || 0.84, 0.05, 1);
+  const normalizationGain = normalizationPeak > 1e-12
+    ? boundedTarget / normalizationPeak
+    : 1;
+
+  for (let column = 0; column < columns; column += 1) {
+    const start = Math.floor(column * input.length / columns);
+    const end = Math.max(
+      start + 1,
+      Math.floor((column + 1) * input.length / columns),
+    );
+    let minimum = 0;
+    let maximum = 0;
+    for (let index = start; index < Math.min(input.length, end); index += 1) {
+      const value = (Number(input[index]) || 0) * normalizationGain;
+      minimum = Math.min(minimum, value);
+      maximum = Math.max(maximum, value);
+    }
+    minimums[column] = clamp(minimum, -1, 1);
+    maximums[column] = clamp(maximum, -1, 1);
+  }
+
+  return Object.freeze({ minimums, maximums, normalizationGain });
+}
+
 export function renderSignalWaveform(canvas, samples, color) {
   const { context, width, height } = prepareCanvas(canvas);
   drawGrid(context, width, height);
+  const envelope = prepareWaveformEnvelope(samples, Math.round(width));
+
   context.strokeStyle = color;
-  context.lineWidth = 1.35;
+  context.lineWidth = 1;
+  context.globalAlpha = 0.72;
   context.beginPath();
-  const stride = Math.max(1, Math.floor(samples.length / width));
-  let point = 0;
-  for (let index = 0; index < samples.length; index += stride) {
-    const x = point * width / Math.max(1, Math.ceil(samples.length / stride) - 1);
-    const y = height / 2 - samples[index] * height * 0.43;
-    if (point === 0) context.moveTo(x, y);
-    else context.lineTo(x, y);
-    point += 1;
+  for (let column = 0; column < envelope.minimums.length; column += 1) {
+    const x = (column + 0.5) * width / envelope.minimums.length;
+    const upperY = height / 2 - envelope.maximums[column] * height * 0.47;
+    const lowerY = height / 2 - envelope.minimums[column] * height * 0.47;
+    context.moveTo(x, upperY);
+    context.lineTo(x, lowerY);
   }
   context.stroke();
+
+  context.globalAlpha = 0.9;
+  context.lineWidth = 1.15;
+  context.beginPath();
+  for (let column = 0; column < envelope.minimums.length; column += 1) {
+    const x = column * width / Math.max(1, envelope.minimums.length - 1);
+    const midpoint = (envelope.minimums[column] + envelope.maximums[column]) / 2;
+    const y = height / 2 - midpoint * height * 0.47;
+    if (column === 0) context.moveTo(x, y);
+    else context.lineTo(x, y);
+  }
+  context.stroke();
+  context.globalAlpha = 1;
 }
 
 const SPECTROGRAM_COLORS = Object.freeze([
