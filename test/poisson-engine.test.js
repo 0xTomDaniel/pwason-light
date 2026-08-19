@@ -24,12 +24,13 @@ test("steady mode keeps the requested rate while producing valid Poisson gaps", 
   assert.ok(Math.abs(meanGap - 0.25) < 0.02);
 });
 
-test("steady mode supports the full 1 to 1000 events-per-second control range", () => {
-  const minimum = createPoissonEngine({ seed: "minimum", rateHz: 1 }).next();
-  const maximum = createPoissonEngine({ seed: "maximum", rateHz: 1000 }).next();
+test("steady mode supports the full 100 to 100000 events-per-second control range", () => {
+  const minimum = createPoissonEngine({ seed: "minimum", rateHz: 100 }).next();
+  const maximum = createPoissonEngine({ seed: "maximum", rateHz: 100_000 }).next();
 
-  assert.equal(minimum.rateHz, 1);
-  assert.equal(maximum.rateHz, 1000);
+  assert.equal(minimum.rateHz, 100);
+  assert.equal(maximum.rateHz, 100_000);
+  assert.ok(maximum.gap > 0);
 });
 
 test("channel coupling endpoints route arrivals privately or share them with unit energy", () => {

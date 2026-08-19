@@ -27,7 +27,7 @@ never begins automatically.
 
 | Control | Behavior |
 | --- | --- |
-| Speed | Continuously selects the total lamp Arrival rate from 1 to 1,000 events/s on a logarithmic scale. |
+| Speed | Continuously selects the total lamp Arrival rate from 100 to 10,000 events/s across three logarithmic ticks; 1,000 events/s remains the default. This exact-rendering trial precedes a planned 100,000/s extension. |
 | Drop Population | Moves the audio Rain Mark distribution from fine-dominant through mixed to large-drop-rich without changing the Arrival rate. |
 | Link Speed + Drop Population | Bidirectionally aligns both normalized slider positions; switching it off preserves their current values. |
 | Channel Coupling | Moves a fixed total Arrival rate between private Channel events and events shared by all eight Channels. |
@@ -71,8 +71,12 @@ Distance Air Damping softens remote high frequencies, and Stereo Spread controls
 continuous left-right placement. The default field extends to about 44.6 m.
 At the accepted 70% setting, its distance curve is the ordinary free-field h/d
 pressure law, leaving many remote Arrivals at a very low but nonzero propagated
-level while rare near Arrivals retain contrast. This is one exact Poisson
-population, not an added background-noise clock or statistical field substitute.
+level while rare near Arrivals retain contrast. The current browser trial
+renders every selected Arrival exactly through 10,000/s. There is no explicit
+rate cap inside playback, weighted representative, super-drop, stationary
+noise bed, or second clock. Density Compensation lowers individual-contact
+level as overlap rises; the increasingly noise-like texture is therefore the
+Dense Shot Limit of the same event population rather than a substituted sound.
 
 Each Arrival receives an audio-only Rain Mark. Drop Population changes the
 probability distribution over drop diameter; the same mark coherently derives a
@@ -124,17 +128,24 @@ controls are off. No recording, grain, impulse response, extracted waveform,
 stable note, long shared envelope, or stationary noise bed contributes to
 synthesis.
 
-Audio is exact Poisson shot synthesis:
+The underlying audio model is Poisson shot synthesis:
 
 ```text
 x(t) = Σ h(t − tᵢ; Mᵢ)
 ```
 
-The same Generated Rain Renderer prepares live and offline plans. A thin
-AudioWorklet sums those plans in continuous blocks, preserving response and
-distance-filter state across boundaries instead of constructing thousands of
-short-lived browser nodes. Tests prove the offline output is identical across
-different block partitions. Poisson timing remains outside the renderer.
+The Generated Rain Renderer and live AudioWorklet share one Rain Arrival
+Rendering Module for response choice, gain, position, and distance filtering.
+The worklet runs the seeded Poisson Engine on the audio render thread and sums
+every resulting plan in continuous blocks, preserving response and filter state
+across boundaries instead of depending on browser timers or constructing
+thousands of short-lived nodes. Tests prove the offline output is identical
+across different block partitions. Poisson timing remains outside the renderer. The
+eight-second synchronous diagnostics remain explicitly fixed at no more than
+1,000 exact Arrivals/s while live playback experiments at 10,000/s; this keeps
+the UI responsive without placing substitutes in the audible path. Moving
+those diagnostics off the UI thread is required before they can follow the
+full experimental rate.
 
 The model is seeded, nonperiodic, and independent of light-channel wavelength.
 Rain recordings provide visible and optional audible evaluation references only;
@@ -277,7 +288,9 @@ Requires a current Node.js runtime. The project has no package dependencies.
 npm test
 ```
 
-The tests cover seeded Poisson behavior, total-rate coupling, linked and unlinked
+The tests cover the exact 100–10,000 Speed trial, the engine's 100,000/s
+headroom, seeded Poisson behavior, the absence of weighted super-drops,
+total-rate coupling, linked and unlinked
 Drop Population controls, coherent Rain Marks, spatial propagation, Acoustic
 Factor normalization and bypass behavior, LED envelopes, compact-window peak
 and cumulative-energy waveform behavior, rounded temporal-energy shape,

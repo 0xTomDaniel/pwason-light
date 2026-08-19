@@ -20,7 +20,8 @@ export function sampleLedOutput(pulses, nowMilliseconds, channelCount = DEFAULT_
 
   for (const pulse of activePulses) {
     const ageSeconds = (nowMilliseconds - pulse.startedAt) / MILLISECONDS_PER_SECOND;
-    const level = envelope(ageSeconds, pulse.attack, pulse.decay) * pulse.amplitude;
+    const level = envelope(ageSeconds, pulse.attack, pulse.decay)
+      * pulse.amplitude;
     pulse.channelWeights.forEach((weight, index) => {
       if (index < levels.length) levels[index] += level * weight;
     });

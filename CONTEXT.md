@@ -60,6 +60,10 @@ _Avoid_: LED spectrum, Channel Coupling, audio Channel
 The exact sample-wise superposition of generated Rain Impact Waveforms at Steady Poisson arrival times. Dense rain becomes noise-like through overlap without a stationary background recording or a second event process.
 _Avoid_: Ambient loop, generic noise bed, granular playback
 
+**Dense Shot Limit**:
+The noise-like texture that emerges when the exact Rain Impact Waveforms of a sufficiently dense Steady Poisson Process overlap. Every Arrival remains present; Density Compensation controls total level without replacing Arrivals with weighted representatives, a stationary bed, a loop, or a second event process.
+_Avoid_: High-density mode, super-drop, stationary noise bed
+
 **Pure Synthesis**:
 Generated audio whose samples come only from algorithmic excitation, response, propagation, and summation. Rain References may be analyzed or auditioned as evaluation evidence but never supply samples, grains, impulse responses, or extracted texture waveforms to generated audio.
 _Avoid_: Sample synthesis, resynthesis, recording-derived texture
@@ -77,7 +81,7 @@ A measured aggregate spectral and temporal shape used to constrain generated rai
 _Avoid_: Sample synthesis, spectral note, selected playback profile
 
 **Generated Rain Renderer**:
-The Module that maps caller-owned Arrivals and the selected Drop Population to complete audible render plans and uses the same path to produce an offline generated profile. It owns Rain Mark sampling, Rain Impact Waveform generation, Acoustic Propagation, and exact block accumulation, but never owns or modifies Poisson timing.
+The Module that maps caller-owned Arrivals and the selected Drop Population to complete audible render plans and offline generated profiles. It owns Rain Mark sampling and Rain Impact Waveform generation and shares the same Arrival rendering policy and exact block accumulation used by live playback, but never owns or modifies Poisson timing.
 _Avoid_: Poisson engine, recorded-rain player
 
 **Rain Reference**:

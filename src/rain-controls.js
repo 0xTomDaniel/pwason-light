@@ -1,5 +1,6 @@
-const MINIMUM_SPEED_LOG = 0;
-const MAXIMUM_SPEED_LOG = 3;
+const MINIMUM_SPEED_LOG = 2;
+const MAXIMUM_SPEED_LOG = 4;
+const SPEED_LOG_SPAN = MAXIMUM_SPEED_LOG - MINIMUM_SPEED_LOG;
 
 function finiteBounded(value, fallback, minimum = 0, maximum = 1) {
   const number = Number(value);
@@ -8,13 +9,13 @@ function finiteBounded(value, fallback, minimum = 0, maximum = 1) {
 }
 
 export function createRainControls({
-  speedLog = 1.364,
-  dropPopulation = speedLog / MAXIMUM_SPEED_LOG,
+  speedLog = 3,
+  dropPopulation = (speedLog - MINIMUM_SPEED_LOG) / SPEED_LOG_SPAN,
   linked = true,
 } = {}) {
   let currentSpeedLog = finiteBounded(
     speedLog,
-    1.364,
+    3,
     MINIMUM_SPEED_LOG,
     MAXIMUM_SPEED_LOG,
   );
@@ -22,7 +23,8 @@ export function createRainControls({
   let currentlyLinked = Boolean(linked);
 
   if (currentlyLinked) {
-    currentDropPopulation = currentSpeedLog / MAXIMUM_SPEED_LOG;
+    currentDropPopulation =
+      (currentSpeedLog - MINIMUM_SPEED_LOG) / SPEED_LOG_SPAN;
   }
 
   function snapshot() {
@@ -42,7 +44,8 @@ export function createRainControls({
       MAXIMUM_SPEED_LOG,
     );
     if (currentlyLinked) {
-      currentDropPopulation = currentSpeedLog / MAXIMUM_SPEED_LOG;
+      currentDropPopulation =
+        (currentSpeedLog - MINIMUM_SPEED_LOG) / SPEED_LOG_SPAN;
     }
     return snapshot();
   }
@@ -50,7 +53,8 @@ export function createRainControls({
   function setDropPopulation(value) {
     currentDropPopulation = finiteBounded(value, currentDropPopulation);
     if (currentlyLinked) {
-      currentSpeedLog = currentDropPopulation * MAXIMUM_SPEED_LOG;
+      currentSpeedLog = MINIMUM_SPEED_LOG
+        + currentDropPopulation * SPEED_LOG_SPAN;
     }
     return snapshot();
   }
@@ -58,7 +62,8 @@ export function createRainControls({
   function setLinked(value) {
     currentlyLinked = Boolean(value);
     if (currentlyLinked) {
-      currentDropPopulation = currentSpeedLog / MAXIMUM_SPEED_LOG;
+      currentDropPopulation =
+        (currentSpeedLog - MINIMUM_SPEED_LOG) / SPEED_LOG_SPAN;
     }
     return snapshot();
   }

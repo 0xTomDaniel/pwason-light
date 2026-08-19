@@ -1,6 +1,6 @@
 const CHANNEL_COUNT = 8;
 const MINIMUM_RATE_HZ = 1;
-const MAXIMUM_RATE_HZ = 1000;
+const MAXIMUM_RATE_HZ = 100_000;
 const DEFAULT_FIELD_RADIUS_METERS = 20;
 
 function hashSeed(value) {
@@ -82,8 +82,8 @@ export function createPoissonEngine({
 
       return Object.freeze({
         id: eventId,
-        at: Number(elapsed.toFixed(6)),
-        gap: Number(gap.toFixed(6)),
+        at: elapsed,
+        gap,
         rateHz: Number(currentRate.toFixed(6)),
         amplitude: Number((0.28 + random() * 0.72).toFixed(6)),
         attack: Number((0.012 + random() * 0.075).toFixed(6)),

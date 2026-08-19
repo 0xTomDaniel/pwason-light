@@ -167,6 +167,28 @@ test("Generated Rain Renderer requires caller-owned Arrivals for an offline prof
   );
 });
 
+test("Generated Rain Renderer never turns one Arrival into a weighted super-drop", () => {
+  const factors = createDefaultAcousticFactors();
+  factors.distanceLoss.enabled = false;
+  factors.densityCompensation.enabled = false;
+  factors.eventVariation.enabled = false;
+  const renderer = createGeneratedRainRenderer({ factors });
+  const arrival = {
+    id: 3,
+    rateHz: 100_000,
+    amplitude: 0.5,
+    position: { radialDistanceMeters: 0, azimuthRadians: 0 },
+  };
+
+  const exact = renderer.prepareArrival(arrival);
+  const accidentallyWeighted = renderer.prepareArrival({
+    ...arrival,
+    renderWeight: 50,
+  });
+
+  assert.equal(accidentallyWeighted.gain, exact.gain);
+});
+
 test("offline rendering is invariant to continuous block partition size", () => {
   const render = blockSize => {
     const renderer = createGeneratedRainRenderer({

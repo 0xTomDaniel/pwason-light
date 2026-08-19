@@ -53,6 +53,7 @@ const SCHEDULER_TICK_MS = 16;
 const AUDIO_LOOKAHEAD_MS = 50;
 const MAX_EVENTS_PER_TICK = 2500;
 const MAX_EVENT_MARKS_PER_SECOND = 30;
+const MAX_GENERATED_DIAGNOSTIC_RATE_HZ = 1_000;
 const MAX_LISTENING_FIELD_RADIUS_METERS = 100;
 const EAR_HEIGHT_METERS = 1.5;
 const ANALYSIS_SAMPLE_RATE = 48_000;
@@ -70,6 +71,7 @@ const volumeInput = document.querySelector("#output-level");
 const sourceMixInput = document.querySelector("#source-mix");
 const soundInput = document.querySelector("#sound-enabled");
 const rateOutput = document.querySelector("#rate-output");
+const rateRenderNote = document.querySelector("#rate-render-note");
 const dropPopulationOutput = document.querySelector("#drop-population-output");
 const couplingOutput = document.querySelector("#coupling-output");
 const volumeOutput = document.querySelector("#output-level-output");
@@ -195,6 +197,7 @@ let waveformBuffer = null;
 let liveRainRenderer = null;
 let rainAudioBufferCache = new WeakMap();
 let rainWorkletNode = null;
+let rainWorkletActive = false;
 let activeImpactAuditionSource = null;
 let activeImpactAuditionButton = null;
 let microscopeScalingMode = microscopeScalingInputs.find(input => input.checked)?.value
@@ -216,6 +219,7 @@ let analysisRainRenderer = createGeneratedRainRenderer({
   earHeightMeters: EAR_HEIGHT_METERS,
   dropPopulation: rainControls.snapshot().dropPopulation,
 });
+let generatedAnalysisRateHz = null;
 let generatedProfileSamples = createCurrentGeneratedProfileSamples();
 let generatedDiagnostics = analyzeRainField(
   generatedProfileSamples,
@@ -273,9 +277,13 @@ function listeningFieldRadiusMeters() {
 }
 
 function createCurrentGeneratedProfileSamples() {
+  generatedAnalysisRateHz = Math.min(
+    selectedRateHz(),
+    MAX_GENERATED_DIAGNOSTIC_RATE_HZ,
+  );
   const profileEngine = createPoissonEngine({
     seed: `${selectedReferenceProfile.id}-generated-profile`,
-    rateHz: selectedRateHz(),
+    rateHz: generatedAnalysisRateHz,
     coupling: 0,
     fieldRadiusMeters: listeningFieldRadiusMeters(),
   });
@@ -423,6 +431,8 @@ function regenerateAcousticAssets(rebuildRenderer) {
     rainWorkletNode?.port.postMessage({
       type: "configure",
       responses: liveRainRenderer.exportResponseBank(),
+      factors: acousticFactors,
+      earHeightMeters: EAR_HEIGHT_METERS,
     });
   }
   renderAnalysisComparison();
@@ -466,6 +476,7 @@ function restartEngine() {
   audioTimelineStartedAt = audioContext?.currentTime ?? 0;
   scheduledArrivals = [];
   clearTimeout(timer);
+  restartRainWorklet();
   if (running) scheduleNext();
   renderLoop.wake();
 }
@@ -478,6 +489,8 @@ function updateControlReadouts() {
   speedPopulationLinkInput.checked = controls.linked;
   rateOutput.value = `${formatRate(rateHz)} events/s`;
   rateInput.setAttribute("aria-valuetext", `${formatRate(rateHz)} events per second`);
+  rateRenderNote.textContent = `Exact Poisson shot synthesis · ${formatRate(rateHz)} Arrivals/s`;
+  rateRenderNote.dataset.mode = "exact";
   couplingOutput.value = `${Math.round(Number(couplingInput.value) * 100)}%`;
   const populationPercent = Math.round(controls.dropPopulation * 100);
   dropPopulationOutput.value = controls.dropPopulation < 0.34
@@ -618,6 +631,41 @@ function updateSourceMix() {
 
   if (mix.referenceGain > 0) startReferencePlayback();
   else stopReferencePlayback();
+  syncRainWorkletState();
+}
+
+function shouldRenderGeneratedAudio() {
+  return running
+    && soundInput.checked
+    && Number(sourceMixInput.value) < 1;
+}
+
+function stopRainWorklet() {
+  if (!rainWorkletNode || !rainWorkletActive) return;
+  rainWorkletNode.port.postMessage({ type: "stop" });
+  rainWorkletActive = false;
+}
+
+function startRainWorklet() {
+  if (!rainWorkletNode || !shouldRenderGeneratedAudio()) return;
+  rainWorkletNode.port.postMessage({
+    type: "start",
+    settings: settings(),
+  });
+  rainWorkletActive = true;
+}
+
+function syncRainWorkletState() {
+  if (shouldRenderGeneratedAudio()) {
+    if (!rainWorkletActive) startRainWorklet();
+  } else {
+    stopRainWorklet();
+  }
+}
+
+function restartRainWorklet() {
+  stopRainWorklet();
+  startRainWorklet();
 }
 
 function formatDecibels(value) {
@@ -645,7 +693,10 @@ function setAnalysisMetrics(analysis, elements) {
 
 function renderRateCalibration() {
   const generatedRateLabel = `${formatRate(selectedRateHz())}/s`;
-  generatedProfileLabel.textContent = `1 s representative @ ${generatedDiagnostics.representativeField.centerSeconds.toFixed(2)} s · 8 s at ${generatedRateLabel}`;
+  const analysisRateLabel = `${formatRate(generatedAnalysisRateHz)}/s`;
+  generatedProfileLabel.textContent = generatedAnalysisRateHz === selectedRateHz()
+    ? `1 s representative @ ${generatedDiagnostics.representativeField.centerSeconds.toFixed(2)} s · 8 s at ${generatedRateLabel}`
+    : `1 s representative @ ${generatedDiagnostics.representativeField.centerSeconds.toFixed(2)} s · diagnostics held at ${analysisRateLabel} · live audio exact at ${generatedRateLabel}`;
   generatedTotalRate.textContent = generatedRateLabel;
   generatedTotalRate.title = "Selected total Poisson Arrival rate";
   generatedDetectedRate.textContent = `${formatRate(generatedProfileOnsets.rateHz)}/s`;
@@ -1351,6 +1402,8 @@ async function ensureAudio() {
         outputChannelCount: [2],
         processorOptions: {
           responses: liveRainRenderer.exportResponseBank(),
+          factors: acousticFactors,
+          earHeightMeters: EAR_HEIGHT_METERS,
         },
       });
       rainWorkletNode.connect(masterGain);
@@ -1426,21 +1479,6 @@ function scheduleAudioBatch(events) {
     || !audioContext
   ) return;
   if (rainWorkletNode) {
-    rainWorkletNode.port.postMessage({
-      type: "schedule",
-      events: events.map(({ event, scheduledAt }) => ({
-        plan: (() => {
-          const prepared = liveRainRenderer.prepareArrival(event);
-          return {
-            variantIndex: prepared.variantIndex,
-            gain: prepared.gain,
-            stereoPan: prepared.stereoPan,
-            filter: prepared.filter,
-          };
-        })(),
-        startFrame: Math.round(scheduledAt * audioContext.sampleRate),
-      })),
-    });
     return;
   }
   for (const scheduled of events) playEvent(scheduled.event, scheduled.scheduledAt);
@@ -1466,7 +1504,7 @@ function renderEventMark(event) {
 function activateArrival(event, startedAt) {
   eventCount += 1;
   eventCountOutput.textContent = String(eventCount).padStart(4, "0");
-  liveRateOutput.textContent = event.rateHz.toFixed(2);
+  liveRateOutput.textContent = formatRate(event.rateHz);
   activePulses.push({ ...event, startedAt });
   renderEventMark(event);
 }
@@ -1518,10 +1556,7 @@ async function toggleRunning() {
   startButton.textContent = "Start process";
   startButton.setAttribute("aria-pressed", "false");
   clearTimeout(timer);
-  rainWorkletNode?.port.postMessage({
-    type: "reset",
-    startFrame: Math.round((audioContext?.currentTime ?? 0) * (audioContext?.sampleRate ?? 1)),
-  });
+  stopRainWorklet();
   stopReferencePlayback();
   renderLoop.wake();
 }
