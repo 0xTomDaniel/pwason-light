@@ -254,10 +254,6 @@ export function createRainMark({ seed, dropPopulation = 0.5, factors } = {}) {
     0.48,
     0.96,
   );
-  const splashProbability = clamp(
-    (0.04 + sizeNormalized * 0.48)
-      * (surface === "leaf" ? 1 : surface === "litter" ? 0.72 : 0.32),
-  );
   const spectralFocus = surface === "leaf"
     ? clamp(interpolate(0.72, 0.58, sizeNormalized) + (random() - 0.5) * 0.14)
     : surface === "litter"
@@ -280,7 +276,6 @@ export function createRainMark({ seed, dropPopulation = 0.5, factors } = {}) {
     impactLevel,
     contactDurationSeconds,
     surfaceDamping,
-    splashProbability,
     spectralFocus,
     spectralSpread,
   });
@@ -302,8 +297,6 @@ export function createRainImpact({
   const random = createRandom((Number(seed) >>> 0) ^ 0xa511e9b3);
   const variation = amount("eventVariation");
   const softness = amount("impactSoftness");
-  const tailScale = interpolate(0.68, 1.25, amount("tailLength"));
-  const sustainScale = interpolate(0.78, 1.22, amount("diffuseField"));
   const dampingScale = interpolate(1.18, 0.78, rainMark.surfaceDamping);
   const sizeDecayScale = interpolate(0.88, 1.18, rainMark.diameterMm / 5.4);
   const contactWidth = rainMark.contactDurationSeconds
@@ -403,8 +396,6 @@ export function createRainImpact({
         * varied(random, 1, 0.16, variation),
       decaySeconds: surface.bandDecayMilliseconds[index]
         / 1000
-        * tailScale
-        * sustainScale
         * dampingScale
         * sizeDecayScale
         * varied(random, 1, interpolate(0.06, 0.9, independence), variation),
@@ -415,29 +406,11 @@ export function createRainImpact({
     };
   });
 
-  const secondaryContacts = [];
-  const splashAmount = amount("microSplashes") * rainMark.splashProbability;
-  const maximumContacts = 1 + Math.floor(rainMark.diameterMm / 1.6);
-  for (let index = 0; index < maximumContacts; index += 1) {
-    if (random() > splashAmount) continue;
-    secondaryContacts.push({
-      delay: interpolate(0.003, 0.028, amount("microSplashDelay"))
-        * (0.7 + random() * 0.8),
-      width: (0.00012 + random() * 0.00028) * interpolate(0.9, 1.4, softness),
-      gain: (0.008 + random() * 0.016) * rainMark.impactLevel * splashAmount,
-    });
-  }
-
   const longestDecay = Math.max(...bands.map(band => band.decaySeconds));
-  const latestSecondaryContact = secondaryContacts.reduce(
-    (latest, contact) => Math.max(latest, contact.delay + contact.width * 4),
-    0,
-  );
   const responseDuration = clamp(
     Math.max(
       contactCenter + contactWidth * 4,
       surfaceContactDuration + longestDecay * 4.2,
-      latestSecondaryContact,
     ),
     0.025,
     0.14,
@@ -485,21 +458,9 @@ export function createRainImpact({
     );
     const wetSurfaceResponse = wetMicrotexture(wetContactWindow);
 
-    let fragments = 0;
-    for (const contact of secondaryContacts) {
-      const localTime = time - contact.delay;
-      if (localTime <= 0) continue;
-      const localAttack = 1 - Math.exp(-localTime / 0.00004);
-      const distance = (localTime - contact.width * 1.25) / contact.width;
-      fragments += -distance
-        * Math.exp(-0.5 * distance * distance)
-        * contact.gain
-        * localAttack;
-    }
-
     const fadeOut = Math.min(1, (samples.length - 1 - index) / fadeOutSamples);
     samples[index] = clamp(
-      (directContact + surfaceResponse + wetSurfaceResponse + fragments) * fadeOut,
+      (directContact + surfaceResponse + wetSurfaceResponse) * fadeOut,
       -0.98,
       0.98,
     );

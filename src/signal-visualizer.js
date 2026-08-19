@@ -135,6 +135,58 @@ export function renderSignalWaveform(canvas, samples, color, {
   drawTimeMarker(context, width, height, markerFraction, markerLabel);
 }
 
+export function renderOnsetPopulation(canvas, population, color) {
+  if (!population?.count || population.envelopeQuantiles?.length !== 3) {
+    renderEmptySignal(canvas, "Aligned onset population will appear here");
+    return;
+  }
+  const { context, width, height } = prepareCanvas(canvas);
+  drawGrid(context, width, height);
+  const [lower, median, upper] = population.envelopeQuantiles;
+  const pointCount = Math.min(lower.length, median.length, upper.length);
+  const xAt = point => point * width / Math.max(1, pointCount - 1);
+  const yAt = value => height - 8 - clamp(value, 0, 1) * (height - 20);
+
+  context.fillStyle = color;
+  context.globalAlpha = 0.16;
+  context.beginPath();
+  for (let point = 0; point < pointCount; point += 1) {
+    const x = xAt(point);
+    const y = yAt(upper[point]);
+    if (point === 0) context.moveTo(x, y);
+    else context.lineTo(x, y);
+  }
+  for (let point = pointCount - 1; point >= 0; point -= 1) {
+    context.lineTo(xAt(point), yAt(lower[point]));
+  }
+  context.closePath();
+  context.fill();
+
+  context.globalAlpha = 0.95;
+  context.strokeStyle = color;
+  context.lineWidth = 1.6;
+  context.beginPath();
+  for (let point = 0; point < pointCount; point += 1) {
+    const x = xAt(point);
+    const y = yAt(median[point]);
+    if (point === 0) context.moveTo(x, y);
+    else context.lineTo(x, y);
+  }
+  context.stroke();
+  context.globalAlpha = 1;
+
+  drawTimeMarker(
+    context,
+    width,
+    height,
+    population.onsetOffsetSeconds / population.durationSeconds,
+    "onset",
+  );
+  context.fillStyle = "rgba(229, 236, 217, 0.68)";
+  context.font = "9px IBM Plex Mono, monospace";
+  context.fillText("q10–q90 band · q50 line", 7, 12);
+}
+
 const SPECTROGRAM_COLORS = Object.freeze([
   Object.freeze([7, 9, 8]),
   Object.freeze([42, 39, 83]),

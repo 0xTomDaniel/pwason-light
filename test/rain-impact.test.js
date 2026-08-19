@@ -189,10 +189,9 @@ test("Direct Contact and generated surface excitation remain independently audit
   const contactOnly = createDefaultAcousticFactors();
   const surfaceOnly = createDefaultAcousticFactors();
 
-  for (const id of ["lowTexture", "midTexture", "highTexture", "microSplashes"] ) {
+  for (const id of ["lowTexture", "midTexture", "highTexture", "wetMicrotexture"]) {
     contactOnly[id].enabled = false;
   }
-  contactOnly.diffuseField.enabled = false;
   surfaceOnly.impactBody.enabled = false;
 
   const contact = createRainImpact({ sampleRate, seed: 42, factors: contactOnly });
@@ -208,7 +207,6 @@ test("leaf and litter Surface Responses have distinct evolving spectral signatur
   for (const surface of ["leaf", "litter"]) {
     const factors = createDefaultAcousticFactors();
     factors.impactBody.enabled = false;
-    factors.microSplashes.enabled = false;
     for (const id of ["leafSurface", "litterSurface", "woodSurface"]) {
       factors[id].enabled = id === `${surface}Surface`;
     }
@@ -292,7 +290,6 @@ test("Wet Microtexture adds high-frequency cusp contrast inside one Rain Impact"
   dryFactors.wetMicrotexture.enabled = false;
   for (const factors of [wetFactors, dryFactors]) {
     factors.impactBody.enabled = false;
-    factors.microSplashes.enabled = false;
   }
   const contrast = factors => Array.from({ length: 96 }, (_, index) => (
     analyzeSignal(
@@ -337,7 +334,6 @@ test("low and high texture regions retain distinct but overlapping decay scales"
   for (const selected of ["lowTexture", "highTexture"]) {
     const factors = createDefaultAcousticFactors();
     factors.impactBody.enabled = false;
-    factors.microSplashes.enabled = false;
     for (const id of ["lowTexture", "midTexture", "highTexture"]) {
       factors[id].enabled = id === selected;
     }
@@ -363,7 +359,6 @@ test("no hidden resonator remains when every explicit excitation is switched off
     "midTexture",
     "highTexture",
     "wetMicrotexture",
-    "microSplashes",
   ]) {
     factors[id].enabled = false;
   }

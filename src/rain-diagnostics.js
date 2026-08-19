@@ -10,6 +10,9 @@ const SPECTRAL_FLOOR_DECIBELS = -70;
 const IMPACT_DURATION_SECONDS = 0.12;
 const IMPACT_PREROLL_SECONDS = 0.02;
 const DISTRIBUTION_QUANTILES = Object.freeze([0.1, 0.25, 0.5, 0.75, 0.9]);
+const ONSET_POPULATION_QUANTILES = Object.freeze([0.1, 0.5, 0.9]);
+const ONSET_POPULATION_POINTS = 240;
+const MAX_ONSET_POPULATION_SIZE = 96;
 
 function normalizedDecibels(powers, floorDecibels = SPECTRAL_FLOOR_DECIBELS) {
   const peak = Math.max(...powers, 1e-20);
@@ -175,6 +178,116 @@ function selectImpactMicroscope(samples, sampleRate, prominentOnsets) {
   });
 }
 
+function selectPopulationOnsets(timesSeconds) {
+  if (timesSeconds.length <= MAX_ONSET_POPULATION_SIZE) return timesSeconds;
+  return Array.from(
+    { length: MAX_ONSET_POPULATION_SIZE },
+    (_, index) => timesSeconds[Math.round(
+      index * (timesSeconds.length - 1) / (MAX_ONSET_POPULATION_SIZE - 1),
+    )],
+  );
+}
+
+function createOnsetPopulation(samples, sampleRate, prominentOnsets) {
+  const sampleCount = Math.min(
+    samples.length,
+    Math.round(sampleRate * IMPACT_DURATION_SECONDS),
+  );
+  const prerollSamples = Math.round(sampleRate * IMPACT_PREROLL_SECONDS);
+  const onsetPoint = Math.round(
+    IMPACT_PREROLL_SECONDS / IMPACT_DURATION_SECONDS * ONSET_POPULATION_POINTS,
+  );
+  const envelopes = [];
+  const peakDelays = [];
+  const energy90Delays = [];
+
+  for (const onsetSeconds of selectPopulationOnsets(prominentOnsets.timesSeconds)) {
+    const onsetIndex = Math.round(onsetSeconds * sampleRate);
+    const startIndex = onsetIndex - prerollSamples;
+    if (startIndex < 0 || startIndex + sampleCount > samples.length) continue;
+    const envelope = new Float32Array(ONSET_POPULATION_POINTS);
+
+    for (let point = 0; point < envelope.length; point += 1) {
+      const start = startIndex + Math.floor(point * sampleCount / envelope.length);
+      const end = startIndex + Math.max(
+        Math.floor((point + 1) * sampleCount / envelope.length),
+        Math.floor(point * sampleCount / envelope.length) + 1,
+      );
+      let energy = 0;
+      for (let index = start; index < end; index += 1) {
+        energy += samples[index] ** 2;
+      }
+      envelope[point] = Math.sqrt(energy / Math.max(1, end - start));
+    }
+
+    const baseline = quantile(
+      [...envelope.subarray(0, onsetPoint)].sort((left, right) => left - right),
+      0.5,
+    );
+    let peak = 0;
+    let peakPoint = onsetPoint;
+    for (let point = 0; point < envelope.length; point += 1) {
+      envelope[point] = Math.max(0, envelope[point] - baseline);
+      if (point >= onsetPoint && envelope[point] > peak) {
+        peak = envelope[point];
+        peakPoint = point;
+      }
+    }
+    if (peak <= 1e-12) continue;
+    for (let point = 0; point < envelope.length; point += 1) {
+      envelope[point] /= peak;
+    }
+
+    const postOnsetEnergy = envelope.subarray(onsetPoint).reduce(
+      (sum, value) => sum + value ** 2,
+      0,
+    );
+    let cumulativeEnergy = 0;
+    let energy90Point = envelope.length - 1;
+    for (let point = onsetPoint; point < envelope.length; point += 1) {
+      cumulativeEnergy += envelope[point] ** 2;
+      if (cumulativeEnergy >= postOnsetEnergy * 0.9) {
+        energy90Point = point;
+        break;
+      }
+    }
+    const pointIntervalSeconds = IMPACT_DURATION_SECONDS / envelope.length;
+    peakDelays.push(Math.max(
+      0,
+      (peakPoint + 0.5) * pointIntervalSeconds - IMPACT_PREROLL_SECONDS,
+    ));
+    energy90Delays.push(Math.max(
+      0,
+      (energy90Point + 0.5) * pointIntervalSeconds - IMPACT_PREROLL_SECONDS,
+    ));
+    envelopes.push(envelope);
+  }
+
+  const envelopeQuantiles = ONSET_POPULATION_QUANTILES.map(probability => (
+    Float32Array.from({ length: ONSET_POPULATION_POINTS }, (_, point) => quantile(
+      envelopes.map(envelope => envelope[point]).sort((left, right) => left - right),
+      probability,
+    ))
+  ));
+  const sortedPeakDelays = peakDelays.sort((left, right) => left - right);
+  const sortedEnergy90Delays = energy90Delays.sort((left, right) => left - right);
+
+  return Object.freeze({
+    count: envelopes.length,
+    quantiles: ONSET_POPULATION_QUANTILES,
+    envelopeQuantiles: Object.freeze(envelopeQuantiles),
+    durationSeconds: IMPACT_DURATION_SECONDS,
+    onsetOffsetSeconds: IMPACT_PREROLL_SECONDS,
+    pointIntervalSeconds: IMPACT_DURATION_SECONDS / ONSET_POPULATION_POINTS,
+    peakDelayQuantilesSeconds: Object.freeze(ONSET_POPULATION_QUANTILES.map(
+      probability => quantile(sortedPeakDelays, probability),
+    )),
+    energy90DelayQuantilesSeconds: Object.freeze(ONSET_POPULATION_QUANTILES.map(
+      probability => quantile(sortedEnergy90Delays, probability),
+    )),
+  });
+}
+
 export function analyzeRainField(samples, sampleRate) {
   const profileAnalysis = analyzeSignal(samples, sampleRate, {
     includeSpectrogram: false,
@@ -193,6 +306,11 @@ export function analyzeRainField(samples, sampleRate) {
       spectralFrames,
     ),
     impactMicroscope: selectImpactMicroscope(
+      samples,
+      profileAnalysis.sampleRate,
+      prominentOnsets,
+    ),
+    onsetPopulation: createOnsetPopulation(
       samples,
       profileAnalysis.sampleRate,
       prominentOnsets,

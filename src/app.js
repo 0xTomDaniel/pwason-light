@@ -30,6 +30,7 @@ import {
 import {
   renderEmptySignal,
   renderDistributionResidual,
+  renderOnsetPopulation,
   renderProfileResidual,
   renderSignalSpectrogram,
   renderSignalWaveform,
@@ -153,6 +154,12 @@ const referenceImpactLabel = document.querySelector("#reference-impact-label");
 const farnellImpactWaveform = document.querySelector("#farnell-impact-waveform");
 const farnellImpactSpectrogram = document.querySelector("#farnell-impact-spectrogram");
 const farnellImpactLabel = document.querySelector("#farnell-impact-label");
+const generatedOnsetPopulation = document.querySelector("#generated-onset-population");
+const generatedOnsetPopulationLabel = document.querySelector("#generated-onset-population-label");
+const referenceOnsetPopulation = document.querySelector("#reference-onset-population");
+const referenceOnsetPopulationLabel = document.querySelector("#reference-onset-population-label");
+const farnellOnsetPopulation = document.querySelector("#farnell-onset-population");
+const farnellOnsetPopulationLabel = document.querySelector("#farnell-onset-population-label");
 const acousticFactorList = document.querySelector("#acoustic-factor-list");
 const acousticPresetOutput = document.querySelector("#acoustic-preset-output");
 const resetAcousticFactorsButton = document.querySelector("#reset-acoustic-factors");
@@ -660,6 +667,17 @@ function renderImpactMicroscope(waveform, spectrogram, label, impact, color) {
   label.textContent = `${impact.alignmentKind === "detected-onset" ? "Detected onset" : "Peak fallback"} ${impact.onsetSeconds.toFixed(3)} s · peak +${peakDelayMilliseconds.toFixed(1)} ms`;
 }
 
+function renderOnsetPopulationPanel(canvas, label, population, color) {
+  renderOnsetPopulation(canvas, population, color);
+  if (!population?.count) {
+    label.textContent = "Waiting for detected onsets…";
+    return;
+  }
+  const medianPeakMilliseconds = population.peakDelayQuantilesSeconds[1] * 1_000;
+  const medianEnergy90Milliseconds = population.energy90DelayQuantilesSeconds[1] * 1_000;
+  label.textContent = `${population.count} aligned onsets · q50 peak +${medianPeakMilliseconds.toFixed(1)} ms · 90% energy +${medianEnergy90Milliseconds.toFixed(1)} ms`;
+}
+
 function renderAnalysisComparison() {
   renderSignalWaveform(generatedAnalysisWaveform, generatedReferenceSamples, "#d9ff86");
   renderSignalSpectrogram(generatedAnalysisSpectrogram, generatedReferenceAnalysis);
@@ -668,6 +686,12 @@ function renderAnalysisComparison() {
     generatedImpactSpectrogram,
     generatedImpactLabel,
     generatedImpact,
+    "#d9ff86",
+  );
+  renderOnsetPopulationPanel(
+    generatedOnsetPopulation,
+    generatedOnsetPopulationLabel,
+    generatedDiagnostics.onsetPopulation,
     "#d9ff86",
   );
   setAnalysisMetrics(generatedProfileAnalysis, {
@@ -728,6 +752,12 @@ function renderAnalysisComparison() {
       measuredReferenceImpact,
       "#54dce3",
     );
+    renderOnsetPopulationPanel(
+      referenceOnsetPopulation,
+      referenceOnsetPopulationLabel,
+      measuredReferenceDiagnostics.onsetPopulation,
+      "#54dce3",
+    );
   } else {
     renderEmptySignal(referenceAnalysisWaveform, "Loading selected Rain Reference");
     renderEmptySignal(referenceAnalysisSpectrogram, "Representative Field will appear here");
@@ -739,6 +769,12 @@ function renderAnalysisComparison() {
       referenceImpactWaveform,
       referenceImpactSpectrogram,
       referenceImpactLabel,
+      null,
+      "#54dce3",
+    );
+    renderOnsetPopulationPanel(
+      referenceOnsetPopulation,
+      referenceOnsetPopulationLabel,
       null,
       "#54dce3",
     );
@@ -783,6 +819,12 @@ function renderAnalysisComparison() {
       farnellReferenceImpact,
       "#ff9d72",
     );
+    renderOnsetPopulationPanel(
+      farnellOnsetPopulation,
+      farnellOnsetPopulationLabel,
+      farnellReferenceDiagnostics.onsetPopulation,
+      "#ff9d72",
+    );
   } else {
     renderEmptySignal(farnellAnalysisWaveform, "Loading Farnell procedural reference");
     renderEmptySignal(farnellAnalysisSpectrogram, "Representative Field will appear here");
@@ -794,6 +836,12 @@ function renderAnalysisComparison() {
       farnellImpactWaveform,
       farnellImpactSpectrogram,
       farnellImpactLabel,
+      null,
+      "#ff9d72",
+    );
+    renderOnsetPopulationPanel(
+      farnellOnsetPopulation,
+      farnellOnsetPopulationLabel,
       null,
       "#ff9d72",
     );

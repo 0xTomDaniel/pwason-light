@@ -11,13 +11,27 @@ import {
 test("every Acoustic Factor has one switch state and one bounded continuous amount", () => {
   const defaults = createDefaultAcousticFactors();
 
-  assert.equal(ACOUSTIC_FACTOR_DEFINITIONS.length, 23);
+  assert.equal(ACOUSTIC_FACTOR_DEFINITIONS.length, 19);
   assert.equal(Object.keys(defaults).length, ACOUSTIC_FACTOR_DEFINITIONS.length);
   for (const definition of ACOUSTIC_FACTOR_DEFINITIONS) {
     assert.equal(typeof defaults[definition.id].enabled, "boolean");
     assert.ok(defaults[definition.id].amount >= 0);
     assert.ok(defaults[definition.id].amount <= 1);
   }
+});
+
+test("the Acoustic Factors Interface omits ineffective sustain and splash dimensions", () => {
+  const factorIds = ACOUSTIC_FACTOR_DEFINITIONS.map(definition => definition.id);
+
+  assert.deepEqual(
+    factorIds.filter(id => [
+      "tailLength",
+      "diffuseField",
+      "microSplashes",
+      "microSplashDelay",
+    ].includes(id)),
+    [],
+  );
 });
 
 test("Acoustic Factor input is copied, completed, clamped, and bypassed when off", () => {
@@ -38,18 +52,19 @@ test("the synthesis baseline preserves the rain-like listening checkpoint", () =
 
   assert.deepEqual(defaults.distanceLoss, { enabled: true, amount: 0.7 });
   assert.deepEqual(defaults.midTexture, { enabled: true, amount: 0.2 });
-  assert.deepEqual(defaults.airDamping, { enabled: true, amount: 0.6 });
+  assert.deepEqual(defaults.airDamping, { enabled: true, amount: 0.7 });
   assert.deepEqual(defaults.compression, { enabled: false, amount: 0.45 });
 });
 
 test("the default preset favors soft leaf and ground splats over hard impacts", () => {
   const defaults = createDefaultAcousticFactors();
 
-  assert.deepEqual(defaults.impactBody, { enabled: true, amount: 0.18 });
+  assert.deepEqual(defaults.impactBody, { enabled: true, amount: 0.08 });
   assert.deepEqual(defaults.impactSoftness, { enabled: true, amount: 0.9 });
+  assert.deepEqual(defaults.lowTexture, { enabled: true, amount: 0.9 });
   assert.deepEqual(defaults.highTexture, { enabled: true, amount: 0.32 });
-  assert.deepEqual(defaults.spectralSparsity, { enabled: true, amount: 0.78 });
+  assert.deepEqual(defaults.bandIndependence, { enabled: true, amount: 0.98 });
+  assert.deepEqual(defaults.spectralSparsity, { enabled: true, amount: 0.92 });
   assert.deepEqual(defaults.wetMicrotexture, { enabled: true, amount: 0.45 });
-  assert.deepEqual(defaults.microSplashes, { enabled: false, amount: 0.2 });
   assert.deepEqual(defaults.woodSurface, { enabled: false, amount: 0.2 });
 });

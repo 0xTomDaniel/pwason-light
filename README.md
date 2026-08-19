@@ -37,15 +37,19 @@ never begins automatically.
 | Audio response | Enables or mutes both generated audio and Reference Playback. |
 | New weather seed | Starts a new reproducible realization without changing the controls. |
 
-The separate **Acoustic Factors** panel exposes every audible parameter in the
-generated model with both an on/off switch and a continuous amount slider. Its
-23 controls cover Direct Contact shape, individually switchable leaf, litter,
-and wood prevalence, analytic surface excitation and sustain, Wet Microtexture,
-low/mid/high texture, Spectral Sparsity, delayed secondary contacts, field depth
-and propagation, high-rate density compensation, and optional compression.
-**Reset all factors** restores the current listening baseline: 70% Distance
-Loss, 20% Mid Texture, 45% Wet Microtexture, 60% Distance Air Damping, Micro-splashes off, Wood
-Surface off, and Compression off. These controls never alter Reference Playback.
+The separate **Acoustic Factors** panel exposes every meaningful audible
+parameter in the generated model with both an on/off switch and a continuous
+amount slider. Its 19 controls cover Direct Contact shape, individually
+switchable leaf, litter, and wood prevalence, analytic surface excitation, Wet
+Microtexture, low/mid/high texture, Spectral Sparsity, field depth and
+propagation, high-rate density compensation, and optional compression. Tail,
+surface-sustain, and secondary-contact controls were removed after diagnostics
+showed that they did not materially affect the field. Surface duration remains
+an internal property of each Rain Mark and surface response. **Reset all
+factors** restores the Redwood-first listening baseline: 8% Impact Body, 90%
+Low Texture, 20% Mid Texture, 98% Band Independence, 92% Spectral Sparsity,
+45% Wet Microtexture, 70% Distance Loss, 70% Distance Air Damping, Wood Surface
+off, and Compression off. These controls never alter Reference Playback.
 
 At 100% Reference, the simulator continues producing light Arrivals but skips
 generated-audio scheduling.
@@ -73,7 +77,7 @@ population, not an added background-noise clock or statistical field substitute.
 Each Arrival receives an audio-only Rain Mark. Drop Population changes the
 probability distribution over drop diameter; the same mark coherently derives a
 velocity proxy, impact level, contact duration, surface damping, target surface,
-broad spectral focus, and secondary-contact probability. Initial surfaces are
+and broad spectral focus. Initial surfaces are
 leaf, litter/soil, and wood. Liquid impacts and bubbles are deliberately
 excluded.
 
@@ -87,8 +91,8 @@ decays. Spectral Sparsity controls the selected-region count. Leaf remains
 broadly papery and bright rather than becoming high-only; litter remains darker
 while retaining upper detail. Band Independence controls how strongly selected
 regions diverge without turning them into notes. Low, Mid, and High Texture
-scale groups without forcing one shared envelope. Wood and Micro-splashes are
-disabled in the default single-drop baseline.
+scale groups without forcing one shared envelope. Wood is disabled in the
+default Redwood-first baseline.
 
 Wet Microtexture adds restrained spray and occasional high-frequency cusps while the
 same compact surface window is open. Correlated analytic noise is thresholded,
@@ -175,6 +179,11 @@ Microscopes select the strongest detected acoustic onset by post-onset energy,
 place it 20 ms into every excerpt, and draw the same marker on waveform and
 spectrogram. Their alignment is limited by the detector's approximately 2.7 ms
 hop and is not a claim about unknowable physical impact time in a recording.
+Three Onset Population panels then align up to 96 evenly sampled detected
+onsets per source, subtract each pre-onset baseline, normalize each envelope,
+and display a q10–q90 band with a q50 line plus median peak and 90%-energy
+timing. This prevents one exceptional strongest contact from defining the
+canonical response shape.
 
 Each reference also shows a level-independent Normalized Profile Distance and
 signed Spectral Profile Residual from the current synth. Spectral Distribution
@@ -184,14 +193,14 @@ mismatch without pretending independent stochastic spectrogram pixels align.
 The displayed Window Δ reports each Representative Field Window's distance from
 its complete profile, which remains authoritative.
 
-The two references are intentionally not averaged into one target. In-browser
-analysis puts Redwood near 3.98 kHz centroid and 22.5% energy above 8 kHz, while
-Farnell’s 14–24 second interval is near 8.07 kHz and 51.2%. The current 45% Wet
-Microtexture baseline is near 4.15 kHz and 22.3%. On the shared 80 Hz–20 kHz
-Rain Diagnostics grid, the current profiles report approximately 6.4 dB to
-Redwood and 5.8 dB to Farnell, with
-6.2 dB and 9.9 dB Spectral Distribution Residuals respectively. Redwood remains
-the enforceable tonal target; Farnell is the separate wet-texture diagnostic.
+The two references are intentionally not averaged into one target. Current
+native-rate analysis puts Redwood near 4.22 kHz centroid and 23.9% energy above
+8 kHz, while Farnell’s 14–24 second interval is near 9.10 kHz and 55.5%. The
+Redwood-first generated baseline is near 4.64 kHz and 24.6%. On the shared
+Rain Diagnostics grid, it reports approximately 6.5 dB Spectral Profile and
+6.1 dB Spectral Distribution distance to Redwood, versus 6.2 dB and 8.9 dB to
+Farnell. Redwood is the sole enforceable target; Farnell is retained only as a
+secondary wet-texture and architecture diagnostic.
 
 The selected Rain Reference can also loop as Reference Playback through Source Mix.
 Farnell playback is restricted to the same 14–24 second profile interval rather
@@ -244,7 +253,8 @@ nine- and thirteen-band Redwood tonal targets, independent texture-region
 decay, response-bank identity, exact block-partition invariance, the shared
 live/offline Generated Rain Renderer, multiscale temporal texture, all three
 reference-file manifests, fixed analysis-interval preparation, normalized
-spectral-distance analysis, pitch-preserving time-stretch policy,
+spectral-distance analysis, bounded aligned-onset population summaries,
+pitch-preserving time-stretch policy,
 the bounded Render Loop, signal analysis, and Source Mix invariants.
 
 ## Repository map

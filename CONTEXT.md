@@ -21,7 +21,7 @@ A homogeneous Poisson arrival process with one constant total lamp rate selected
 _Avoid_: Living rate, Cox process, weather modulation
 
 **Rain Mark**:
-The audio-only physical interpretation assigned to an Arrival by the Generated Rain Renderer. It coherently relates a synthesized impact's drop-size class, velocity, surface response, level, duration, broad spectral focus, and secondary-contact behavior without changing the light event.
+The audio-only physical interpretation assigned to an Arrival by the Generated Rain Renderer. It coherently relates a synthesized impact's drop-size class, velocity, surface response, level, duration, and broad spectral focus without changing the light event.
 _Avoid_: Arrival, LED mark, recorded grain
 
 **Drop Population**:
@@ -33,7 +33,7 @@ The optional bidirectional relationship that keeps the normalized Speed and Drop
 _Avoid_: Channel Coupling, Spectral Coupling, Cox modulation
 
 **Rain Impact Waveform**:
-A complete pure-synthesis, band-limited, signed pressure-like response derived from one Rain Mark and used identically for Arrivals from every Channel. It contains a sub-millisecond Direct Contact followed by a compact rounded leaf/ground Surface Response, may contain finite Wet Microtexture and delayed Micro-splashes, but has no bubble contribution, stable note, stationary background, or relationship to LED wavelength.
+A complete pure-synthesis, band-limited, signed pressure-like response derived from one Rain Mark and used identically for Arrivals from every Channel. It contains a restrained sub-millisecond Direct Contact followed by a compact rounded leaf/ground Surface Response and may contain finite Wet Microtexture, but has no secondary-contact layer, bubble contribution, stable note, stationary background, or relationship to LED wavelength.
 _Avoid_: Note, tone, spectral voice
 
 **Direct Contact**:
@@ -45,7 +45,7 @@ The generated, event-specific vibration excited when a Rain Mark contacts leaves
 _Avoid_: Diffuse Response, recorded impulse response, bubble tone
 
 **Wet Microtexture**:
-Finite nonlinear surface detail inside one Rain Impact Waveform. Correlated analytic noise is thresholded, rectified, power-shaped, high-pass filtered, and routed through a short seed-varied band-pass wavelet while the parent contact window is open. It never creates an Arrival, Micro-splash, independent clock, stationary bed, recorded grain, or bubble response.
+Finite nonlinear surface detail inside one Rain Impact Waveform. Correlated analytic noise is thresholded, rectified, power-shaped, high-pass filtered, and routed through a short seed-varied band-pass wavelet while the parent contact window is open. It never creates an Arrival, secondary contact, independent clock, stationary bed, recorded grain, or bubble response.
 _Avoid_: Bubble layer, second event process, generic noise bed
 
 **Spectral Sparsity**:
@@ -68,12 +68,8 @@ _Avoid_: Hidden tuning constant, spectral Channel, weather process
 A complete set of Acoustic Factor switch states and amounts. The default Redwood-target preset is a starting model, not an automatically fitted truth claim.
 _Avoid_: Recording profile, sample preset
 
-**Micro-splash**:
-A quieter delayed secondary contact generated inside one Rain Impact Waveform. It belongs to its parent Arrival and never counts as an additional Arrival.
-_Avoid_: Secondary Poisson event, extra drop stream
-
 **Acoustic Target Profile**:
-A measured aggregate spectral and temporal shape used to constrain generated rain texture. Pwason's current enforceable Acoustic Target Profile includes independently normalized nine-band broad and thirteen-band fine contours from the default Redwood Rain Reference but contains no recording samples or response waveforms. Farnell remains a separate diagnostic Procedural Rain Reference because its much brighter, more impulsive profile conflicts with Redwood and must not be silently averaged into a fictitious target.
+A measured aggregate spectral and temporal shape used to constrain generated rain texture. Pwason's sole enforceable Acoustic Target Profile is the independently normalized nine-band broad and thirteen-band fine contours from the default Redwood Rain Reference; it contains no recording samples or response waveforms. Farnell remains a secondary diagnostic Procedural Rain Reference because its much brighter, more impulsive profile conflicts with Redwood and must not be silently averaged into the primary target.
 _Avoid_: Sample synthesis, spectral note, selected playback profile
 
 **Generated Rain Renderer**:
@@ -143,6 +139,10 @@ _Avoid_: Strongest contact, fixed favorite moment, aligned drop
 **Impact Microscope**:
 A 120-millisecond excerpt centered around one prominent acoustic onset, with that detected onset placed at the same visible offset for every source. It compares contact morphology and reports detector-bounded alignment rather than claiming knowledge of an exact physical impact time inside a recording.
 _Avoid_: Representative Field Window, physical-drop timestamp, strongest sample
+
+**Onset Population**:
+A bounded diagnostic population of prominent acoustic onsets, each represented by a baseline-subtracted, independently normalized 120-millisecond RMS envelope aligned to the shared 20-millisecond onset marker. Its q10–q90 band, q50 line, and median peak and 90%-energy delays describe typical contact morphology without allowing one strongest onset to define the source.
+_Avoid_: Average waveform, physical-drop alignment, synthesis layer
 
 **Spectral Profile Residual**:
 The signed, level-independent dB difference between two complete-profile spectra. Positive values mean generated rain has excess normalized energy at that frequency; negative values mean generated rain is missing energy.

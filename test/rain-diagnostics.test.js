@@ -52,6 +52,41 @@ test("Rain Diagnostics aligns every Impact Microscope to a detected acoustic ons
   ) < 1 / sampleRate);
 });
 
+test("Rain Diagnostics summarizes a population of onset-aligned contact envelopes", () => {
+  const sampleRate = 48_000;
+  const samples = new Float32Array(sampleRate * 3);
+  for (const [timeSeconds, amplitude] of [
+    [0.5, 0.4],
+    [1.25, 0.7],
+    [2, 1],
+    [2.6, 0.55],
+  ]) {
+    const onset = Math.round(timeSeconds * sampleRate);
+    for (let offset = 0; offset < sampleRate * 0.04; offset += 1) {
+      samples[onset + offset] += amplitude
+        * Math.sin(2 * Math.PI * 2_800 * offset / sampleRate)
+        * Math.exp(-offset / (sampleRate * 0.008));
+    }
+  }
+
+  const population = analyzeRainField(samples, sampleRate).onsetPopulation;
+  const onsetPoint = Math.round(
+    population.onsetOffsetSeconds / population.pointIntervalSeconds,
+  );
+  const median = population.envelopeQuantiles[1];
+  const preOnsetPeak = Math.max(...median.subarray(0, onsetPoint));
+  const postOnsetPeak = Math.max(...median.subarray(onsetPoint));
+
+  assert.ok(population.count >= 4);
+  assert.deepEqual(population.quantiles, [0.1, 0.5, 0.9]);
+  assert.equal(population.envelopeQuantiles.length, 3);
+  assert.equal(median.length, 240);
+  assert.ok(Math.abs(population.onsetOffsetSeconds - 0.02) < 1 / sampleRate);
+  assert.ok(postOnsetPeak > preOnsetPeak * 4);
+  assert.ok(population.peakDelayQuantilesSeconds[1] >= 0);
+  assert.ok(population.energy90DelayQuantilesSeconds[1] > 0);
+});
+
 test("Rain Diagnostics exposes time-order-independent spectral distribution residuals", () => {
   const sampleRate = 8_000;
   const steady = Float32Array.from(
