@@ -3,7 +3,7 @@ const DEFAULT_SAMPLE_RATE = 48_000;
 const DEFAULT_RATE_HZ = 1_000;
 const DEFAULT_PULSE_WIDTH_MS = 4;
 const DEFAULT_TARGET_CURRENT = 0.5;
-const DEFAULT_PWM_PULSE_CURRENT = 1;
+const DEFAULT_PWM_ON_CURRENT = 1;
 const MINIMUM_RATE_HZ = 1;
 const MAXIMUM_RATE_HZ = 48_000;
 const DRIVE_SOURCES = new Set(["poisson", "pwm"]);
@@ -50,15 +50,15 @@ export function derivePwmTiming({
   totalRateHz = DEFAULT_RATE_HZ,
   channelCount = DEFAULT_CHANNEL_COUNT,
   targetCurrent = DEFAULT_TARGET_CURRENT,
-  pwmPulseCurrent = DEFAULT_PWM_PULSE_CURRENT,
+  pwmOnCurrent = DEFAULT_PWM_ON_CURRENT,
 } = {}) {
   const channels = Math.max(1, Math.floor(finite(channelCount, DEFAULT_CHANNEL_COUNT)));
   const rate = clamp(finite(totalRateHz, DEFAULT_RATE_HZ), MINIMUM_RATE_HZ, MAXIMUM_RATE_HZ);
   const target = clamp(finite(targetCurrent, DEFAULT_TARGET_CURRENT), 0.001, 1);
-  const pulseCurrent = clamp(finite(pwmPulseCurrent, DEFAULT_PWM_PULSE_CURRENT), target, 1);
+  const onCurrent = clamp(finite(pwmOnCurrent, DEFAULT_PWM_ON_CURRENT), target, 1);
   const frequencyHz = rate / channels;
   const periodSeconds = 1 / frequencyHz;
-  const dutyCycle = target / pulseCurrent;
+  const dutyCycle = target / onCurrent;
 
   return Object.freeze({
     frequencyHz,
@@ -76,7 +76,7 @@ export function createPoissonLedLabEngine({
   rateHz = DEFAULT_RATE_HZ,
   pulseWidthMs = DEFAULT_PULSE_WIDTH_MS,
   targetCurrent = DEFAULT_TARGET_CURRENT,
-  pwmPulseCurrent = DEFAULT_PWM_PULSE_CURRENT,
+  pwmOnCurrent = DEFAULT_PWM_ON_CURRENT,
   source = "poisson",
 } = {}) {
   const channels = Math.max(1, Math.floor(finite(channelCount, DEFAULT_CHANNEL_COUNT)));
@@ -86,7 +86,7 @@ export function createPoissonLedLabEngine({
   let totalRateHz = clamp(finite(rateHz, DEFAULT_RATE_HZ), MINIMUM_RATE_HZ, MAXIMUM_RATE_HZ);
   let pulseSeconds = clamp(finite(pulseWidthMs, DEFAULT_PULSE_WIDTH_MS), 0.05, 1_000) / 1_000;
   let target = clamp(finite(targetCurrent, DEFAULT_TARGET_CURRENT), 0.001, 1);
-  let pwmPeak = clamp(finite(pwmPulseCurrent, DEFAULT_PWM_PULSE_CURRENT), target, 1);
+  let pwmPeak = clamp(finite(pwmOnCurrent, DEFAULT_PWM_ON_CURRENT), target, 1);
   if (!DRIVE_SOURCES.has(source)) {
     throw new TypeError(`Unknown LED lab drive source: ${source}`);
   }
@@ -103,7 +103,7 @@ export function createPoissonLedLabEngine({
       totalRateHz,
       channelCount: channels,
       targetCurrent: target,
-      pwmPulseCurrent: pwmPeak,
+      pwmOnCurrent: pwmPeak,
     });
     return {
       decay: Math.exp(-1 / (samplesPerSecond * pulseSeconds)),
@@ -143,8 +143,8 @@ export function createPoissonLedLabEngine({
     if (settings.targetCurrent !== undefined) {
       target = clamp(finite(settings.targetCurrent, target), 0.001, 1);
     }
-    if (settings.pwmPulseCurrent !== undefined) {
-      pwmPeak = finite(settings.pwmPulseCurrent, pwmPeak);
+    if (settings.pwmOnCurrent !== undefined) {
+      pwmPeak = finite(settings.pwmOnCurrent, pwmPeak);
     }
     pwmPeak = clamp(pwmPeak, target, 1);
     if (currentSource !== previousSource) {
@@ -242,7 +242,7 @@ export function createPoissonLedLabEngine({
       targetCurrent: target,
       source: currentSource,
       pwmFrequencyHz: values.pwmFrequencyHz,
-      pwmPulseCurrent: pwmPeak,
+      pwmOnCurrent: pwmPeak,
       pwmDutyCycle: values.pwmDutyCycle,
       pwmPeriodSeconds: values.pwmPeriodSeconds,
       pwmOnTimeSeconds: values.pwmOnTimeSeconds,

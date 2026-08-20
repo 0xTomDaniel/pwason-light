@@ -55,7 +55,7 @@ test("the lab exposes PWM as a matched scientific control condition", async () =
   assert.match(html, /name="monitor-source"[^>]+value="pwm"/);
   assert.match(html, /id="pwm-frequency-output"/);
   assert.match(html, /PWM frequency = total event rate ÷ eight/i);
-  assert.match(html, /duty is derived as Target Mean Current ÷ PWM Pulse Current/i);
+  assert.match(html, /duty is derived as Target Mean Current ÷ PWM On Current/i);
   assert.match(html, /data-condition-target="pwm"/i);
   assert.match(html, /commanded mean/i);
   assert.match(html, /frame mean/i);
@@ -63,14 +63,14 @@ test("the lab exposes PWM as a matched scientific control condition", async () =
   assert.match(html, /Both conditions run continuously/i);
 });
 
-test("PWM exposes pulse current separately while deriving duty from the shared mean", async () => {
+test("PWM exposes On Current separately while deriving duty from the shared mean", async () => {
   const html = await readFile(specificationUrl, "utf8");
 
-  assert.match(html, /id="pwm-pulse-current"[^>]+min="50"[^>]+max="100"[^>]+step="0\.1"[^>]+value="100"/);
-  assert.match(html, /id="pwm-pulse-current-output">100%<\/output>/);
+  assert.match(html, /id="pwm-on-current"[^>]+min="50"[^>]+max="100"[^>]+step="0\.1"[^>]+value="100"/);
+  assert.match(html, /id="pwm-on-current-output">100%<\/output>/);
   assert.match(html, /id="pwm-duty-output">50% duty<\/output>/);
-  assert.match(html, /duty = Target Mean Current ÷ PWM Pulse Current/i);
-  assert.match(html, /pulse-current minimum follows Target Mean Current/i);
+  assert.match(html, /duty = Target Mean Current ÷ PWM On Current/i);
+  assert.match(html, /On Current minimum follows Target Mean Current/i);
 });
 
 test("PWM exposes derived on-time and silence as read-only timing evidence", async () => {
@@ -79,6 +79,20 @@ test("PWM exposes derived on-time and silence as read-only timing evidence", asy
   assert.match(html, /<span>PWM on time<\/span><output id="pwm-on-time-output">4\.00 ms<\/output>/i);
   assert.match(html, /<span>PWM silence<\/span><output id="pwm-silence-output">4\.00 ms<\/output>/i);
   assert.match(html, /on-time and silence are derived readouts, not independent controls/i);
+});
+
+test("the specification distinguishes matched current from optical and perceptual equivalence", async () => {
+  const html = await readFile(specificationUrl, "utf8");
+
+  assert.match(html, /PWM On Current is a waveform-morphology control, not a brightness control/i);
+  assert.match(html, /Imean = Ion × D/i);
+  assert.match(html, /IRMS = √\(Imean × Ion\)/i);
+  assert.match(html, /equal mean current does not guarantee equal optical emission/i);
+  assert.match(html, /48 kHz total event budget is not a 48 kHz PWM carrier/i);
+  assert.match(html, /6 kHz per Channel/i);
+  assert.match(html, /no universal imperceptibility frequency/i);
+  assert.match(html, /20 kHz/i);
+  assert.match(html, /photodiode/i);
 });
 
 test("the lab exposes simultaneous fixed-scale condition scopes and one selected audio scope", async () => {

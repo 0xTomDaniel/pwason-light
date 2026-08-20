@@ -35,9 +35,9 @@ It runs one exact total-lamp Poisson field and one matched PWM Control in
 parallel from 1–48,000 total events/s, with a separate nine-LED bank for each.
 Poisson assigns each Arrival uniformly to one of eight Channels. PWM drives all
 eight Channels in phase at `Λ/8`, so their combined cycle budget remains `Λ`.
-Its independent PWM Pulse Current selects the on-state current from the shared
-Target Mean Current through 100%, while duty is derived as `target ÷ pulse` to
-hold the mean fixed. At the pulse-current minimum, duty reaches 100% and PWM
+Its independent PWM On Current selects the positive on-state current from the shared
+Target Mean Current through 100%, while duty is derived as `target ÷ on current` to
+hold the mean fixed. At the On Current minimum, duty reaches 100% and PWM
 becomes continuous reduced current. Derived PWM On Time and PWM Silence
 readouts expose the resulting morphology without becoming additional controls.
 Current Fall Time applies only to Poisson.

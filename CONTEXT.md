@@ -17,16 +17,24 @@ The standalone current-first comparison Module that owns simultaneous Steady Poi
 _Avoid_: Rain renderer, audio-to-light adapter, mixed acoustic source
 
 **PWM Control**:
-The deterministic scientific control condition that runs continuously beside Poisson in the LED lab. Every Channel receives the same phase-aligned waveform at frequency `Λ/8`, so eight cycle counts sum to the selected total event budget `Λ`. PWM Pulse Current sets its positive on-state current and duty is derived as `Target Mean Current / PWM Pulse Current`, preserving the shared commanded mean. At the pulse-current minimum, duty is 100% and the output becomes continuous reduced current; at exactly 100% Target Mean Current it is full DC. Phase and cycle accounting continue in both cases. Current Fall Time is ignored. The bank exposes commanded mean, pulse current, and duty separately from each LED's Frame-Mean Current. A separate nine-LED bank and fixed-scale current scope always display it; Monitor Source only chooses which condition feeds selected metrics, commanded-mean subtraction, Monitor Gain, and the Audio Oscilloscope.
+The deterministic scientific control condition that runs continuously beside Poisson in the LED lab. Every Channel receives the same phase-aligned waveform at frequency `Λ/8`, so eight cycle counts sum to the selected total event budget `Λ`. PWM On Current sets its positive on-state current and duty is derived as `Target Mean Current / PWM On Current`, preserving the shared commanded mean. At the On Current minimum, duty is 100% and the output becomes continuous reduced current; at exactly 100% Target Mean Current it is full DC. Phase and cycle accounting continue in both cases. Current Fall Time is ignored. The bank exposes commanded mean, On Current, and duty separately from each LED's Frame-Mean Current. A separate nine-LED bank and fixed-scale current scope always display it; Monitor Source only chooses which condition feeds selected metrics, commanded-mean subtraction, Monitor Gain, and the Audio Oscilloscope.
 _Avoid_: Poisson approximation, audio oscillator, staggered aggregate smoothing
 
-**PWM Pulse Current**:
-The PWM Control's on-state current, continuously selectable from Target Mean Current through 100%. Its lower bound follows Target Mean Current because a smaller pulse could not reach the commanded mean without an impossible duty above 100%. Duty is always derived rather than independently controlled, so changing pulse height cannot invalidate the mean-matched experiment.
+**PWM On Current**:
+The PWM Control's positive current during its on-state, continuously selectable from Target Mean Current through 100%. Its lower bound follows Target Mean Current because a smaller on-state could not reach the commanded mean without an impossible duty above 100%. Duty is always derived rather than independently controlled, so changing on-state height cannot invalidate the mean-matched experiment. It is a waveform-morphology control, not a second brightness target.
 _Avoid_: Second brightness target, unrestricted peak current, measured frame mean
 
 **PWM Timing**:
 The read-only morphology derived from PWM Control frequency and duty. Period is `1 / (Λ/8)`, On Time is `duty × period`, and Silence is `(1 − duty) × period`. On Time and Silence are not independent controls because selecting both would determine a new frequency and duty, breaking the Total Event Budget and Target Mean Current match.
 _Avoid_: Independent pulse-width control, independent dead time, Poisson Current Fall Time
+
+**Optical Emission**:
+The light actually emitted by an LED as a function of its instantaneous current, junction temperature, device physics, phosphor response, and package. Equal mean current does not imply equal mean Optical Emission because current-to-flux conversion is nonlinear and part-specific. Optical Emission must be measured photometrically and is not established by a virtual current meter.
+_Avoid_: Commanded current, virtual brightness, assumed photon count
+
+**Temporal Light Modulation**:
+Variation of measured Optical Emission over time. Its perceptibility and risk depend jointly on frequency content, modulation depth, waveform, duty, luminance, motion, exposure, observer, and imaging system; no single carrier frequency guarantees imperceptibility. Periodic and aperiodic waveforms require appropriate frequency- or time-domain analysis.
+_Avoid_: PWM frequency alone, browser LED animation, universal flicker cutoff
 
 **Current Response**:
 The positive exponential current injected into one Channel by one Arrival in the standalone LED lab. Its selectable fall time controls overlap. Its charge varies inversely with total Arrival rate and response duration so high-density comparisons approach the selected Target Mean Current without using automatic signal normalization or a hard clipping plateau.

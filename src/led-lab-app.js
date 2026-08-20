@@ -31,8 +31,8 @@ const pulseInput = document.querySelector("#pulse-width");
 const pulseOutput = document.querySelector("#pulse-width-output");
 const targetInput = document.querySelector("#target-current");
 const targetOutput = document.querySelector("#target-current-output");
-const pwmPulseInput = document.querySelector("#pwm-pulse-current");
-const pwmPulseOutput = document.querySelector("#pwm-pulse-current-output");
+const pwmOnInput = document.querySelector("#pwm-on-current");
+const pwmOnOutput = document.querySelector("#pwm-on-current-output");
 const pwmDutyOutput = document.querySelector("#pwm-duty-output");
 const pwmOnTimeOutput = document.querySelector("#pwm-on-time-output");
 const pwmSilenceOutput = document.querySelector("#pwm-silence-output");
@@ -132,15 +132,15 @@ function settings() {
     rateHz: rateFromControl(),
     pulseWidthMs: pulseWidthFromControl(),
     targetCurrent: Number(targetInput.value) / 100,
-    pwmPulseCurrent: Number(pwmPulseInput.value) / 100,
+    pwmOnCurrent: Number(pwmOnInput.value) / 100,
   };
 }
 
 function updateControlLabels() {
   const targetPercent = Number(targetInput.value);
-  pwmPulseInput.min = String(targetPercent);
-  if (Number(pwmPulseInput.value) < targetPercent) {
-    pwmPulseInput.value = String(targetPercent);
+  pwmOnInput.min = String(targetPercent);
+  if (Number(pwmOnInput.value) < targetPercent) {
+    pwmOnInput.value = String(targetPercent);
   }
   const values = settings();
   const safeMonitorGain = maximumSafeMonitorGain(values.targetCurrent);
@@ -156,19 +156,19 @@ function updateControlLabels() {
     ? `${values.pulseWidthMs.toFixed(2)} ms`
     : `${values.pulseWidthMs.toFixed(values.pulseWidthMs < 10 ? 1 : 0)} ms`;
   targetOutput.value = `${Number.isInteger(targetPercent) ? targetPercent : targetPercent.toFixed(1)}%`;
-  const pwmPulsePercent = values.pwmPulseCurrent * 100;
+  const pwmOnPercent = values.pwmOnCurrent * 100;
   const pwmTiming = derivePwmTiming({
     totalRateHz: values.rateHz,
     channelCount: 8,
     targetCurrent: values.targetCurrent,
-    pwmPulseCurrent: values.pwmPulseCurrent,
+    pwmOnCurrent: values.pwmOnCurrent,
   });
   const pwmDutyPercent = pwmTiming.dutyCycle * 100;
-  pwmPulseOutput.value = `${Number.isInteger(pwmPulsePercent) ? pwmPulsePercent : pwmPulsePercent.toFixed(1)}%`;
+  pwmOnOutput.value = `${Number.isInteger(pwmOnPercent) ? pwmOnPercent : pwmOnPercent.toFixed(1)}%`;
   pwmDutyOutput.value = `${pwmDutyPercent.toFixed(1).replace(/\.0$/, "")}% duty`;
   pwmOnTimeOutput.value = formatDuration(pwmTiming.onTimeSeconds);
   pwmSilenceOutput.value = formatDuration(pwmTiming.silenceSeconds);
-  pwmTargetOutput.value = `${targetOutput.value} mean · ${pwmPulseOutput.value} pulse · ${pwmDutyOutput.value}`;
+  pwmTargetOutput.value = `${targetOutput.value} mean · ${pwmOnOutput.value} on · ${pwmDutyOutput.value}`;
   volumeOutput.value = `${formatMonitorGain(monitorGainFromControl())} effective`;
   monitorGainMaximumOutput.value = `${formatMonitorGain(safeMonitorGain)} base safe max`;
   const sourceName = selectedSource() === "pwm" ? "PWM" : "Poisson";
@@ -478,7 +478,7 @@ for (const input of [
   rateInput,
   pulseInput,
   targetInput,
-  pwmPulseInput,
+  pwmOnInput,
   soundInput,
   volumeInput,
 ]) {

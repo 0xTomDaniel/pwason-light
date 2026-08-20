@@ -162,20 +162,21 @@ test("PWM is a matched periodic control with the same total event budget", () =>
   )));
 });
 
-test("PWM pulse current trades pulse height for duty while preserving commanded mean", () => {
+test("PWM On Current trades on-state height for duty while preserving commanded mean", () => {
   const engine = createPoissonLedLabEngine({
     source: "pwm",
     sampleRate: 48_000,
     rateHz: 8_000,
     targetCurrent: 0.25,
-    pwmPulseCurrent: 0.5,
+    pwmOnCurrent: 0.5,
   });
   const block = engine.render(48_000);
   const snapshot = engine.snapshot();
   const mean = block.fusedCurrent.reduce((sum, value) => sum + value, 0) /
     block.fusedCurrent.length;
 
-  assert.equal(snapshot.pwmPulseCurrent, 0.5);
+  assert.equal(snapshot.pwmOnCurrent, 0.5);
+  assert.equal("pwmPulseCurrent" in snapshot, false);
   assert.equal(snapshot.pwmDutyCycle, 0.5);
   assert.ok(Math.abs(mean - 0.25) < 2e-5);
   assert.ok(block.currentChannels.every(channel => (
@@ -183,36 +184,36 @@ test("PWM pulse current trades pulse height for duty while preserving commanded 
   )));
 });
 
-test("PWM pulse current cannot imply a duty cycle above 100%", () => {
+test("PWM On Current cannot imply a duty cycle above 100%", () => {
   const engine = createPoissonLedLabEngine({
     source: "pwm",
     targetCurrent: 0.6,
-    pwmPulseCurrent: 0.4,
+    pwmOnCurrent: 0.4,
   });
 
-  assert.equal(engine.snapshot().pwmPulseCurrent, 0.6);
+  assert.equal(engine.snapshot().pwmOnCurrent, 0.6);
   assert.equal(engine.snapshot().pwmDutyCycle, 1);
 
   const snapshot = engine.configure({
     targetCurrent: 0.8,
-    pwmPulseCurrent: 0.7,
+    pwmOnCurrent: 0.7,
   });
-  assert.equal(snapshot.pwmPulseCurrent, 0.8);
+  assert.equal(snapshot.pwmOnCurrent, 0.8);
   assert.equal(snapshot.pwmDutyCycle, 1);
 });
 
-test("PWM timing reports on-time and silence from frequency, mean, and pulse current", () => {
+test("PWM timing reports on-time and silence from frequency, mean, and PWM On Current", () => {
   const fullPulse = derivePwmTiming({
     totalRateHz: 8_000,
     channelCount: 8,
     targetCurrent: 0.25,
-    pwmPulseCurrent: 1,
+    pwmOnCurrent: 1,
   });
   const reducedPulse = derivePwmTiming({
     totalRateHz: 8_000,
     channelCount: 8,
     targetCurrent: 0.25,
-    pwmPulseCurrent: 0.5,
+    pwmOnCurrent: 0.5,
   });
 
   assert.deepEqual(fullPulse, {
