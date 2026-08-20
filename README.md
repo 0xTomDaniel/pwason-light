@@ -31,15 +31,17 @@ model at:
 
 <http://127.0.0.1:7160/docs/specs/poisson-led-lab.spec.html>
 
-It runs one exact total-lamp Poisson field from 1–48,000 Arrivals/s, assigns
-each Arrival uniformly to one of eight Channels, and displays a ninth Aggregate
-White signal equal to their instantaneous mean. Each Arrival injects only a
-positive exponential Current Response. Event charge scales inversely with rate
-so selected mean current stays comparable while stochastic modulation is free
-to converge. Its mono sound monitor is derived from Aggregate White by one 2 Hz
-DC blocker and manual Output Level; it has no independent source model or
-automatic gain. This standalone page does not call or modify the existing rain
-renderer.
+It runs one exact total-lamp Poisson field and one matched PWM Control in
+parallel from 1–48,000 total events/s, with a separate nine-LED bank for each.
+Poisson assigns each Arrival uniformly to one of eight Channels. PWM drives all
+eight Channels in phase at `Λ/8`, so their combined rising-edge budget remains
+`Λ`; Target Mean Current becomes its duty cycle. Current Fall Time applies only
+to Poisson. A Monitor Source selector chooses which continuously running
+condition feeds the metrics, fixed-scale oscilloscopes, and mono sound monitor;
+it never starts, stops, or resets either condition. Each ninth Aggregate White
+signal is the instantaneous eight-Channel mean. The sound monitor adds only a
+2 Hz DC blocker and manual Output Level. This standalone page does not call or
+modify the existing rain renderer.
 
 ## Controls
 

@@ -18,6 +18,8 @@ const startButton = document.querySelector("#start-stop");
 const rateInput = document.querySelector("#led-rate");
 const rateOutput = document.querySelector("#led-rate-output");
 const channelRateOutput = document.querySelector("#channel-rate-output");
+const pwmFrequencyOutput = document.querySelector("#pwm-frequency-output");
+const sourceInputs = [...document.querySelectorAll('[name="monitor-source"]')];
 const pulseInput = document.querySelector("#pulse-width");
 const pulseOutput = document.querySelector("#pulse-width-output");
 const targetInput = document.querySelector("#target-current");
@@ -31,18 +33,31 @@ const rmsOutput = document.querySelector("#rms-modulation");
 const peakOutput = document.querySelector("#peak-current");
 const limitOutput = document.querySelector("#limit-proximity");
 const arrivalOutput = document.querySelector("#observed-rate");
-const leds = [...document.querySelectorAll("[data-current-led]")];
-const ledValues = [...document.querySelectorAll("[data-current-value]")];
-const canvas = document.querySelector("#current-scope");
-const context = canvas.getContext("2d");
+const observedRateLabel = document.querySelector("#observed-rate-label");
+const ledBanks = Object.fromEntries(
+  [...document.querySelectorAll("[data-condition-bank]")].map(bank => [
+    bank.dataset.conditionBank,
+    {
+      leds: [...bank.querySelectorAll("[data-current-led]")],
+      values: [...bank.querySelectorAll("[data-current-value]")],
+    },
+  ]),
+);
+const leds = Object.values(ledBanks).flatMap(bank => bank.leds);
+const currentCanvas = document.querySelector("#current-scope");
+const audioCanvas = document.querySelector("#audio-scope");
+const scopeSourceOutput = document.querySelector("#scope-source-output");
+const audioSourceOutput = document.querySelector("#audio-source-output");
 
 let audioContext = null;
 let workletNode = null;
 let monitorGain = null;
 let running = false;
-let scopeRing = new Float32Array(48_000);
-let scopeWrite = 0;
-let scopeFilled = 0;
+let lastMonitorSource = "poisson";
+
+function selectedSource() {
+  return sourceInputs.find(input => input.checked)?.value ?? "poisson";
+}
 
 function rateFromControl() {
   return Math.min(48_000, Math.max(1, Math.round(10 ** Number(rateInput.value))));
@@ -60,6 +75,7 @@ function formatRate(rate) {
 
 function settings() {
   return {
+    monitorSource: selectedSource(),
     rateHz: rateFromControl(),
     pulseWidthMs: pulseWidthFromControl(),
     targetCurrent: Number(targetInput.value) / 100,
@@ -68,18 +84,32 @@ function settings() {
 
 function updateControlLabels() {
   const values = settings();
-  rateOutput.value = `${values.rateHz.toLocaleString()} Arrivals/s`;
-  channelRateOutput.value = `${formatRate(values.rateHz / 8)} expected per Channel`;
+  rateOutput.value = `${values.rateHz.toLocaleString()} events/s shared`;
+  channelRateOutput.value = `${formatRate(values.rateHz / 8)} expected Poisson per Channel`;
+  pwmFrequencyOutput.value = `${formatRate(values.rateHz / 8)} per Channel`;
   pulseOutput.value = values.pulseWidthMs < 1
     ? `${values.pulseWidthMs.toFixed(2)} ms`
     : `${values.pulseWidthMs.toFixed(values.pulseWidthMs < 10 ? 1 : 0)} ms`;
   targetOutput.value = `${Math.round(values.targetCurrent * 100)}%`;
   volumeOutput.value = `${Math.round(Number(volumeInput.value) * 100)}%`;
+  const sourceName = selectedSource() === "pwm" ? "PWM" : "Poisson";
+  scopeSourceOutput.textContent = `${sourceName} · min/max-preserving`;
+  audioSourceOutput.textContent = `${sourceName} · post-DC · before Output Level`;
 }
 
 function configureRunningEngine() {
+  const monitorChanged = lastMonitorSource !== selectedSource();
+  lastMonitorSource = selectedSource();
   updateControlLabels();
   workletNode?.port.postMessage({ type: "configure", settings: settings() });
+  if (monitorChanged) {
+    currentScope.clear();
+    audioScope.clear();
+    scopeRenderLoop.wake();
+  }
+  if (running) {
+    statusOutput.value = `Both running · monitoring ${selectedSource() === "pwm" ? "PWM" : "Poisson"}`;
+  }
   if (monitorGain && audioContext) {
     const level = soundInput.checked ? Number(volumeInput.value) : 0;
     monitorGain.gain.setTargetAtTime(level, audioContext.currentTime, 0.01);
@@ -87,116 +117,163 @@ function configureRunningEngine() {
 }
 
 function clearLeds() {
-  leds.forEach((led, index) => {
-    led.style.setProperty("--level", "0");
-    led.setAttribute("aria-valuenow", "0");
-    if (ledValues[index]) ledValues[index].value = "0.0% mean";
-  });
+  for (const bank of Object.values(ledBanks)) {
+    bank.leds.forEach((led, index) => {
+      led.style.setProperty("--level", "0");
+      led.setAttribute("aria-valuenow", "0");
+      if (bank.values[index]) bank.values[index].value = "0.0% mean";
+    });
+  }
   meanOutput.value = "0.0%";
   rmsOutput.value = "0.0%";
   peakOutput.value = "0.0%";
   limitOutput.value = "0.00%";
+  observedRateLabel.textContent = selectedSource() === "pwm"
+    ? "PWM rising edges"
+    : "Poisson Arrivals";
   arrivalOutput.value = "0/s";
 }
 
-function appendScope(samples, sampleRate) {
-  if (scopeRing.length !== Math.round(sampleRate * SCOPE_SECONDS)) {
-    scopeRing = new Float32Array(Math.round(sampleRate * SCOPE_SECONDS));
-    scopeWrite = 0;
-    scopeFilled = 0;
-  }
-  for (const sample of samples) {
-    scopeRing[scopeWrite] = sample;
-    scopeWrite = (scopeWrite + 1) % scopeRing.length;
-    scopeFilled = Math.min(scopeRing.length, scopeFilled + 1);
-  }
-}
+function createScope(canvas, { minimum, maximum, color, center = null }) {
+  const context = canvas.getContext("2d");
+  let ring = new Float32Array(48_000);
+  let write = 0;
+  let filled = 0;
 
-function currentAt(index) {
-  const start = (scopeWrite - scopeFilled + scopeRing.length) % scopeRing.length;
-  return scopeRing[(start + index) % scopeRing.length];
-}
-
-function resizeCanvas() {
-  const ratio = Math.min(2, window.devicePixelRatio || 1);
-  const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
-  const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
-  if (canvas.width !== width || canvas.height !== height) {
-    canvas.width = width;
-    canvas.height = height;
-  }
-  return { width, height, ratio };
-}
-
-function drawScope() {
-  const { width, height, ratio } = resizeCanvas();
-  context.clearRect(0, 0, width, height);
-  context.fillStyle = "#070b0a";
-  context.fillRect(0, 0, width, height);
-  context.strokeStyle = "rgba(120, 159, 154, .13)";
-  context.lineWidth = ratio;
-  for (let line = 0; line <= 4; line += 1) {
-    const y = line * height / 4;
-    context.beginPath();
-    context.moveTo(0, y);
-    context.lineTo(width, y);
-    context.stroke();
-  }
-  for (let line = 0; line <= 8; line += 1) {
-    const x = line * width / 8;
-    context.beginPath();
-    context.moveTo(x, 0);
-    context.lineTo(x, height);
-    context.stroke();
+  function append(samples, sampleRate) {
+    if (ring.length !== Math.round(sampleRate * SCOPE_SECONDS)) {
+      ring = new Float32Array(Math.round(sampleRate * SCOPE_SECONDS));
+      write = 0;
+      filled = 0;
+    }
+    for (const sample of samples) {
+      ring[write] = sample;
+      write = (write + 1) % ring.length;
+      filled = Math.min(ring.length, filled + 1);
+    }
   }
 
-  if (scopeFilled > 0) {
-    context.strokeStyle = "#d7ff73";
-    context.fillStyle = "rgba(201, 245, 103, .15)";
+  function valueAt(index) {
+    const start = (write - filled + ring.length) % ring.length;
+    return ring[(start + index) % ring.length];
+  }
+
+  function draw() {
+    const ratio = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.max(1, Math.round(canvas.clientWidth * ratio));
+    const height = Math.max(1, Math.round(canvas.clientHeight * ratio));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = "#070b0a";
+    context.fillRect(0, 0, width, height);
+    context.strokeStyle = "rgba(120, 159, 154, .13)";
+    context.lineWidth = ratio;
+    for (let line = 0; line <= 4; line += 1) {
+      const y = line * height / 4;
+      context.beginPath();
+      context.moveTo(0, y);
+      context.lineTo(width, y);
+      context.stroke();
+    }
+    for (let line = 0; line <= 8; line += 1) {
+      const x = line * width / 8;
+      context.beginPath();
+      context.moveTo(x, 0);
+      context.lineTo(x, height);
+      context.stroke();
+    }
+    if (center !== null) {
+      const centerY = height - (center - minimum) / (maximum - minimum) * height;
+      context.strokeStyle = "rgba(105, 229, 220, .38)";
+      context.beginPath();
+      context.moveTo(0, centerY);
+      context.lineTo(width, centerY);
+      context.stroke();
+    }
+
+    if (filled === 0) return;
+    context.strokeStyle = color;
     context.lineWidth = Math.max(1, ratio);
     context.beginPath();
     for (let pixel = 0; pixel < width; pixel += 1) {
-      const start = Math.floor(pixel * scopeFilled / width);
-      const end = Math.max(start + 1, Math.floor((pixel + 1) * scopeFilled / width));
-      let minimum = 1;
-      let maximum = 0;
+      const start = Math.floor(pixel * filled / width);
+      const end = Math.max(start + 1, Math.floor((pixel + 1) * filled / width));
+      let localMinimum = Infinity;
+      let localMaximum = -Infinity;
       for (let sample = start; sample < end; sample += 1) {
-        const current = currentAt(sample);
-        minimum = Math.min(minimum, current);
-        maximum = Math.max(maximum, current);
+        const value = valueAt(sample);
+        localMinimum = Math.min(localMinimum, value);
+        localMaximum = Math.max(localMaximum, value);
       }
       const x = pixel + 0.5;
-      const yMaximum = height - maximum * height;
-      const yMinimum = height - minimum * height;
+      const yMaximum = height - (localMaximum - minimum) / (maximum - minimum) * height;
+      const yMinimum = height - (localMinimum - minimum) / (maximum - minimum) * height;
       context.moveTo(x, yMaximum);
       context.lineTo(x, yMinimum);
     }
     context.stroke();
   }
+
+  function clear() {
+    ring.fill(0);
+    write = 0;
+    filled = 0;
+  }
+
+  return Object.freeze({ append, clear, draw });
 }
 
+const currentScope = createScope(currentCanvas, {
+  minimum: 0,
+  maximum: 1,
+  color: "#d7ff73",
+});
+const audioScope = createScope(audioCanvas, {
+  minimum: -1,
+  maximum: 1,
+  center: 0,
+  color: "#69e5dc",
+});
+
 const scopeRenderLoop = createRenderLoop({
-  draw: drawScope,
+  draw: () => {
+    currentScope.draw();
+    audioScope.draw();
+  },
   isActive: () => false,
   requestFrame: callback => requestAnimationFrame(callback),
   framesPerSecond: 30,
 });
 
-function renderCurrentFrame(message) {
-  appendScope(message.scope, message.engine.sampleRate);
-  scopeRenderLoop.wake();
-  message.levels.forEach((level, index) => {
+function renderBank(name, condition) {
+  const bank = ledBanks[name];
+  condition.levels.forEach((level, index) => {
     const bounded = Math.min(1, Math.max(0, level));
-    leds[index]?.style.setProperty("--level", bounded.toFixed(5));
-    leds[index]?.setAttribute("aria-valuenow", String(Math.round(bounded * 100)));
-    if (ledValues[index]) ledValues[index].value = `${(bounded * 100).toFixed(1)}% mean`;
+    bank?.leds[index]?.style.setProperty("--level", bounded.toFixed(5));
+    bank?.leds[index]?.setAttribute("aria-valuenow", String(Math.round(bounded * 100)));
+    if (bank?.values[index]) bank.values[index].value = `${(bounded * 100).toFixed(1)}% mean`;
   });
+}
+
+function renderCurrentFrame(message) {
+  for (const [name, condition] of Object.entries(message.conditions)) {
+    renderBank(name, condition);
+  }
+  const monitored = message.conditions[message.monitorSource];
+  const engine = message.engine.conditions[message.monitorSource];
+  currentScope.append(monitored.scope, engine.sampleRate);
+  audioScope.append(monitored.audioScope, engine.sampleRate);
+  scopeRenderLoop.wake();
   const aggregate = 8;
-  meanOutput.value = `${(message.levels[aggregate] * 100).toFixed(1)}%`;
-  rmsOutput.value = `${(message.modulationRms[aggregate] * 100).toFixed(2)}%`;
-  peakOutput.value = `${(message.peaks[aggregate] * 100).toFixed(1)}%`;
-  limitOutput.value = `${(message.nearLimitFraction * 100).toFixed(3)}%`;
-  arrivalOutput.value = `${Math.round(message.arrivalCount * message.engine.sampleRate / message.sampleCount).toLocaleString()}/s`;
+  meanOutput.value = `${(monitored.levels[aggregate] * 100).toFixed(1)}%`;
+  rmsOutput.value = `${(monitored.modulationRms[aggregate] * 100).toFixed(2)}%`;
+  peakOutput.value = `${(monitored.peaks[aggregate] * 100).toFixed(1)}%`;
+  limitOutput.value = `${(monitored.nearLimitFraction * 100).toFixed(3)}%`;
+  observedRateLabel.textContent = monitored.eventKind;
+  arrivalOutput.value = `${Math.round(monitored.eventCount * engine.sampleRate / message.sampleCount).toLocaleString()}/s`;
 }
 
 async function start() {
@@ -219,7 +296,7 @@ async function start() {
   running = true;
   instrument.dataset.running = "true";
   startButton.textContent = "Stop field";
-  statusOutput.value = "Running · current owns the signal";
+  statusOutput.value = `Both running · monitoring ${selectedSource() === "pwm" ? "PWM" : "Poisson"}`;
 }
 
 async function stop() {
@@ -236,9 +313,8 @@ async function stop() {
   const contextToClose = audioContext;
   audioContext = null;
   await contextToClose?.close();
-  scopeRing.fill(0);
-  scopeWrite = 0;
-  scopeFilled = 0;
+  currentScope.clear();
+  audioScope.clear();
   clearLeds();
   scopeRenderLoop.wake();
 }
@@ -256,7 +332,14 @@ startButton.addEventListener("click", async () => {
   }
 });
 
-for (const input of [rateInput, pulseInput, targetInput, soundInput, volumeInput]) {
+for (const input of [
+  ...sourceInputs,
+  rateInput,
+  pulseInput,
+  targetInput,
+  soundInput,
+  volumeInput,
+]) {
   input.addEventListener("input", configureRunningEngine);
   input.addEventListener("change", configureRunningEngine);
 }
@@ -269,6 +352,8 @@ updateControlLabels();
 clearLeds();
 scopeRenderLoop.wake();
 
-leds.forEach((led, index) => {
-  led.setAttribute("aria-label", `${CHANNEL_NAMES[index]} frame-mean current`);
-});
+for (const [name, bank] of Object.entries(ledBanks)) {
+  bank.leds.forEach((led, index) => {
+    led.setAttribute("aria-label", `${name === "pwm" ? "PWM" : "Poisson"} ${CHANNEL_NAMES[index]} frame-mean current`);
+  });
+}

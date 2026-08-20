@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createPoissonLedLabEngine } from "../src/led-current-engine.js";
+import { createLedLabComparisonEngine } from "../src/led-lab-comparison-engine.js";
 
 function concatenate(blocks, key) {
   const totalLength = blocks.reduce((sum, block) => sum + block[key].length, 0);
@@ -133,4 +134,112 @@ test("constant-mean scaling makes modulation converge as total rate rises", () =
 
   assert.ok(Math.abs(dense.mean - 0.5) < 0.04);
   assert.ok(dense.rms < medium.rms * 0.55);
+});
+
+test("PWM is a matched periodic control with the same total event budget", () => {
+  const engine = createPoissonLedLabEngine({
+    source: "pwm",
+    sampleRate: 48_000,
+    rateHz: 8_000,
+    targetCurrent: 0.25,
+  });
+  const block = engine.render(48_000);
+  const snapshot = engine.snapshot();
+  const mean = block.fusedCurrent.reduce((sum, value) => sum + value, 0) /
+    block.fusedCurrent.length;
+
+  assert.equal(snapshot.source, "pwm");
+  assert.equal(snapshot.pwmFrequencyHz, 1_000);
+  assert.equal(block.eventKind, "PWM rising edges");
+  assert.equal(block.eventCount, 8_000);
+  assert.deepEqual(block.eventsByChannel, Array(8).fill(1_000));
+  assert.ok(Math.abs(mean - 0.25) < 1e-6);
+  assert.ok(block.currentChannels.every(channel => (
+    channel.every(current => current === 0 || current === 1)
+  )));
+  assert.ok(block.currentChannels.slice(1).every(channel => (
+    channel.every((current, sample) => current === block.currentChannels[0][sample])
+  )));
+});
+
+test("PWM uses the same direct current-to-AC monitor as Poisson current", () => {
+  const engine = createPoissonLedLabEngine({
+    source: "pwm",
+    sampleRate: 48_000,
+    rateHz: 8_000,
+    targetCurrent: 0.5,
+    dcBlockHz: 2,
+  });
+  const block = engine.render(1_024);
+  const coefficient = engine.snapshot().dcBlockCoefficient;
+
+  let previousCurrent = 0;
+  let previousAudio = 0;
+  for (let sample = 0; sample < block.audioMonitor.length; sample += 1) {
+    const expected = block.fusedCurrent[sample] - previousCurrent + coefficient * previousAudio;
+    assert.ok(Math.abs(block.audioMonitor[sample] - expected) < 1e-6);
+    previousCurrent = block.fusedCurrent[sample];
+    previousAudio = block.audioMonitor[sample];
+  }
+});
+
+test("switching source conditions starts the selected experiment from a clean state", () => {
+  const engine = createPoissonLedLabEngine({
+    seed: "source-switch",
+    source: "poisson",
+    sampleRate: 48_000,
+    rateHz: 8_000,
+  });
+  engine.render(2_048);
+
+  const snapshot = engine.configure({ source: "pwm" });
+  const pwm = engine.render(1);
+
+  assert.equal(snapshot.source, "pwm");
+  assert.equal(snapshot.elapsedSamples, 0);
+  assert.equal(snapshot.totalEvents, 0);
+  assert.ok(pwm.currentChannels.every(channel => channel[0] === 1));
+});
+
+test("the comparison engine renders Poisson and PWM continuously from shared controls", () => {
+  const engine = createLedLabComparisonEngine({
+    seed: "parallel-control",
+    sampleRate: 48_000,
+    rateHz: 8_000,
+    pulseWidthMs: 4,
+    targetCurrent: 0.25,
+  });
+
+  const first = engine.render(48_000);
+  const beforeSwitch = engine.snapshot();
+  engine.configure({ monitorSource: "pwm" });
+  const second = engine.render(128);
+  const afterSwitch = engine.snapshot();
+
+  assert.equal(first.conditions.poisson.fusedCurrent.length, 48_000);
+  assert.equal(first.conditions.pwm.eventCount, 8_000);
+  assert.ok(Math.abs(first.conditions.poisson.eventCount - 8_000) < 300);
+  assert.equal(beforeSwitch.conditions.poisson.elapsedSamples, 48_000);
+  assert.equal(beforeSwitch.conditions.pwm.elapsedSamples, 48_000);
+  assert.equal(afterSwitch.conditions.poisson.elapsedSamples, 48_128);
+  assert.equal(afterSwitch.conditions.pwm.elapsedSamples, 48_128);
+  assert.equal(afterSwitch.monitorSource, "pwm");
+  assert.equal(second.audioMonitor, second.conditions.pwm.audioMonitor);
+});
+
+test("shared comparison settings configure both conditions without cross-coupling their source", () => {
+  const engine = createLedLabComparisonEngine();
+  const snapshot = engine.configure({
+    rateHz: 48_000,
+    pulseWidthMs: 2,
+    targetCurrent: 0.4,
+  });
+
+  assert.equal(snapshot.conditions.poisson.source, "poisson");
+  assert.equal(snapshot.conditions.pwm.source, "pwm");
+  for (const condition of Object.values(snapshot.conditions)) {
+    assert.equal(condition.rateHz, 48_000);
+    assert.equal(condition.targetCurrent, 0.4);
+  }
+  assert.equal(snapshot.conditions.poisson.pulseWidthMs, 2);
 });

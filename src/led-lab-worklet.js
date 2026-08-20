@@ -1,25 +1,40 @@
-import { createPoissonLedLabEngine } from "./led-current-engine.js";
+import { createLedLabComparisonEngine } from "./led-lab-comparison-engine.js";
 
 const REPORT_FRAMES = 768;
 const CHANNEL_COUNT = 8;
+const CONDITION_NAMES = ["poisson", "pwm"];
+
+function createAccumulator() {
+  return {
+    events: 0,
+    nearLimit: 0,
+    currentSum: new Float64Array(CHANNEL_COUNT + 1),
+    currentEnergy: new Float64Array(CHANNEL_COUNT + 1),
+    currentPeak: new Float64Array(CHANNEL_COUNT + 1),
+    scopeSamples: [],
+    audioScopeSamples: [],
+    eventKind: "",
+  };
+}
 
 class PoissonLedLabProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
-    this.engine = createPoissonLedLabEngine({
+    this.engine = createLedLabComparisonEngine({
       ...options.processorOptions,
       sampleRate,
     });
     this.running = true;
     this.reportSamples = 0;
-    this.reportArrivals = 0;
-    this.reportNearLimit = 0;
-    this.currentSum = new Float64Array(CHANNEL_COUNT + 1);
-    this.currentEnergy = new Float64Array(CHANNEL_COUNT + 1);
-    this.currentPeak = new Float64Array(CHANNEL_COUNT + 1);
-    this.scopeSamples = [];
+    this.accumulators = Object.fromEntries(
+      CONDITION_NAMES.map(name => [name, createAccumulator()]),
+    );
     this.port.onmessage = ({ data }) => {
-      if (data?.type === "configure") this.engine.configure(data.settings);
+      if (data?.type === "configure") {
+        const before = this.engine.snapshot().monitorSource;
+        const next = this.engine.configure(data.settings);
+        if (next.monitorSource !== before) this.resetReport();
+      }
       if (data?.type === "reset") {
         this.engine.reset();
         this.resetReport();
@@ -30,54 +45,68 @@ class PoissonLedLabProcessor extends AudioWorkletProcessor {
 
   resetReport() {
     this.reportSamples = 0;
-    this.reportArrivals = 0;
-    this.reportNearLimit = 0;
-    this.currentSum.fill(0);
-    this.currentEnergy.fill(0);
-    this.currentPeak.fill(0);
-    this.scopeSamples = [];
+    this.accumulators = Object.fromEntries(
+      CONDITION_NAMES.map(name => [name, createAccumulator()]),
+    );
   }
 
-  accumulate(block) {
+  accumulateCondition(accumulator, block) {
     const length = block.fusedCurrent.length;
     for (let sample = 0; sample < length; sample += 1) {
-      let fused = block.fusedCurrent[sample];
+      const fused = block.fusedCurrent[sample];
       for (let channel = 0; channel < CHANNEL_COUNT; channel += 1) {
         const current = block.currentChannels[channel][sample];
-        this.currentSum[channel] += current;
-        this.currentEnergy[channel] += current * current;
-        this.currentPeak[channel] = Math.max(this.currentPeak[channel], current);
+        accumulator.currentSum[channel] += current;
+        accumulator.currentEnergy[channel] += current * current;
+        accumulator.currentPeak[channel] = Math.max(accumulator.currentPeak[channel], current);
       }
-      this.currentSum[CHANNEL_COUNT] += fused;
-      this.currentEnergy[CHANNEL_COUNT] += fused * fused;
-      this.currentPeak[CHANNEL_COUNT] = Math.max(this.currentPeak[CHANNEL_COUNT], fused);
-      this.scopeSamples.push(fused);
+      accumulator.currentSum[CHANNEL_COUNT] += fused;
+      accumulator.currentEnergy[CHANNEL_COUNT] += fused * fused;
+      accumulator.currentPeak[CHANNEL_COUNT] = Math.max(accumulator.currentPeak[CHANNEL_COUNT], fused);
+      accumulator.scopeSamples.push(fused);
+      accumulator.audioScopeSamples.push(block.audioMonitor[sample]);
     }
-    this.reportSamples += length;
-    this.reportArrivals += block.arrivalCount;
-    this.reportNearLimit += block.nearLimitSamples;
+    accumulator.events += block.eventCount;
+    accumulator.eventKind = block.eventKind;
+    accumulator.nearLimit += block.nearLimitSamples;
+  }
+
+  summarizeCondition(name, sampleCount) {
+    const accumulator = this.accumulators[name];
+    const levels = Array.from(accumulator.currentSum, sum => sum / sampleCount);
+    const modulationRms = Array.from(
+      accumulator.currentEnergy,
+      (energy, index) => Math.sqrt(Math.max(0, energy / sampleCount - levels[index] ** 2)),
+    );
+    return {
+      levels,
+      modulationRms,
+      peaks: Array.from(accumulator.currentPeak),
+      eventCount: accumulator.events,
+      eventKind: accumulator.eventKind,
+      nearLimitFraction: accumulator.nearLimit / (sampleCount * CHANNEL_COUNT),
+      scope: Float32Array.from(accumulator.scopeSamples),
+      audioScope: Float32Array.from(accumulator.audioScopeSamples),
+    };
   }
 
   publishReport() {
     if (this.reportSamples < REPORT_FRAMES) return;
-    const sampleCount = this.reportSamples;
-    const levels = Array.from(this.currentSum, sum => sum / sampleCount);
-    const modulationRms = Array.from(
-      this.currentEnergy,
-      (energy, index) => Math.sqrt(Math.max(0, energy / sampleCount - levels[index] ** 2)),
+    const snapshot = this.engine.snapshot();
+    const conditions = Object.fromEntries(
+      CONDITION_NAMES.map(name => [name, this.summarizeCondition(name, this.reportSamples)]),
     );
-    const scope = Float32Array.from(this.scopeSamples);
+    const transfers = CONDITION_NAMES.flatMap(name => [
+      conditions[name].scope.buffer,
+      conditions[name].audioScope.buffer,
+    ]);
     this.port.postMessage({
       type: "current-frame",
-      levels,
-      modulationRms,
-      peaks: Array.from(this.currentPeak),
-      arrivalCount: this.reportArrivals,
-      sampleCount,
-      nearLimitFraction: this.reportNearLimit / (sampleCount * CHANNEL_COUNT),
-      scope,
-      engine: this.engine.snapshot(),
-    }, [scope.buffer]);
+      sampleCount: this.reportSamples,
+      monitorSource: snapshot.monitorSource,
+      conditions,
+      engine: snapshot,
+    }, transfers);
     this.resetReport();
   }
 
@@ -87,7 +116,10 @@ class PoissonLedLabProcessor extends AudioWorkletProcessor {
     const frameCount = output[0]?.length ?? 128;
     const block = this.engine.render(frameCount);
     for (const channel of output) channel.set(block.audioMonitor);
-    this.accumulate(block);
+    for (const name of CONDITION_NAMES) {
+      this.accumulateCondition(this.accumulators[name], block.conditions[name]);
+    }
+    this.reportSamples += frameCount;
     this.publishReport();
     return true;
   }

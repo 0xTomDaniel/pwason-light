@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Interactive specification for a current-first, eight-channel Poisson LED experiment with a fused white monitor.">
+  <meta name="description" content="Interactive specification for parallel nine-output Poisson and PWM LED current experiments with a selectable monitor.">
   <title>Poisson LED Lab — Current-First Specification</title>
   <script defer src="./.viz/runtime.js"></script>
   <style>
@@ -116,6 +116,11 @@
       text-transform: uppercase;
     }
     .signal-path strong { color: #b6c7be; font-weight: 600; }
+    .condition-bank + .condition-bank { margin-top: 34px; padding-top: 30px; border-top: 1px solid #26342f; }
+    .condition-head { display: flex; justify-content: space-between; gap: 18px; align-items: baseline; margin-bottom: 16px; }
+    .condition-head strong { color: #dce9d8; font: 800 .68rem var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+    .condition-head span { color: #6f8076; font: .56rem var(--mono); }
+    [data-condition-bank="pwm"] .condition-head strong { color: var(--cyan); }
     .led-bank { display: grid; grid-template-columns: repeat(9, minmax(54px, 1fr)); gap: clamp(6px, 1vw, 13px); }
     .channel { min-width: 0; text-align: center; }
     .led-shell {
@@ -163,6 +168,18 @@
     .controls { display: flex; flex-direction: column; gap: 24px; padding: 28px 23px; border-left: 1px solid var(--line); background: rgba(3,7,6,.5); }
     .control label, .switch-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 9px; color: #b8c5bc; font: 700 .64rem var(--mono); letter-spacing: .07em; text-transform: uppercase; }
     .control output { color: var(--signal); text-align: right; }
+    .control[data-enabled="false"] { opacity: .42; }
+    .control[data-enabled="false"] input { cursor: not-allowed; }
+    .source-control { padding: 0; border: 0; margin: 0; }
+    .source-control legend { margin-bottom: 9px; color: #b8c5bc; font: 700 .64rem var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+    .source-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; padding: 1px; background: #40514a; }
+    .source-tabs label { position: relative; cursor: pointer; }
+    .source-tabs input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .source-tabs span { display: block; padding: 11px 8px; color: #7f8f86; background: #0a100e; font: 800 .61rem var(--mono); letter-spacing: .08em; text-align: center; text-transform: uppercase; }
+    .source-tabs input:checked + span { color: #0b120c; background: var(--signal); }
+    .source-tabs input:focus-visible + span { outline: 2px solid #f0ffbd; outline-offset: -2px; }
+    .control-note { margin: 8px 0 0; color: #6f8076; font: .55rem/1.45 var(--mono); }
+    #pwm-frequency-output { color: var(--cyan); }
     input[type="range"] { width: 100%; height: 4px; appearance: none; border-radius: 0; background: #35433e; accent-color: var(--signal); }
     input[type="range"]::-webkit-slider-thumb { width: 14px; height: 22px; appearance: none; border: 1px solid #e0e9d9; border-radius: 1px; background: #839985; box-shadow: 0 2px 10px #000; }
     .range-ends { display: flex; justify-content: space-between; margin-top: 7px; color: #65736b; font: .55rem var(--mono); text-transform: uppercase; }
@@ -173,7 +190,7 @@
     .log-ticks span:first-child::before { left: 0; }
     .log-ticks span:last-child { transform: translateX(-100%); }
     .log-ticks span:last-child::before { right: 0; left: auto; }
-    #channel-rate-output { display: block; margin-top: 8px; color: #7d9185; font: .56rem var(--mono); }
+    #channel-rate-output, #pwm-frequency-output { display: block; margin-top: 8px; color: #7d9185; font: .56rem var(--mono); }
     .switch-label { align-items: center; margin: 0; cursor: pointer; }
     .switch-label input { width: 36px; height: 20px; accent-color: var(--signal); }
     .audio-note { margin: -12px 0 0; color: #6c7b72; font: .58rem/1.48 var(--mono); }
@@ -226,11 +243,11 @@
 
     <header class="hero">
       <div>
-        <p class="eyebrow">LED current laboratory · no acoustic source model</p>
+        <p class="eyebrow">Poisson hypothesis · matched PWM control · no acoustic source model</p>
         <h1>Watch the current converge.</h1>
       </div>
       <div class="hero-copy">
-        <p>This isolated bench asks one question: when a steady Poisson field drives bounded positive current, how quickly does stochastic modulation become perceptually continuous?</p>
+        <p>This isolated bench asks one question: when a steady Poisson field drives bounded positive current, how quickly does stochastic modulation become perceptually continuous relative to conventional PWM?</p>
       </div>
     </header>
 
@@ -246,17 +263,19 @@
 
     <section id="experiment" class="instrument" data-led-lab data-running="false" aria-label="Interactive Poisson LED current laboratory">
       <div class="instrument-head">
-        <span class="status">Poisson current field</span>
+        <span class="status">Parallel current comparison</span>
         <output id="engine-status">Stopped · zero current</output>
       </div>
       <div class="bench">
         <div class="display-deck">
           <div class="signal-path">
-            <strong>Optical: Poisson Arrivals → positive current → virtual LEDs</strong>
-            <span>Monitor: current → DC blocker → output level → mono speakers</span>
+            <strong>Optical: Poisson + PWM → two independent virtual LED banks</strong>
+            <span>Monitor: selected Aggregate White → DC blocker → output level → mono speakers</span>
           </div>
 
-          <div class="led-bank" aria-label="Eight current Channels and Aggregate White">
+          <div class="condition-bank" data-condition-bank="poisson">
+            <div class="condition-head"><strong>Poisson experiment</strong><span>stochastic Arrivals · exponential current fall</span></div>
+            <div class="led-bank" aria-label="Poisson eight current Channels and Aggregate White">
             <div class="channel">
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#9867ff"></div></div>
               <strong>Violet</strong><span>400–420 nm</span><output data-current-value>0.0% mean</output>
@@ -293,10 +312,53 @@
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#f6fff0"></div></div>
               <strong>White Σ</strong><span>normalized mean of eight Channels</span><output data-current-value>0.0% mean</output>
             </div>
+            </div>
+          </div>
+
+          <div class="condition-bank" data-condition-bank="pwm">
+            <div class="condition-head"><strong>PWM control</strong><span>periodic · binary current · phase aligned</span></div>
+            <div class="led-bank" aria-label="PWM eight current Channels and Aggregate White">
+              <div class="channel">
+                <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#9867ff"></div></div>
+                <strong>Violet</strong><span>400–420 nm</span><output data-current-value>0.0% mean</output>
+              </div>
+              <div class="channel">
+                <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#2e66ff"></div></div>
+                <strong>Royal Blue</strong><span>~455 nm</span><output data-current-value>0.0% mean</output>
+              </div>
+              <div class="channel">
+                <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#28e5ed"></div></div>
+                <strong>Cyan</strong><span>~502 nm</span><output data-current-value>0.0% mean</output>
+              </div>
+              <div class="channel">
+                <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#38e66d"></div></div>
+                <strong>Green</strong><span>~525 nm</span><output data-current-value>0.0% mean</output>
+              </div>
+              <div class="channel">
+                <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#b8ef53"></div></div>
+                <strong>PC Lime</strong><span>phosphor</span><output data-current-value>0.0% mean</output>
+              </div>
+              <div class="channel">
+                <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#ffac43"></div></div>
+                <strong>PC Amber</strong><span>phosphor</span><output data-current-value>0.0% mean</output>
+              </div>
+              <div class="channel">
+                <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#ff4037"></div></div>
+                <strong>Red</strong><span>~625 nm</span><output data-current-value>0.0% mean</output>
+              </div>
+              <div class="channel">
+                <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#bd111d"></div></div>
+                <strong>Deep Red</strong><span>~660 nm</span><output data-current-value>0.0% mean</output>
+              </div>
+              <div class="channel aggregate">
+                <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#f6fff0"></div></div>
+                <strong>White Σ</strong><span>normalized mean of eight Channels</span><output data-current-value>0.0% mean</output>
+              </div>
+            </div>
           </div>
 
           <div class="scope-panel">
-            <div class="scope-head"><strong>Aggregate current · one-second rolling window</strong><span>min/max-preserving display</span></div>
+            <div class="scope-head"><strong>Monitored aggregate current · one-second rolling window</strong><span id="scope-source-output">Poisson · min/max-preserving</span></div>
             <div class="scope-screen">
               <canvas id="current-scope" aria-label="One-second Aggregate White current waveform"></canvas>
               <span class="scope-label">0–100% current · all 48 kHz samples</span>
@@ -306,31 +368,51 @@
               <div class="metric"><span>RMS modulation</span><output id="rms-modulation">0.0%</output></div>
               <div class="metric"><span>Peak current</span><output id="peak-current">0.0%</output></div>
               <div class="metric"><span>Near limit</span><output id="limit-proximity">0.00%</output></div>
-              <div class="metric"><span>Observed arrivals</span><output id="observed-rate">0/s</output></div>
+              <div class="metric"><span id="observed-rate-label">Poisson Arrivals</span><output id="observed-rate">0/s</output></div>
+            </div>
+          </div>
+
+          <div class="scope-panel audio-scope-panel">
+            <div class="scope-head"><strong>Monitored audio AC waveform · one-second rolling window</strong><span id="audio-source-output">Poisson · post-DC · before Output Level</span></div>
+            <div class="scope-screen">
+              <canvas id="audio-scope" aria-label="One-second AC-coupled audio waveform"></canvas>
+              <span class="scope-label">fixed −1 to +1 current units · no visual normalization</span>
             </div>
           </div>
         </div>
 
         <aside class="controls" aria-label="Experiment controls">
+          <fieldset class="source-control">
+            <legend>Monitor source</legend>
+            <div class="source-tabs">
+              <label><input type="radio" name="monitor-source" value="poisson" checked><span>Poisson</span></label>
+              <label><input type="radio" name="monitor-source" value="pwm"><span>PWM control</span></label>
+            </div>
+            <p class="control-note">Both conditions run continuously. This only chooses the scopes, metrics, and audible monitor. PWM frequency = total event rate ÷ eight.</p>
+          </fieldset>
+
           <div class="control">
-            <label for="led-rate"><span>Total arrival rate</span><output id="led-rate-output">1,000 Arrivals/s</output></label>
+            <label for="led-rate"><span>Total event budget</span><output id="led-rate-output">1,000 Arrivals/s</output></label>
             <input id="led-rate" type="range" min="0" max="4.681241237375588" step="any" value="3">
             <div class="log-ticks" aria-hidden="true">
               <span style="--tick:0%">1</span><span style="--tick:21.36%">10</span><span style="--tick:42.72%">100</span><span style="--tick:64.09%">1k</span><span style="--tick:85.45%">10k</span><span style="--tick:100%">48k</span>
             </div>
             <output id="channel-rate-output">125 Hz expected per Channel</output>
+            <output id="pwm-frequency-output">125 Hz per Channel</output>
           </div>
 
-          <div class="control">
+          <div class="control" data-poisson-only data-enabled="true">
             <label for="pulse-width"><span>Current fall time</span><output id="pulse-width-output">4.0 ms</output></label>
             <input id="pulse-width" type="range" min="-1.3010299956639813" max="2" step="0.001" value="0.6020599913279624">
             <div class="range-ends"><span>0.05 ms</span><span>100 ms</span></div>
+            <p class="control-note">Poisson condition only; PWM remains binary.</p>
           </div>
 
           <div class="control">
             <label for="target-current"><span>Target mean current</span><output id="target-current-output">50%</output></label>
             <input id="target-current" type="range" min="1" max="90" step="1" value="50">
             <div class="range-ends"><span>1%</span><span>90%</span></div>
+            <p class="control-note">Target Mean Current becomes PWM duty cycle in the control condition.</p>
           </div>
 
           <label class="switch-label" for="sound-enabled"><span>AC current monitor</span><input id="sound-enabled" type="checkbox" role="switch" checked></label>
@@ -349,21 +431,22 @@
     <section id="problem" class="spec-section">
       <div class="section-head">
         <span class="section-number">01 · Problem statement</span>
-        <div><h2>The optical hypothesis needs its own clean bench.</h2><p class="section-lede">The existing prototype begins with an acoustic waveform and derives light from it. That makes the LED result inseparable from decisions made for sound. This experiment instead needs to reveal what a bounded, positive, steady Poisson current field does before any acoustic interpretation exists.</p></div>
+        <div><h2>The optical hypothesis needs its own clean bench and control.</h2><p class="section-lede">The existing prototype begins with an acoustic waveform and derives light from it. That makes the LED result inseparable from decisions made for sound. This experiment instead reveals what a bounded, positive, steady Poisson current field does before acoustic interpretation and compares it with a conventional deterministic PWM condition.</p></div>
       </div>
       <div class="card-grid">
         <article class="card"><h3>Current lacks authority</h3><p>An audio-first path allows an acoustic decision to change the LED waveform. The optical experiment cannot then distinguish Poisson behavior from source-model behavior.</p></article>
         <article class="card"><h3>Rate is easily misread</h3><p>Speed must continue to mean one total lamp rate. At the maximum, 48,000 Arrivals/s total becomes an expected 6,000 Arrivals/s per Channel—not 48 kHz on every Channel.</p></article>
         <article class="card"><h3>A monitor can hide convergence</h3><p>Automatic level matching would keep high-density modulation loud even as the current becomes steadier. The monitor must preserve the current’s changing AC magnitude.</p></article>
+        <article class="card"><h3>No control condition</h3><p>Without a rate- and mean-matched PWM baseline, the experiment cannot distinguish a Poisson-specific result from ordinary high-frequency visual integration.</p></article>
       </div>
     </section>
 
     <section id="solution" class="spec-section">
       <div class="section-head">
         <span class="section-number">02 · Solution</span>
-        <div><h2>Generate positive current, then listen to what remains after DC.</h2><p class="section-lede">One homogeneous Poisson clock emits exact Arrivals. Uniform marking splits them into eight independent Channel streams. Each Arrival injects the same nonnegative current response; higher density reduces charge per Arrival so selected mean current stays comparable. Aggregate White is the normalized fused monitor.</p></div>
+        <div><h2>Run stochastic current beside a periodic control, then choose what to monitor.</h2><p class="section-lede">Poisson emits exact Arrivals and uniformly marks one of eight Channels. PWM drives all eight Channels in phase at Λ/8 cycles/s. Both conditions advance continuously from the same Total Event Budget and Target Mean Current. Separate LED banks remain visible while Monitor Source selects only the diagnostics, scopes, and direct AC Current Monitor.</p></div>
       </div>
-      <div class="equation">λᵢ = Λ / 8<br>Iᵢ(t) = smooth-limit(Σⱼ q(Λ, τ, Ī) · exp(−(t − tᵢⱼ)/τ))<br>Iwhite(t) = (1/8) Σᵢ Iᵢ(t)<br>audio(t) = DCBlock₂Hz(Iwhite(t))</div>
+      <div class="equation">Poisson: λᵢ = Λ / 8; Iᵢ(t) = smooth-limit(Σⱼ q(Λ, τ, Ī) · exp(−(t − tᵢⱼ)/τ))<br>PWM control: fPWM = Λ / 8; duty = Ī; I₁(t) = … = I₈(t) ∈ {0, 1}<br>Both: Iwhite(t) = (1/8) Σᵢ Iᵢ(t); audio(t) = DCBlock₂Hz(Iwhite(t))</div>
     </section>
 
     <section id="stories" class="spec-section">
@@ -373,6 +456,9 @@
       </div>
       <ol class="story-list">
         <li>As an experimenter, I want to sweep one logarithmic total rate from 1 through 48 kHz, so that sparse flashes and dense convergence occupy one continuous control.</li>
+        <li>As an experimenter, I want a PWM Control with the same total event budget, so that the Poisson hypothesis has a conventional deterministic baseline.</li>
+        <li>As an experimenter, I want both conditions to run simultaneously in separate LED banks, so that changing the monitored source cannot substitute a later trial for a parallel control.</li>
+        <li>As an experimenter, I want PWM Channels phase-aligned, so that hidden phase staggering cannot artificially flatten Aggregate White.</li>
         <li>As an experimenter, I want every Arrival assigned uniformly to exactly one of eight Channels, so that Channel count does not multiply the lamp’s selected event rate.</li>
         <li>As an experimenter, I want a ninth white monitor formed from all eight currents, so that I can inspect the complete field without inventing a ninth stream.</li>
         <li>As an experimenter, I want average current held approximately constant as Speed changes, so that increasing brightness or saturation cannot masquerade as convergence.</li>
@@ -381,6 +467,7 @@
         <li>As an experimenter, I want fixed monitor gain, so that genuinely diminishing modulation is allowed to become quiet.</li>
         <li>As an experimenter, I want each virtual LED to show the arithmetic mean of every current sample in its display interval, so that no Arrival is silently discarded.</li>
         <li>As an experimenter, I want a one-second min/max-preserving scope, so that sub-frame current structure remains visible even though the DOM LEDs update at monitor refresh rate.</li>
+        <li>As an experimenter, I want a separate fixed-scale audio oscilloscope, so that I can inspect the exact DC-to-AC conversion without normalization disguising its magnitude.</li>
         <li>As an experimenter, I want mean, RMS modulation, peak, limiter proximity, and observed rate together, so that I can distinguish convergence from clipping or missed events.</li>
         <li>As an experimenter, I want Stop to force zero sound and zero current immediately, so that stopped state is unambiguous.</li>
         <li>As a future hardware designer, I want the browser’s display-refresh limitation stated plainly, so that this page is not mistaken for a physical flicker-perception test.</li>
@@ -390,17 +477,20 @@
     <section id="decisions" class="spec-section">
       <div class="section-head">
         <span class="section-number">04 · Implementation decisions</span>
-        <div><h2>One deep Module owns the complete signal contract.</h2><p class="section-lede">The Poisson LED Lab Engine Interface is the sole behavioral seam. The worklet adapts rendered blocks to audio and diagnostic messages; the page adapts those messages to pixels and controls.</p></div>
+        <div><h2>One comparison Module owns the complete signal contract.</h2><p class="section-lede">The Poisson LED Lab Engine Interface advances two fixed-source condition engines from shared settings and exposes one monitor choice. The worklet adapts both rendered blocks to audio and diagnostic messages; the page adapts those messages to two LED banks, pixels, and controls.</p></div>
       </div>
       <div class="card-grid">
         <article class="card"><h3>Exact timing</h3><p>Inter-arrival gaps are exponentially distributed. Multiple Arrivals may occur inside one 48 kHz sample interval and each contributes independently; sample coincidence never merges event identity or energy.</p></article>
+        <article class="card"><h3>Matched PWM control</h3><p>Every PWM Channel uses one shared phase, binary 0/100% current, frequency Λ/8, and duty equal to Target Mean Current. The eight rising-edge counts therefore sum to Λ. It advances beside Poisson and ignores Current Fall Time because that control belongs only to Poisson Current Responses.</p></article>
+        <article class="card"><h3>Monitor, not switch</h3><p>Monitor Source selects which completed condition block feeds the scopes, metrics, and audio output. It does not start, stop, reset, or reconfigure either condition.</p></article>
         <article class="card"><h3>Uniform routing</h3><p>Every Arrival receives one uniform Channel mark. Poisson splitting gives eight independent streams with expected rate Λ/8 and preserves Λ as the total lamp rate.</p></article>
         <article class="card"><h3>Positive response</h3><p>An Arrival injects a positive exponential current response with selectable fall time τ. There are no spectral, spatial, acoustic, or event-morphology marks.</p></article>
         <article class="card"><h3>Mean-held charge</h3><p>Event charge varies inversely with expected Channel rate and response duration. At high overlap, the smooth limiter’s expected output approaches Target Mean Current. Sparse bounded pulses cannot always reach that target and must report their actual mean honestly.</p></article>
         <article class="card"><h3>Smooth limit</h3><p>Raw positive shot current maps through u/(1+u). The current remains continuous in value, nonnegative, and below 100%, without a hard clipping plateau.</p></article>
         <article class="card"><h3>White fusion</h3><p>Aggregate White equals the arithmetic mean of the eight instantaneous Channel currents. It has no Arrivals, response state, or independent gain of its own.</p></article>
         <article class="card"><h3>Direct sound monitor</h3><p>A standard first-order 2 Hz DC blocker converts fused current to a signed AC signal. The only later operation is the explicit user-controlled output level. The signal is copied equally to both speakers.</p></article>
-        <article class="card"><h3>Frame integration</h3><p>Every worklet sample contributes to the arithmetic mean displayed by each DOM LED. Measurements are diagnostic views, not selectable rendering modes. The scope uses per-pixel minima and maxima to retain excursions.</p></article>
+        <article class="card"><h3>Dual oscilloscopes</h3><p>The Current Oscilloscope uses a fixed 0–100% scale. The Audio Oscilloscope plots the exact post-blocker, pre-volume samples on a fixed −1 to +1 current-unit scale with a zero line. Both preserve per-pixel minima and maxima and perform no visual normalization.</p></article>
+        <article class="card"><h3>Frame integration</h3><p>Every worklet sample contributes to the arithmetic mean displayed by each DOM LED. Measurements and oscilloscopes are diagnostic views, not selectable rendering modes.</p></article>
         <article class="card"><h3>Isolation</h3><p>This standalone file and its Modules do not call, configure, or revise the existing generated-audio path. The two experiments share only durable domain definitions for Arrival, Channel, Speed, and Aggregate White.</p></article>
       </div>
     </section>
@@ -415,8 +505,9 @@
         <article class="card"><h3>Signal evidence</h3><p>Every Channel sample remains in [0,1), Aggregate White equals the exact sample mean, and the audio output satisfies the declared DC-block recurrence with no hidden transformation.</p></article>
         <article class="card"><h3>Continuity evidence</h3><p>One render and arbitrarily partitioned renders must return identical Channel current, fused current, and audio samples for the same seed and settings.</p></article>
         <article class="card"><h3>Rate evidence</h3><p>The maximum clamps to 48,000 total Arrivals/s and reports 6,000 expected Arrivals/s per Channel. Dense current must show lower RMS modulation than a tenfold slower field at the same target and fall time.</p></article>
-        <article class="card"><h3>Display evidence</h3><p>The page exposes nine accessible meters, exact total/per-Channel language, the fixed frame-mean rule, the current diagnostics, and one explicit sound-monitor switch.</p></article>
-        <article class="card"><h3>Browser evidence</h3><p>Start must produce changing current, rate changes must not restart the page, sound disable must leave LEDs running, Stop must darken all meters, and the console and worklet must remain error-free at 48 kHz.</p></article>
+        <article class="card"><h3>PWM evidence</h3><p>At an 8,000/s total event budget and 25% target, every Channel must produce the same binary 1 kHz waveform, exactly 1,000 rising edges/s, 25% mean current, and 8,000 combined edges/s. Both conditions must satisfy the same DC-block recurrence.</p></article>
+        <article class="card"><h3>Display evidence</h3><p>The page exposes eighteen accessible meters in two labeled condition banks, one accessible monitor selector, exact total/per-Channel language, the fixed frame-mean rule, both fixed-scale oscilloscopes, current diagnostics, and one explicit sound-monitor switch.</p></article>
+        <article class="card"><h3>Browser evidence</h3><p>Start must animate both banks, Monitor Source and shared-control changes must not restart either condition, sound disable must leave all LEDs running, Stop must darken all eighteen meters, and the console and worklet must remain error-free at 48 kHz.</p></article>
       </div>
     </section>
 
@@ -435,11 +526,11 @@
     <section class="spec-section">
       <div class="section-head">
         <span class="section-number">07 · Further notes</span>
-        <div><h2>The virtual LEDs integrate; the scope remembers.</h2><p class="section-lede">A typical display cannot emit the worklet’s 48 kHz optical waveform. Its LED circles therefore report one honest exposure-like frame mean. The adjacent current scope and statistics carry the evidence lost to refresh-rate integration. A future physical build must repeat the experiment with a measured current driver and photodiode before any claim about imperceptible modulation is accepted.</p></div>
+        <div><h2>The virtual LEDs integrate; both scopes remember.</h2><p class="section-lede">A typical display cannot emit the worklet’s 48 kHz optical waveform. Its LED circles therefore report one honest exposure-like frame mean. The fixed-scale Current and Audio Oscilloscopes carry the DC and AC evidence lost to refresh-rate integration. PWM is a scientific comparison condition, not the planned hardware decision. A future physical build must repeat both conditions with a measured current driver and photodiode before any claim about imperceptible modulation is accepted.</p></div>
       </div>
     </section>
 
-    <footer><span>Poisson LED Lab · Standalone interactive specification</span><span>Draft 0.1 · 20 August 2026</span></footer>
+    <footer><span>Poisson LED Lab · Standalone interactive specification</span><span>Draft 0.2 · 20 August 2026</span></footer>
   </main>
   <script type="module" src="../../src/led-lab-app.js"></script>
 </body>
