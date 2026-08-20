@@ -17,7 +17,7 @@ The standalone current-first comparison Module that owns simultaneous Steady Poi
 _Avoid_: Rain renderer, audio-to-light adapter, mixed acoustic source
 
 **PWM Control**:
-The deterministic scientific control condition that runs continuously beside Poisson in the LED lab. Every Channel receives the same phase-aligned waveform at frequency `Λ/8`, so eight cycle counts sum to the selected total event budget `Λ`. PWM On Current sets its positive on-state current and duty is derived as `Target Mean Current / PWM On Current`, preserving the shared commanded mean. At the On Current minimum, duty is 100% and the output becomes continuous reduced current; at exactly 100% Target Mean Current it is full DC. Phase and cycle accounting continue in both cases. Current Fall Time is ignored. The bank exposes commanded mean, On Current, and duty separately from each LED's Frame-Mean Current. A separate nine-LED bank and fixed-scale current scope always display it; Monitor Source only chooses which condition feeds selected metrics, commanded-mean subtraction, Monitor Gain, and the Audio Oscilloscope.
+The deterministic scientific control condition that runs continuously beside Poisson in the LED lab. Every Channel receives the same phase-aligned waveform at frequency `Λ/8`, so eight cycle counts sum to the selected total event budget `Λ`. PWM On Current sets its positive on-state current and duty is derived as `Target Mean Current / PWM On Current`, preserving the shared commanded mean. At the On Current minimum, duty is 100% and the output becomes continuous reduced current; at exactly 100% Target Mean Current it is full DC. Phase and cycle accounting continue in both cases. Current Fall Time is ignored. The bank exposes commanded mean, On Current, duty, and PWM LED Presentation. A separate nine-LED bank and fixed-scale current scope always display it; Monitor Source only chooses which condition feeds selected metrics, commanded-mean subtraction, Monitor Gain, and the Audio Oscilloscope.
 _Avoid_: Poisson approximation, audio oscillator, staggered aggregate smoothing
 
 **PWM On Current**:
@@ -57,8 +57,16 @@ The fixed post-worklet listening-only factor applied after selecting a continuou
 _Avoid_: Automatic loudness matching, current scaling, source-dependent optical gain
 
 **Frame-Mean Current**:
-The single virtual-LED display rule in the standalone LED lab: the arithmetic mean of every worklet-rate current sample in one display interval. Other reported statistics are diagnostics rather than selectable drive modes. Two simultaneous fixed-scale Current Oscilloscopes and one selected-source Audio Oscilloscope retain within-frame excursions without visual normalization.
-_Avoid_: Downsampled event, peak brightness mode, physical flicker proof
+The Poisson virtual-LED display value equal to the arithmetic mean of every worklet-rate current sample in one report interval. It preserves every sample while allowing the frame-limited DOM to show stochastic convergence. It is not used by the PWM bank because a fixed report window can manufacture beat modulation when it contains a fractional number of PWM cycles. Two simultaneous fixed-scale Current Oscilloscopes and one selected-source Audio Oscilloscope retain within-report excursions without visual normalization.
+_Avoid_: PWM presentation, downsampled event, peak brightness mode, physical flicker proof
+
+**PWM LED Presentation**:
+The display-only, refresh-aware interpretation of PWM Control on the nine virtual PWM LEDs. The presentation measures browser animation-frame cadence, normalizes fractional timing such as 59.94 Hz, accepts a higher display capability only after repeated observations, and latches that capability for the run so dropped frames cannot demote it. Its resolved-quality ceiling is `min(15 Hz, display refresh / 4)`, requiring four browser frames per cycle and capping resolved eight-Channel display at 120 total events/s. Below 70% of that ceiling it shows presentation-phase On Current or zero; through the final 30% it progressively blends those currents toward the complete-cycle mean; at and above the ceiling it emits exact `PWM On Current × duty`. It exposes Resolved, Transition, or Integrated mode and measured refresh, applies no CSS brightness transition, and never changes or feeds back into current samples, Current Oscilloscopes, metrics, audio, or hardware requirements.
+_Avoid_: PWM current source, fixed report-window mean, camera simulator, optical low-pass filter
+
+**LED Display Transfer**:
+The shared virtual-disc Adapter from bounded linear current evidence to approximate sRGB display code, `D(I) = I^(1/2.2)`. It makes an integrated current level target the same average screen luminance as the corresponding resolved on/off duty. Both Poisson and PWM banks use it, while accessible meters, engine output, scopes, metrics, and audio remain linear current. It is display calibration only and cannot feed back into either signal.
+_Avoid_: optical gamma, current correction, engine gain, perceptual normalization
 
 **Scope Timebase**:
 The shared diagnostic window for the standalone LED lab's two Current Oscilloscopes and selected-source Audio Oscilloscope, selectable as 1 s, 100 ms, 10 ms, or 1 ms and defaulting to 10 ms. It changes only retained and displayed history. Connected per-pixel minimum and maximum envelopes preserve sustained same-sign plateaus as visible horizontal traces and preserve unresolved excursions as a bounded band without modifying, normalizing, or feeding back into either condition.

@@ -119,8 +119,10 @@
     .condition-bank + .condition-bank { margin-top: 34px; padding-top: 30px; border-top: 1px solid #26342f; }
     .condition-head { display: flex; justify-content: space-between; gap: 18px; align-items: baseline; margin-bottom: 16px; }
     .condition-head strong { color: #dce9d8; font: 800 .68rem var(--mono); letter-spacing: .12em; text-transform: uppercase; }
-    .condition-head span { color: #6f8076; font: .56rem var(--mono); }
+    .condition-head span { color: #6f8076; font: .56rem var(--mono); text-align: right; }
     [data-condition-bank="pwm"] .condition-head strong { color: var(--cyan); }
+    #pwm-led-presentation-output { display: block; margin-top: 3px; color: var(--cyan); }
+    .presentation-note { margin: -9px 0 16px; color: #718078; font: .54rem/1.5 var(--mono); }
     .led-bank { display: grid; grid-template-columns: repeat(9, minmax(54px, 1fr)); gap: clamp(6px, 1vw, 13px); }
     .channel { min-width: 0; text-align: center; }
     .led-shell {
@@ -147,7 +149,6 @@
         0 0 calc(var(--level) * 36px) color-mix(in srgb, var(--led-color) calc(var(--level) * 94%), transparent),
         0 0 calc(var(--level) * 76px) color-mix(in srgb, var(--led-color) calc(var(--level) * 55%), transparent),
         inset 0 0 calc(8px + var(--level) * 22px) rgba(255,255,255,calc(var(--level) * .38));
-      transition: background 32ms linear, box-shadow 32ms linear;
     }
     .channel strong { display: block; overflow: hidden; margin-bottom: 2px; font: 700 clamp(.54rem, .9vw, .67rem) var(--mono); letter-spacing: .05em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
     .channel > span { color: #69776f; font: .58rem var(--mono); }
@@ -262,7 +263,7 @@
 </head>
 <body>
   <main>
-    <div class="topline"><span>Pwason Light · Experimental branch</span><span>Current-first / Draft 0.5</span></div>
+    <div class="topline"><span>Pwason Light · Experimental branch</span><span>Current-first / Draft 0.8</span></div>
 
     <header class="hero">
       <div>
@@ -339,44 +340,45 @@
             </div>
           </div>
 
-          <div class="condition-bank" data-condition-bank="pwm">
-            <div class="condition-head"><strong>PWM control</strong><span>periodic · phase aligned · <output data-condition-target="pwm">50% mean · 100% pulse · 50% duty</output></span></div>
+          <div class="condition-bank" data-condition-bank="pwm" data-presentation-mode="integrated">
+            <div class="condition-head"><strong>PWM control</strong><span>periodic · phase aligned · <output data-condition-target="pwm">50% mean · 100% on · 50% duty</output><output id="pwm-led-presentation-output">Integrated · measuring display refresh</output></span></div>
+            <p class="presentation-note">Resolved below the four-frame quality limit; Transition through its final 30%; Integrated at ≥15 Hz per Channel (≥120 total). Disc brightness is display-transfer compensated; the scope retains exact linear current.</p>
             <div class="led-bank" aria-label="PWM eight current Channels and Aggregate White">
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#9867ff"></div></div>
-                <strong>Violet</strong><span>400–420 nm</span><output data-current-value>0.0% frame mean</output>
+                <strong>Violet</strong><span>400–420 nm</span><output data-current-value>0.0% presentation</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#2e66ff"></div></div>
-                <strong>Royal Blue</strong><span>~455 nm</span><output data-current-value>0.0% frame mean</output>
+                <strong>Royal Blue</strong><span>~455 nm</span><output data-current-value>0.0% presentation</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#28e5ed"></div></div>
-                <strong>Cyan</strong><span>~502 nm</span><output data-current-value>0.0% frame mean</output>
+                <strong>Cyan</strong><span>~502 nm</span><output data-current-value>0.0% presentation</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#38e66d"></div></div>
-                <strong>Green</strong><span>~525 nm</span><output data-current-value>0.0% frame mean</output>
+                <strong>Green</strong><span>~525 nm</span><output data-current-value>0.0% presentation</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#b8ef53"></div></div>
-                <strong>PC Lime</strong><span>phosphor</span><output data-current-value>0.0% frame mean</output>
+                <strong>PC Lime</strong><span>phosphor</span><output data-current-value>0.0% presentation</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#ffac43"></div></div>
-                <strong>PC Amber</strong><span>phosphor</span><output data-current-value>0.0% frame mean</output>
+                <strong>PC Amber</strong><span>phosphor</span><output data-current-value>0.0% presentation</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#ff4037"></div></div>
-                <strong>Red</strong><span>~625 nm</span><output data-current-value>0.0% frame mean</output>
+                <strong>Red</strong><span>~625 nm</span><output data-current-value>0.0% presentation</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#bd111d"></div></div>
-                <strong>Deep Red</strong><span>~660 nm</span><output data-current-value>0.0% frame mean</output>
+                <strong>Deep Red</strong><span>~660 nm</span><output data-current-value>0.0% presentation</output>
               </div>
               <div class="channel aggregate">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#f6fff0"></div></div>
-                <strong>White Σ</strong><span>normalized mean of eight Channels</span><output data-current-value>0.0% frame mean</output>
+                <strong>White Σ</strong><span>normalized mean of eight Channels</span><output data-current-value>0.0% presentation</output>
               </div>
             </div>
           </div>
@@ -498,13 +500,14 @@
         <article class="card"><h3>Rate is easily misread</h3><p>Speed must continue to mean one total lamp rate. At the maximum, 48,000 Arrivals/s total becomes an expected 6,000 Arrivals/s per Channel—not 48 kHz on every Channel.</p></article>
         <article class="card"><h3>A monitor can hide convergence</h3><p>Automatic level matching would keep high-density modulation loud even as the current becomes steadier. The monitor must preserve the current’s changing AC magnitude.</p></article>
         <article class="card"><h3>No control condition</h3><p>Without a rate- and mean-matched PWM baseline, the experiment cannot distinguish a Poisson-specific result from ordinary high-frequency visual integration.</p></article>
+        <article class="card"><h3>Report windows create false beats</h3><p>A fixed 768-sample display average updates at 62.5 Hz. Unless Λ is a multiple of 500, that window contains a fractional number of PWM cycles, so its average oscillates before the browser resamples it again at the display refresh. Variable-refresh browsers can also alternate full and dropped animation frames, making a naïve refresh estimate jump between 60 and 120 Hz. The resulting meta-flicker is a presentation artefact, not PWM current.</p></article>
       </div>
     </section>
 
     <section id="solution" class="spec-section">
       <div class="section-head">
         <span class="section-number">02 · Solution</span>
-        <div><h2>Run stochastic current beside a periodic control, then choose what to monitor.</h2><p class="section-lede">Poisson emits exact Arrivals and uniformly marks one of eight Channels. PWM drives all eight Channels in phase at Λ/8 cycles/s. Both conditions advance continuously from the same Total Event Budget and Target Mean Current; PWM On Current trades on-state height against automatically derived duty without changing that mean. Separate LED banks and fixed-scale current scopes remain visible while Monitor Source selects only the metrics, audio scope, and direct AC Current Monitor.</p></div>
+        <div><h2>Run stochastic current beside a periodic control, then choose what to monitor.</h2><p class="section-lede">Poisson emits exact Arrivals and uniformly marks one of eight Channels. PWM drives all eight Channels in phase at Λ/8 cycles/s. Both conditions advance continuously from the same Total Event Budget and Target Mean Current; PWM On Current trades on-state height against automatically derived duty without changing that mean. A refresh-aware PWM LED Presentation requires at least four browser frames per resolved cycle, progressively reduces illustrated modulation as that quality limit approaches, and uses integrated current at and above 15 Hz per Channel. A shared inverse display-transfer Adapter makes equal linear current target comparable screen luminance in both LED banks. Separate fixed-scale scopes always retain the authoritative 48 kHz signals.</p></div>
       </div>
       <div class="equation">Poisson: λᵢ = Λ / 8; Iᵢ(t) = smooth-limit(Σⱼ q(Λ, τ, Ī) · exp(−(t − tᵢⱼ)/τ))<br>PWM control: fPWM = Λ / 8; duty = Ī; I₁(t) = … = I₈(t) ∈ {0, 1}<br>Both: Iwhite(t) = (1/8) Σᵢ Iᵢ(t); audio(t) = Iwhite(t) − Ī</div>
     </section>
@@ -527,7 +530,15 @@
         <li>As an experimenter, I want to hear only the AC portion of fused current, so that audible modulation corresponds directly to optical modulation.</li>
         <li>As an experimenter, I want fixed monitor gain, so that genuinely diminishing modulation is allowed to become quiet.</li>
         <li>As an experimenter, I want manual logarithmic Monitor Gain up to the exact target-dependent no-clipping bound, with PWM monitored at one quarter the Poisson level, so that both waveforms can be auditioned comfortably without changing the optical experiment.</li>
-        <li>As an experimenter, I want each virtual LED to show the arithmetic mean of every current sample in its display interval, so that no Arrival is silently discarded.</li>
+        <li>As an experimenter, I want every Poisson virtual LED to show the arithmetic mean of every current sample in its report interval, so that no Arrival is silently discarded.</li>
+        <li>As an experimenter, I want PWM below the four-frame quality limit to appear as rate-faithful resolved on/off frames, so that representable pulsing remains visible.</li>
+        <li>As an experimenter, I want resolved modulation to converge continuously into integrated brightness near the display limit, so that the visualization never makes a drastic representation jump.</li>
+        <li>As an experimenter, I want repeated high-refresh observations to latch the display capability for the run, so that ordinary dropped frames cannot flip the presentation between modes.</li>
+        <li>As an experimenter, I want resolved PWM limited to 15 Hz per Channel and at least four browser frames per cycle, so that mathematically sub-Nyquist rates are not presented as visually faithful when their pulse width is badly quantized.</li>
+        <li>As an experimenter, I want both LED banks to translate linear current through the same declared display transfer, so that integrated and temporally resolved current have comparable average screen brightness.</li>
+        <li>As an experimenter, I want faster PWM to display its exact cycle-integrated current, so that arbitrary report-window boundaries cannot manufacture a slower beat.</li>
+        <li>As an experimenter, I want the active PWM LED Presentation and measured refresh rate visible, so that I always know whether the discs are resolving pulses or reporting integrated brightness.</li>
+        <li>As an experimenter, I want no CSS brightness transition on the virtual LEDs, so that the page does not add a second unmeasured temporal filter.</li>
         <li>As an experimenter, I want a shared 1 s, 100 ms, 10 ms, or 1 ms scope timebase, so that I can move between convergence and individual PWM pulse morphology.</li>
         <li>As an experimenter, I want to vary PWM On Current while holding the commanded mean fixed, so that I can compare tall narrow pulses, shorter wider pulses, and continuous reduced current fairly.</li>
         <li>As an experimenter, I want connected minimum and maximum envelopes, so that a sustained positive or negative plateau remains visible instead of collapsing into zero-length vertical marks.</li>
@@ -556,7 +567,7 @@
       </div>
       <div class="card-grid">
         <article class="card"><h3>Exact timing</h3><p>Inter-arrival gaps are exponentially distributed. Multiple Arrivals may occur inside one 48 kHz sample interval and each contributes independently; sample coincidence never merges event identity or energy.</p></article>
-        <article class="card"><h3>Matched PWM control</h3><p>Every PWM Channel uses one shared phase and frequency Λ/8. PWM On Current selects the positive on-state current from the commanded Target Mean Current through 100%; duty is derived as Target Mean Current ÷ PWM On Current, so their product always preserves the shared mean. On-time is duty ÷ frequency and silence is (1 − duty) ÷ frequency; both remain read-only evidence because independently controlling them would redefine frequency and duty. At the lower On Current endpoint duty reaches 100% and the output becomes continuous reduced current. The eight cycle counts still sum to Λ. The bank header displays commanded mean, On Current, and duty separately from each LED's short Frame-Mean Current. PWM advances beside Poisson and ignores Current Fall Time because that control belongs only to Poisson Current Responses.</p></article>
+        <article class="card"><h3>Matched PWM control</h3><p>Every PWM Channel uses one shared phase and frequency Λ/8. PWM On Current selects the positive on-state current from the commanded Target Mean Current through 100%; duty is derived as Target Mean Current ÷ PWM On Current, so their product always preserves the shared mean. On-time is duty ÷ frequency and silence is (1 − duty) ÷ frequency; both remain read-only evidence because independently controlling them would redefine frequency and duty. At the lower On Current endpoint duty reaches 100% and the output becomes continuous reduced current. The eight cycle counts still sum to Λ. The bank header displays commanded mean, On Current, duty, measured display refresh, and PWM LED Presentation separately. PWM advances beside Poisson and ignores Current Fall Time because that control belongs only to Poisson Current Responses.</p></article>
         <article class="card"><h3>Monitor, not switch</h3><p>Monitor Source selects which completed condition block feeds the metrics, audio scope, and audio output. Both current scopes continue independently and retain their histories. The selector does not start, stop, reset, or reconfigure either condition.</p></article>
         <article class="card"><h3>Uniform routing</h3><p>Every Arrival receives one uniform Channel mark. Poisson splitting gives eight independent streams with expected rate Λ/8 and preserves Λ as the total lamp rate.</p></article>
         <article class="card"><h3>Positive response</h3><p>An Arrival injects a positive exponential current response with selectable fall time τ. There are no spectral, spatial, acoustic, or event-morphology marks.</p></article>
@@ -566,7 +577,9 @@
         <article class="card"><h3>White fusion</h3><p>Aggregate White equals the arithmetic mean of the eight instantaneous Channel currents. It has no Arrivals, response state, or independent gain of its own.</p></article>
         <article class="card"><h3>Direct sound monitor</h3><p>Every fused-current sample is translated vertically by subtracting the commanded Target Mean Current. This preserves the waveform point for point without a DC filter, history, decay, or frequency shaping. A fixed source factor then leaves Poisson at unity and attenuates PWM to one quarter, followed by explicit logarithmic manual base Monitor Gain. The base defaults to the 2× safe maximum at a 50% target, making effective gain 2× for Poisson and 0.5× for PWM. Its target-dependent bound is Gsafe = 1 ÷ max(Ī, 1 − Ī), so no possible bounded current sample can exceed browser full scale. Changing Target Mean Current updates the slider maximum and clamps its value immediately. The signal is copied equally to both speakers with no automatic normalization, limiting, or compression. Because sparse bounded Poisson current may not attain its target exactly, it may retain a small inaudible residual offset rather than altering the waveform to force a measured zero mean.</p></article>
         <article class="card"><h3>Three oscilloscopes</h3><p>Dedicated Poisson and PWM Current Oscilloscopes simultaneously plot their Aggregate White currents on the same fixed 0–100% scale. The selected-source Audio Oscilloscope plots exact target-centered, pre-gain samples on a fixed −1 to +1 current-unit scale with a zero line. One timebase selects 1 s, 100 ms, 10 ms, or 1 ms for all three. Every scope draws connected per-pixel minimum and maximum envelopes, retains unresolved excursions, preserves same-sign plateaus, and performs no visual normalization.</p></article>
-        <article class="card"><h3>Frame integration</h3><p>Every worklet sample contributes to the arithmetic mean displayed by each DOM LED. Measurements and oscilloscopes are diagnostic views, not selectable rendering modes.</p></article>
+        <article class="card"><h3>Refresh-aware PWM presentation</h3><p>The PWM LED Presentation Module measures requestAnimationFrame cadence and normalizes ordinary fractional timing such as 59.94 Hz to its nearby nominal display rate. A higher refresh capability is accepted only after four observations and then latched for the run; slower dropped frames cannot demote it. The resolved-quality ceiling is min(15 Hz, display refresh ÷ 4), requiring at least four browser frames per PWM cycle and capping eight-Channel resolved presentation at 120 total events/s. Below 70% of that ceiling, a presentation-only phase emits On Current or zero. Across the remaining 30%, smoothstep interpolation progressively mixes that resolved current toward PWM On Current × duty; at and above the ceiling it emits the exact complete-cycle current mean. This declared display antialiasing never enters the engine, scopes, metrics, audio, or hardware hypothesis.</p></article>
+        <article class="card"><h3>Shared display transfer</h3><p>The LED Display Transfer Adapter maps every bounded linear current presentation value through the approximate inverse sRGB relation D(I) = I^(1/2.2) before assigning the CSS intensity. Thus a 50% integrated current uses about 73% display code, whose emitted screen luminance is approximately the temporal average of alternating full-on and off frames. Both Poisson and PWM banks use the same Adapter. Accessible current readouts, engine samples, scopes, audio, and metrics remain linear and uncompensated; this is a display calibration, not optical signal processing.</p></article>
+        <article class="card"><h3>Poisson frame integration</h3><p>Every worklet sample contributes to the report-interval arithmetic mean displayed by each Poisson DOM LED. The PWM bank does not reuse those arbitrary report-window means. Neither bank applies CSS brightness interpolation. Measurements and oscilloscopes remain authoritative diagnostic views rather than inputs to either current engine.</p></article>
         <article class="card"><h3>Isolation</h3><p>This standalone file and its Modules do not call, configure, or revise the existing generated-audio path. The two experiments share only durable domain definitions for Arrival, Channel, Speed, and Aggregate White.</p></article>
       </div>
     </section>
@@ -647,7 +660,9 @@
         <article class="card"><h3>PWM timing evidence</h3><p>At 1 kHz per Channel, a 25% target with 100% On Current must report 0.25 ms on and 0.75 ms silent. Reducing On Current to 50% must report 0.50 ms on and 0.50 ms silent while preserving the same 25% commanded mean.</p></article>
         <article class="card"><h3>Terminology evidence</h3><p>The public engine Interface, control label, specification, and tests must use PWM On Current. The obsolete PWM Pulse Current field must not remain as a silent alias because two names would obscure which term is authoritative.</p></article>
         <article class="card"><h3>Full-DC evidence</h3><p>At a 100% target, both conditions must emit exact unit current on all eight Channels and Aggregate White while their underlying event counts continue. Direct subtraction of the commanded unit mean must make every audio-monitor sample exactly zero without NaN, infinity, clipping logic, filter state, or a stopped clock.</p></article>
-        <article class="card"><h3>Display evidence</h3><p>The page exposes eighteen accessible meters in two labeled condition banks, two simultaneous accessible current scopes, one selected-source audio scope, one accessible monitor selector, one shared scope timebase, exact total/per-Channel language, the fixed frame-mean rule, current diagnostics, and one explicit sound-monitor switch.</p></article>
+        <article class="card"><h3>Display evidence</h3><p>The page exposes eighteen accessible meters in two labeled condition banks, two simultaneous accessible current scopes, one selected-source audio scope, one accessible monitor selector, one shared scope timebase, exact total/per-Channel language, Poisson report means, the active PWM LED Presentation with measured refresh, current diagnostics, and one explicit sound-monitor switch.</p></article>
+        <article class="card"><h3>PWM presentation evidence</h3><p>At measured 60 Hz or 120 Hz refresh, the resolved-quality ceiling must not exceed 15 Hz per Channel: 10 Hz must resolve, 12.5 Hz must use a bounded transition whose high and low currents both move toward the matched mean, and 15 Hz, 16 Hz, 137.5 Hz, and 1 kHz must remain integrated without report-window beating. Repeated 120 Hz observations must latch even when later frames alternate between 120 and 60 Hz cadence. Presentation changes must leave engine samples, scopes, event counts, audio, and metrics byte-for-byte unchanged.</p></article>
+        <article class="card"><h3>Display-transfer evidence</h3><p>The shared LED Display Transfer must map zero and full current to zero and full display code, bound invalid inputs, and map 50% current to a display level D where D^2.2 = 0.5. Both LED banks must call this same Adapter while retaining linear values in their accessible meters and diagnostics.</p></article>
         <article class="card"><h3>Scope evidence</h3><p>A known PWM pulse train must retain zero and one plateaus after display reduction. When multiple excursions fall inside one column, the same Interface must retain their true minimum and maximum without normalization or invented zero crossings.</p></article>
         <article class="card"><h3>Browser evidence</h3><p>Start must animate both banks and both current scopes. Monitor Source changes must preserve both current histories while changing selected metrics, the audio scope, and audible output; shared-control changes must not restart either condition. Sound disable must leave all LEDs and current scopes running, Stop must darken all eighteen meters, and the console and worklet must remain error-free at 48 kHz.</p></article>
         <article class="card"><h3>Solar-reference evidence</h3><p>A future physical comparison must first match mean emitted optical power, then report temporal modulation from the same photodiode, bandwidth, aperture, and exposure for low-ripple DC, PWM, and Poisson. Spectral comparison must separately name the ASTM G173 direct-normal or global-tilt target and report the measured spectral residual; electrical mean current alone satisfies neither comparison.</p></article>
@@ -669,11 +684,11 @@
     <section class="spec-section">
       <div class="section-head">
         <span class="section-number">08 · Further notes</span>
-        <div><h2>The virtual LEDs integrate; all three scopes remember and zoom.</h2><p class="section-lede">A typical display cannot emit the worklet’s 48 kHz optical waveform. Its LED circles therefore report one honest exposure-like frame mean. The simultaneous fixed-scale Poisson and PWM Current Oscilloscopes plus the selected-source Audio Oscilloscope carry the DC and AC evidence lost to refresh-rate integration, while their shared timebase separates long-run convergence from pulse morphology. PWM is a scientific comparison condition, not the planned hardware decision. Sunlight supplies the conceptual reference: spectrally broadband and atmosphere-dependent, yet effectively steady in macroscopic time. A future physical build must benchmark steady DC, consumer-class PWM, cinema-class PWM, and Poisson on the same optical load with photodiode, thermal, spectral, and camera evidence before any claim about solar similarity or imperceptible modulation is accepted.</p></div>
+        <div><h2>The LED discs declare their limit; all three scopes remember and zoom.</h2><p class="section-lede">A typical display cannot emit the worklet’s 48 kHz optical waveform. Poisson discs report complete report-interval means. PWM discs require four frames per resolved cycle, progressively converge toward the matched mean near a maximum 15 Hz per-Channel ceiling, and remain integrated above it rather than aliasing arbitrary report windows or dropped frames. Both banks apply the same inverse display transfer so equal current targets produce comparable screen luminance. The simultaneous fixed-scale Poisson and PWM Current Oscilloscopes plus the selected-source Audio Oscilloscope remain authoritative for exact DC and AC evidence. Sunlight supplies the conceptual reference: spectrally broadband and atmosphere-dependent, yet effectively steady in macroscopic time. A future physical build must benchmark steady DC, consumer-class PWM, cinema-class PWM, and Poisson on the same optical load with photodiode, thermal, spectral, and camera evidence before any claim about solar similarity or imperceptible modulation is accepted.</p></div>
       </div>
     </section>
 
-    <footer><span>Poisson LED Lab · Standalone interactive specification</span><span>Draft 0.5 · 20 August 2026</span></footer>
+    <footer><span>Poisson LED Lab · Standalone interactive specification</span><span>Draft 0.8 · 20 August 2026</span></footer>
   </main>
   <script type="module" src="../../src/led-lab-app.js"></script>
 </body>

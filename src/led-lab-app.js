@@ -5,6 +5,8 @@ import {
   maximumSafeMonitorGain,
 } from "./led-monitor-gain.js";
 import { prepareScopeEnvelope } from "./led-scope-visualizer.js";
+import { currentToDisplayLevel } from "./led-display-transfer.js";
+import { createPwmLedPresentation } from "./pwm-led-presentation.js";
 
 const CHANNEL_NAMES = [
   "Violet",
@@ -41,6 +43,7 @@ const volumeInput = document.querySelector("#output-level");
 const volumeOutput = document.querySelector("#output-level-output");
 const monitorGainMaximumOutput = document.querySelector("#monitor-gain-maximum");
 const pwmTargetOutput = document.querySelector('[data-condition-target="pwm"]');
+const pwmPresentationOutput = document.querySelector("#pwm-led-presentation-output");
 const statusOutput = document.querySelector("#engine-status");
 const meanOutput = document.querySelector("#mean-current");
 const rmsOutput = document.querySelector("#rms-modulation");
@@ -52,6 +55,7 @@ const ledBanks = Object.fromEntries(
   [...document.querySelectorAll("[data-condition-bank]")].map(bank => [
     bank.dataset.conditionBank,
     {
+      element: bank,
       leds: [...bank.querySelectorAll("[data-current-led]")],
       values: [...bank.querySelectorAll("[data-current-value]")],
     },
@@ -73,6 +77,11 @@ let workletNode = null;
 let monitorGain = null;
 let running = false;
 let lastMonitorSource = "poisson";
+let latestCurrentFrame = null;
+let pwmLedPresentation = createPwmLedPresentation();
+let lastPoissonPresentation = null;
+let lastPwmPresentation = null;
+let lastPwmPresentationLabel = "";
 
 function selectedSource() {
   return sourceInputs.find(input => input.checked)?.value ?? "poisson";
@@ -196,13 +205,22 @@ function configureRunningEngine() {
 }
 
 function clearLeds() {
-  for (const bank of Object.values(ledBanks)) {
+  for (const [name, bank] of Object.entries(ledBanks)) {
     bank.leds.forEach((led, index) => {
       led.style.setProperty("--level", "0");
       led.setAttribute("aria-valuenow", "0");
-      if (bank.values[index]) bank.values[index].value = "0.0% frame mean";
+      if (bank.values[index]) {
+        bank.values[index].value = name === "pwm"
+          ? "0.0% presentation"
+          : "0.0% frame mean";
+      }
     });
   }
+  ledBanks.pwm?.element?.setAttribute("data-presentation-mode", "integrated");
+  pwmPresentationOutput.value = "Integrated · measuring display refresh";
+  lastPoissonPresentation = null;
+  lastPwmPresentation = null;
+  lastPwmPresentationLabel = "";
   meanOutput.value = "0.0%";
   rmsOutput.value = "0.0%";
   peakOutput.value = "0.0%";
@@ -388,22 +406,69 @@ const scopeRenderLoop = createRenderLoop({
   framesPerSecond: 30,
 });
 
-function renderBank(name, condition) {
+function renderBank(name, levels, description) {
   const bank = ledBanks[name];
-  condition.levels.forEach((level, index) => {
+  levels.forEach((level, index) => {
     const bounded = Math.min(1, Math.max(0, level));
-    bank?.leds[index]?.style.setProperty("--level", bounded.toFixed(5));
+    const displayLevel = currentToDisplayLevel(bounded);
+    bank?.leds[index]?.style.setProperty("--level", displayLevel.toFixed(5));
     bank?.leds[index]?.setAttribute("aria-valuenow", String(Math.round(bounded * 100)));
-    if (bank?.values[index]) bank.values[index].value = `${(bounded * 100).toFixed(1)}% frame mean`;
+    if (bank?.values[index]) bank.values[index].value = `${(bounded * 100).toFixed(1)}% ${description}`;
   });
 }
 
+function renderLedFrame(timestampMs) {
+  if (!running || !latestCurrentFrame) return;
+  if (lastPoissonPresentation !== latestCurrentFrame) {
+    renderBank("poisson", latestCurrentFrame.conditions.poisson.levels, "frame mean");
+    lastPoissonPresentation = latestCurrentFrame;
+  }
+
+  const pwm = latestCurrentFrame.engine.conditions.pwm;
+  const presentation = pwmLedPresentation.frame({
+    timestampMs,
+    pwmFrequencyHz: pwm.pwmFrequencyHz,
+    pwmOnCurrent: pwm.pwmOnCurrent,
+    pwmDutyCycle: pwm.pwmDutyCycle,
+  });
+  if (
+    lastPwmPresentation?.level !== presentation.level
+    || lastPwmPresentation?.mode !== presentation.mode
+  ) {
+    renderBank(
+      "pwm",
+      Array(CHANNEL_NAMES.length).fill(presentation.level),
+      presentation.mode,
+    );
+    ledBanks.pwm?.element?.setAttribute("data-presentation-mode", presentation.mode);
+    lastPwmPresentation = presentation;
+  }
+  const mode = {
+    resolved: "Resolved",
+    transition: "Transition",
+    integrated: "Integrated",
+  }[presentation.mode];
+  const label = `${mode} · ${formatRate(pwm.pwmFrequencyHz)} PWM · ${formatRate(presentation.displayRefreshRateHz)} display`;
+  if (label !== lastPwmPresentationLabel) {
+    pwmPresentationOutput.value = label;
+    lastPwmPresentationLabel = label;
+  }
+}
+
+const ledRenderLoop = createRenderLoop({
+  draw: renderLedFrame,
+  isActive: () => running,
+  requestFrame: callback => requestAnimationFrame(callback),
+  framesPerSecond: 500,
+});
+
 function renderCurrentFrame(message) {
+  latestCurrentFrame = message;
   for (const [name, condition] of Object.entries(message.conditions)) {
-    renderBank(name, condition);
     const conditionEngine = message.engine.conditions[name];
     currentScopes[name]?.append(condition.scope, conditionEngine.sampleRate);
   }
+  ledRenderLoop.wake();
   const monitored = message.conditions[message.monitorSource];
   const engine = message.engine.conditions[message.monitorSource];
   audioScope.append(monitored.audioScope, engine.sampleRate);
@@ -419,6 +484,8 @@ function renderCurrentFrame(message) {
 
 async function start() {
   if (running) return;
+  latestCurrentFrame = null;
+  pwmLedPresentation = createPwmLedPresentation();
   audioContext = new AudioContext({ sampleRate: 48_000, latencyHint: "interactive" });
   await audioContext.audioWorklet.addModule(new URL("./led-lab-worklet.js", import.meta.url));
   workletNode = new AudioWorkletNode(audioContext, "poisson-led-lab", {
@@ -438,6 +505,7 @@ async function start() {
   instrument.dataset.running = "true";
   startButton.textContent = "Stop field";
   statusOutput.value = `Both running · monitoring ${selectedSource() === "pwm" ? "PWM" : "Poisson"}`;
+  ledRenderLoop.wake();
 }
 
 async function stop() {
@@ -451,6 +519,7 @@ async function stop() {
   monitorGain?.disconnect();
   workletNode = null;
   monitorGain = null;
+  latestCurrentFrame = null;
   const contextToClose = audioContext;
   audioContext = null;
   await contextToClose?.close();
@@ -501,6 +570,11 @@ scopeRenderLoop.wake();
 
 for (const [name, bank] of Object.entries(ledBanks)) {
   bank.leds.forEach((led, index) => {
-    led.setAttribute("aria-label", `${name === "pwm" ? "PWM" : "Poisson"} ${CHANNEL_NAMES[index]} frame-mean current`);
+    led.setAttribute(
+      "aria-label",
+      name === "pwm"
+        ? `PWM ${CHANNEL_NAMES[index]} refresh-aware current presentation`
+        : `Poisson ${CHANNEL_NAMES[index]} frame-mean current`,
+    );
   });
 }

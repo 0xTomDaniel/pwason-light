@@ -41,6 +41,19 @@ hold the mean fixed. At the On Current minimum, duty reaches 100% and PWM
 becomes continuous reduced current. Derived PWM On Time and PWM Silence
 readouts expose the resulting morphology without becoming additional controls.
 Current Fall Time applies only to Poisson.
+The Poisson LED bank displays complete report-interval current means. The PWM
+bank instead uses a refresh-aware presentation. Repeated higher-rate animation
+frames latch the display capability for the run, so dropped frames cannot flip
+the inferred limit. Resolved PWM requires at least four browser frames per
+cycle and is capped at 15 Hz per Channel, or 120 total events/s. The final 30%
+below that limit progressively blends toward the exact complete-cycle current
+mean; rates at or above it remain integrated. Its active Resolved, Transition,
+or Integrated mode and measured display rate are visible beside the bank.
+Both banks convert linear current to CSS intensity through an approximate
+inverse sRGB transfer (`display = current^(1/2.2)`), making integrated and
+temporally resolved current target comparable average screen luminance while
+meters and scopes remain linear. This removes false beats and the prior dark
+integrated display; the current oscilloscope retains the exact 48 kHz waveform.
 Target Mean Current travels continuously from 1–100%; exactly 100% is a shared
 full-DC endpoint while both underlying clocks continue. A Monitor
 Source selector chooses which continuously running condition feeds selected

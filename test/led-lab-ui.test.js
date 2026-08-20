@@ -6,13 +6,14 @@ const specificationUrl = new URL(
   "../docs/specs/poisson-led-lab.spec.html",
   import.meta.url,
 );
+const applicationUrl = new URL("../src/led-lab-app.js", import.meta.url);
 
 test("the standalone LED lab exposes parallel nine-LED Poisson and PWM banks", async () => {
   const html = await readFile(specificationUrl, "utf8");
 
   assert.equal((html.match(/\sdata-current-led(?:\s|>)/g) ?? []).length, 18);
   assert.equal((html.match(/<div class="condition-bank" data-condition-bank="poisson">/g) ?? []).length, 1);
-  assert.equal((html.match(/<div class="condition-bank" data-condition-bank="pwm">/g) ?? []).length, 1);
+  assert.equal((html.match(/<div class="condition-bank" data-condition-bank="pwm"[^>]*>/g) ?? []).length, 1);
   assert.equal((html.match(/<strong>White Σ<\/strong>/g) ?? []).length, 2);
   assert.match(html, /normalized mean of eight Channels/i);
 });
@@ -36,16 +37,34 @@ test("current owns the signal path and audio is only its mean-centered monitor",
   assert.doesNotMatch(html, /id="(?:compression|compressor|limiter|equalizer)"/i);
 });
 
-test("the LED display has one fixed frame-mean rule and separate diagnostics", async () => {
+test("the Poisson LED display preserves complete report means and separate diagnostics", async () => {
   const html = await readFile(specificationUrl, "utf8");
 
   assert.match(html, /arithmetic mean of every current sample/i);
+  assert.match(html, /PWM bank does not reuse those arbitrary report-window means/i);
   assert.match(html, /id="mean-current"/);
   assert.match(html, /id="rms-modulation"/);
   assert.match(html, /id="peak-current"/);
   assert.match(html, /id="limit-proximity"/);
   assert.match(html, /id="poisson-current-scope"/);
   assert.match(html, /id="pwm-current-scope"/);
+});
+
+test("the PWM LED bank declares its refresh-aware presentation mode", async () => {
+  const [html, application] = await Promise.all([
+    readFile(specificationUrl, "utf8"),
+    readFile(applicationUrl, "utf8"),
+  ]);
+
+  assert.match(html, /id="pwm-led-presentation-output"/);
+  assert.match(html, /Resolved below the four-frame quality limit/i);
+  assert.match(html, /Transition through its final 30%/i);
+  assert.match(html, /Integrated at ≥15 Hz per Channel/i);
+  assert.doesNotMatch(html, /transition:\s*background 32ms/i);
+  assert.match(application, /createPwmLedPresentation/);
+  assert.match(application, /presentation\.mode/);
+  assert.match(application, /presentation\.displayRefreshRateHz/);
+  assert.match(application, /currentToDisplayLevel/);
 });
 
 test("the lab exposes PWM as a matched scientific control condition", async () => {
