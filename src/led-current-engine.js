@@ -3,7 +3,6 @@ const DEFAULT_SAMPLE_RATE = 48_000;
 const DEFAULT_RATE_HZ = 1_000;
 const DEFAULT_PULSE_WIDTH_MS = 4;
 const DEFAULT_TARGET_CURRENT = 0.5;
-const DEFAULT_DC_BLOCK_HZ = 2;
 const MINIMUM_RATE_HZ = 1;
 const MAXIMUM_RATE_HZ = 48_000;
 const DRIVE_SOURCES = new Set(["poisson", "pwm"]);
@@ -53,7 +52,6 @@ export function createPoissonLedLabEngine({
   rateHz = DEFAULT_RATE_HZ,
   pulseWidthMs = DEFAULT_PULSE_WIDTH_MS,
   targetCurrent = DEFAULT_TARGET_CURRENT,
-  dcBlockHz = DEFAULT_DC_BLOCK_HZ,
   source = "poisson",
 } = {}) {
   const channels = Math.max(1, Math.floor(finite(channelCount, DEFAULT_CHANNEL_COUNT)));
@@ -62,26 +60,22 @@ export function createPoissonLedLabEngine({
   const rawState = new Float64Array(channels);
   let totalRateHz = clamp(finite(rateHz, DEFAULT_RATE_HZ), MINIMUM_RATE_HZ, MAXIMUM_RATE_HZ);
   let pulseSeconds = clamp(finite(pulseWidthMs, DEFAULT_PULSE_WIDTH_MS), 0.05, 1_000) / 1_000;
-  let target = clamp(finite(targetCurrent, DEFAULT_TARGET_CURRENT), 0.001, 0.95);
-  let dcCutoffHz = clamp(finite(dcBlockHz, DEFAULT_DC_BLOCK_HZ), 0.1, 20);
+  let target = clamp(finite(targetCurrent, DEFAULT_TARGET_CURRENT), 0.001, 1);
   if (!DRIVE_SOURCES.has(source)) {
     throw new TypeError(`Unknown LED lab drive source: ${source}`);
   }
   let currentSource = source;
   let timeToNextArrival = exponentialGap(random, totalRateHz);
   let pwmPhase = 0;
-  let previousFusedCurrent = 0;
-  let previousAudio = 0;
   let elapsedSamples = 0;
   let totalEvents = 0;
 
   function derived() {
     const expectedChannelRateHz = totalRateHz / channels;
-    const rawTarget = target / (1 - target);
+    const rawTarget = target < 1 ? target / (1 - target) : 0;
     return {
       decay: Math.exp(-1 / (samplesPerSecond * pulseSeconds)),
       eventInjection: rawTarget / (expectedChannelRateHz * pulseSeconds),
-      dcBlockCoefficient: Math.exp(-2 * Math.PI * dcCutoffHz / samplesPerSecond),
       expectedChannelRateHz,
       pwmFrequencyHz: expectedChannelRateHz,
     };
@@ -91,8 +85,6 @@ export function createPoissonLedLabEngine({
     rawState.fill(0);
     timeToNextArrival = exponentialGap(random, totalRateHz);
     pwmPhase = 0;
-    previousFusedCurrent = 0;
-    previousAudio = 0;
     elapsedSamples = 0;
     totalEvents = 0;
   }
@@ -113,10 +105,7 @@ export function createPoissonLedLabEngine({
       pulseSeconds = clamp(finite(settings.pulseWidthMs, pulseSeconds * 1_000), 0.05, 1_000) / 1_000;
     }
     if (settings.targetCurrent !== undefined) {
-      target = clamp(finite(settings.targetCurrent, target), 0.001, 0.95);
-    }
-    if (settings.dcBlockHz !== undefined) {
-      dcCutoffHz = clamp(finite(settings.dcBlockHz, dcCutoffHz), 0.1, 20);
+      target = clamp(finite(settings.targetCurrent, target), 0.001, 1);
     }
     if (currentSource !== previousSource) {
       resetExperiment();
@@ -135,7 +124,7 @@ export function createPoissonLedLabEngine({
     const fusedCurrent = new Float32Array(length);
     const audioMonitor = new Float32Array(length);
     const eventsByChannel = Array(channels).fill(0);
-    const { decay, eventInjection, dcBlockCoefficient } = derived();
+    const { decay, eventInjection } = derived();
     const secondsPerSample = 1 / samplesPerSecond;
     let eventCount = 0;
     let nearLimitSamples = 0;
@@ -172,7 +161,7 @@ export function createPoissonLedLabEngine({
           timeToNextArrival += exponentialGap(random, totalRateHz);
         }
         for (let channel = 0; channel < channels; channel += 1) {
-          const current = smoothCurrentLimit(rawState[channel]);
+          const current = target >= 1 ? 1 : smoothCurrentLimit(rawState[channel]);
           currentChannels[channel][sample] = current;
           fused += current;
           if (current >= 0.98) nearLimitSamples += 1;
@@ -181,10 +170,7 @@ export function createPoissonLedLabEngine({
       fused /= channels;
       fusedCurrent[sample] = fused;
 
-      const acCurrent = fused - previousFusedCurrent + dcBlockCoefficient * previousAudio;
-      audioMonitor[sample] = acCurrent;
-      previousFusedCurrent = fused;
-      previousAudio = acCurrent;
+      audioMonitor[sample] = fused - target;
     }
 
     elapsedSamples += length;
@@ -195,7 +181,9 @@ export function createPoissonLedLabEngine({
       audioMonitor,
       eventCount,
       eventsByChannel: Object.freeze(eventsByChannel),
-      eventKind: currentSource === "pwm" ? "PWM rising edges" : "Poisson Arrivals",
+      eventKind: currentSource === "pwm"
+        ? (target >= 1 ? "PWM cycles · full DC" : "PWM rising edges")
+        : "Poisson Arrivals",
       arrivalCount: eventCount,
       arrivalsByChannel: Object.freeze([...eventsByChannel]),
       nearLimitSamples,
@@ -214,8 +202,6 @@ export function createPoissonLedLabEngine({
       targetCurrent: target,
       source: currentSource,
       pwmFrequencyHz: values.pwmFrequencyHz,
-      dcBlockHz: dcCutoffHz,
-      dcBlockCoefficient: values.dcBlockCoefficient,
       elapsedSamples,
       totalEvents,
       totalArrivals: totalEvents,

@@ -26,13 +26,14 @@ test("the standalone controls describe one total rate through 48 kHz", async () 
   assert.match(html, /6,000 Arrivals\/s per Channel/i);
 });
 
-test("current owns the signal path and audio is only its AC-coupled monitor", async () => {
+test("current owns the signal path and audio is only its mean-centered monitor", async () => {
   const html = await readFile(specificationUrl, "utf8");
 
   assert.match(html, /Poisson \+ PWM → two independent virtual LED banks/i);
-  assert.match(html, /selected Aggregate White → DC blocker → output level → mono speakers/i);
+  assert.match(html, /selected Aggregate White − Target Mean Current → Monitor Gain → mono speakers/i);
   assert.match(html, /id="sound-enabled"[^>]+checked/);
-  assert.doesNotMatch(html, /compression|equalizer|rain mark|surface response/i);
+  assert.doesNotMatch(html, /equalizer|rain mark|surface response/i);
+  assert.doesNotMatch(html, /id="(?:compression|compressor|limiter|equalizer)"/i);
 });
 
 test("the LED display has one fixed frame-mean rule and separate diagnostics", async () => {
@@ -63,7 +64,35 @@ test("the lab exposes separate fixed-scale current and audio oscilloscopes", asy
 
   assert.match(html, /id="current-scope"/);
   assert.match(html, /id="audio-scope"/);
-  assert.match(html, /audio AC waveform/i);
+  assert.match(html, /target-centered waveform/i);
   assert.match(html, /fixed −1 to \+1 current units/i);
   assert.match(html, /no visual normalization/i);
+});
+
+test("the scopes expose a shared morphology timebase", async () => {
+  const html = await readFile(specificationUrl, "utf8");
+
+  assert.match(html, /name="scope-timebase"[^>]+value="1"/);
+  assert.match(html, /name="scope-timebase"[^>]+value="0\.1"/);
+  assert.match(html, /name="scope-timebase"[^>]+value="0\.01"[^>]+checked/);
+  assert.match(html, /name="scope-timebase"[^>]+value="0\.001"/);
+  assert.match(html, /connected min\/max envelopes/i);
+});
+
+test("Target Mean Current travels continuously to a declared 100% full-DC endpoint", async () => {
+  const html = await readFile(specificationUrl, "utf8");
+
+  assert.match(html, /id="target-current"[^>]+max="100"[^>]+step="0\.1"/);
+  assert.match(html, /<span>100%<\/span>/);
+  assert.match(html, /100% is full DC/i);
+});
+
+test("the AC Current Monitor exposes manual logarithmic gain without automatic processing", async () => {
+  const html = await readFile(specificationUrl, "utf8");
+
+  assert.match(html, /<span>Monitor gain<\/span>/i);
+  assert.match(html, /id="output-level"[^>]+min="-2"[^>]+max="1\.505149978319906"/);
+  assert.match(html, /id="output-level"[^>]+step="any"[^>]+value="0\.3010299956639812"/);
+  assert.match(html, /<span>0\.01×<\/span><span>32×<\/span>/);
+  assert.match(html, /no automatic gain, limiter, or compressor/i);
 });

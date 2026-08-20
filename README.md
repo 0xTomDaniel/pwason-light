@@ -36,12 +36,18 @@ parallel from 1–48,000 total events/s, with a separate nine-LED bank for each.
 Poisson assigns each Arrival uniformly to one of eight Channels. PWM drives all
 eight Channels in phase at `Λ/8`, so their combined rising-edge budget remains
 `Λ`; Target Mean Current becomes its duty cycle. Current Fall Time applies only
-to Poisson. A Monitor Source selector chooses which continuously running
+to Poisson. Target Mean Current travels continuously from 1–100%; exactly 100%
+is a shared full-DC endpoint while both underlying clocks continue. A Monitor
+Source selector chooses which continuously running
 condition feeds the metrics, fixed-scale oscilloscopes, and mono sound monitor;
-it never starts, stops, or resets either condition. Each ninth Aggregate White
-signal is the instantaneous eight-Channel mean. The sound monitor adds only a
-2 Hz DC blocker and manual Output Level. This standalone page does not call or
-modify the existing rain renderer.
+it never starts, stops, or resets either condition. A shared Scope Timebase
+selects a 1 s, 100 ms, 10 ms, or 1 ms window, defaulting to 10 ms so sustained
+PWM plateaus remain visible. Connected minimum and maximum envelopes preserve
+both flat plateaus and unresolved excursions without normalizing the signal.
+Each ninth Aggregate White signal is the instantaneous eight-Channel mean. The
+sound monitor subtracts commanded Target Mean Current directly from Aggregate
+White, then applies a logarithmic 0.01×–32× manual Monitor Gain (2× by default). This
+standalone page does not call or modify the existing rain renderer.
 
 ## Controls
 

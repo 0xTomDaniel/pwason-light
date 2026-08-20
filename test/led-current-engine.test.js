@@ -56,24 +56,21 @@ test("Aggregate White is the sample-by-sample arithmetic mean of the eight posit
   )));
 });
 
-test("the only sound transformation is the declared current-to-AC recurrence", () => {
+test("the only sound transformation is direct commanded-mean subtraction", () => {
   const engine = createPoissonLedLabEngine({
     seed: "direct-monitor",
     sampleRate: 48_000,
     rateHz: 2_400,
-    dcBlockHz: 2,
+    targetCurrent: 0.35,
   });
   const block = engine.render(8_192);
-  const coefficient = engine.snapshot().dcBlockCoefficient;
 
-  let previousCurrent = 0;
-  let previousAudio = 0;
   for (let sample = 0; sample < block.audioMonitor.length; sample += 1) {
-    const expected = block.fusedCurrent[sample] - previousCurrent + coefficient * previousAudio;
+    const expected = block.fusedCurrent[sample] - 0.35;
     assert.ok(Math.abs(block.audioMonitor[sample] - expected) < 1e-6);
-    previousCurrent = block.fusedCurrent[sample];
-    previousAudio = block.audioMonitor[sample];
   }
+  assert.equal("dcBlockCoefficient" in engine.snapshot(), false);
+  assert.equal("dcBlockHz" in engine.snapshot(), false);
 });
 
 test("rendering is invariant to AudioWorklet block partitions", () => {
@@ -167,19 +164,13 @@ test("PWM uses the same direct current-to-AC monitor as Poisson current", () => 
     source: "pwm",
     sampleRate: 48_000,
     rateHz: 8_000,
-    targetCurrent: 0.5,
-    dcBlockHz: 2,
+    targetCurrent: 0.25,
   });
   const block = engine.render(1_024);
-  const coefficient = engine.snapshot().dcBlockCoefficient;
 
-  let previousCurrent = 0;
-  let previousAudio = 0;
   for (let sample = 0; sample < block.audioMonitor.length; sample += 1) {
-    const expected = block.fusedCurrent[sample] - previousCurrent + coefficient * previousAudio;
+    const expected = block.fusedCurrent[sample] - 0.25;
     assert.ok(Math.abs(block.audioMonitor[sample] - expected) < 1e-6);
-    previousCurrent = block.fusedCurrent[sample];
-    previousAudio = block.audioMonitor[sample];
   }
 });
 
@@ -242,4 +233,25 @@ test("shared comparison settings configure both conditions without cross-couplin
     assert.equal(condition.targetCurrent, 0.4);
   }
   assert.equal(snapshot.conditions.poisson.pulseWidthMs, 2);
+});
+
+test("100% target is an explicit full-DC endpoint while both clocks continue", () => {
+  for (const source of ["poisson", "pwm"]) {
+    const engine = createPoissonLedLabEngine({
+      seed: `full-dc-${source}`,
+      source,
+      sampleRate: 8_000,
+      rateHz: 800,
+      targetCurrent: 1,
+    });
+    const block = engine.render(8_000);
+
+    assert.equal(engine.snapshot().targetCurrent, 1);
+    assert.ok(block.currentChannels.every(channel => (
+      channel.every(current => current === 1)
+    )));
+    assert.ok(block.fusedCurrent.every(current => current === 1));
+    assert.ok(block.audioMonitor.every(sample => sample === 0));
+    assert.ok(block.eventCount > 0);
+  }
 });

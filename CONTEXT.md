@@ -17,7 +17,7 @@ The standalone current-first comparison Module that owns simultaneous Steady Poi
 _Avoid_: Rain renderer, audio-to-light adapter, mixed acoustic source
 
 **PWM Control**:
-The deterministic scientific control condition that runs continuously beside Poisson in the LED lab. Every Channel receives the same phase-aligned binary current at frequency `Λ/8`, so eight rising-edge counts sum to the selected total event budget `Λ`. Target Mean Current becomes duty cycle and Current Fall Time is ignored. A separate nine-LED bank always displays it; Monitor Source only chooses whether its Aggregate White feeds diagnostics, the DC blocker, Output Level, and both oscilloscopes.
+The deterministic scientific control condition that runs continuously beside Poisson in the LED lab. Below full DC, every Channel receives the same phase-aligned binary current at frequency `Λ/8`, so eight rising-edge counts sum to the selected total event budget `Λ`. Target Mean Current becomes duty cycle and Current Fall Time is ignored. At exactly 100%, current remains continuously on while PWM phase and cycle accounting continue. A separate nine-LED bank always displays it; Monitor Source only chooses whether its Aggregate White feeds diagnostics, commanded-mean subtraction, Monitor Gain, and both oscilloscopes.
 _Avoid_: Poisson approximation, audio oscillator, staggered aggregate smoothing
 
 **Current Response**:
@@ -25,16 +25,24 @@ The positive exponential current injected into one Channel by one Arrival in the
 _Avoid_: Rain Impact Waveform, audio envelope, LED flash animation
 
 **Target Mean Current**:
-The high-overlap mean-current target used to scale Current Response charge as Speed changes in the Poisson condition and the exact duty cycle in the PWM Control. Sparse bounded Poisson responses may not physically attain it and must report their actual mean. It is not feedback, automatic gain applied to observed samples, or a guarantee at every Poisson rate.
+The continuously selectable 1–100% high-overlap mean-current target used to scale Current Response charge as Speed changes in the Poisson condition and the exact duty cycle in the PWM Control. Sparse bounded Poisson responses may not physically attain an intermediate target and must report their actual mean. Exactly 100% is the shared full-DC limit: all Channels output unit current while both underlying clocks continue and the AC Current Monitor is immediately silent. It is not feedback or automatic gain applied to observed samples.
 _Avoid_: Brightness normalization, current measurement, limiter threshold
 
 **AC Current Monitor**:
-The mono audible signal obtained only by passing Aggregate White through one first-order 2 Hz DC blocker and the explicit Output Level. It preserves all remaining modulation, uses no tone shaping or automatic gain, and becomes quiet when the current becomes steady. A fixed-scale Audio Oscilloscope displays the exact post-blocker samples before Output Level.
+The mono audible signal obtained by subtracting commanded Target Mean Current directly from every Aggregate White sample, then applying explicit Monitor Gain. The subtraction only translates the current waveform's vertical origin; it has no filter state, decay, or frequency shaping. Sparse bounded Poisson current can retain a small residual offset when its actual mean differs from its target. A fixed-scale Audio Oscilloscope displays the exact target-centered samples before Monitor Gain.
 _Avoid_: Audio synthesizer, acoustic response, loudness matching
 
+**Monitor Gain**:
+The explicit fixed scalar applied after DC conversion solely for listening. Its logarithmic 0.01×–32× control defaults to 2× and cannot affect either current engine, either LED bank, or the pre-gain Audio Oscilloscope. It performs no normalization, compression, limiting, or feedback, so high settings may clip the browser audio output.
+_Avoid_: Automatic gain, loudness matching, optical gain
+
 **Frame-Mean Current**:
-The single virtual-LED display rule in the standalone LED lab: the arithmetic mean of every worklet-rate current sample in one display interval. Other reported statistics are diagnostics rather than selectable drive modes. Separate min/max-preserving, fixed-scale Current and Audio Oscilloscopes retain within-frame excursions without visual normalization.
+The single virtual-LED display rule in the standalone LED lab: the arithmetic mean of every worklet-rate current sample in one display interval. Other reported statistics are diagnostics rather than selectable drive modes. Separate fixed-scale Current and Audio Oscilloscopes retain within-frame excursions without visual normalization.
 _Avoid_: Downsampled event, peak brightness mode, physical flicker proof
+
+**Scope Timebase**:
+The shared diagnostic window for the standalone LED lab's Current and Audio Oscilloscopes, selectable as 1 s, 100 ms, 10 ms, or 1 ms and defaulting to 10 ms. It changes only retained and displayed history. Connected per-pixel minimum and maximum envelopes preserve sustained same-sign plateaus as visible horizontal traces and preserve unresolved excursions as a bounded band without modifying, normalizing, or feeding back into either condition.
+_Avoid_: Signal rate, PWM duty, waveform resampling, display gain
 
 **Optical Drive Signal**:
 One of eight positive current-like signals obtained from its matching signed, pre-stereo generated-audio Channel bus by full-wave rectification, one manually selected fixed Current Sensitivity, a smooth current limiter, and the selected Optical Current Mode. Both pressure polarities contribute current without becoming new Arrivals. The signal has no light-specific rate compensation, smoothing, envelope, or automatic normalization and does not change the blessed generated rain audio, Poisson timing, or Channel routing.

@@ -1,4 +1,5 @@
 import { createRenderLoop } from "./render-loop.js";
+import { prepareScopeEnvelope } from "./led-scope-visualizer.js";
 
 const CHANNEL_NAMES = [
   "Violet",
@@ -11,7 +12,7 @@ const CHANNEL_NAMES = [
   "Deep Red",
   "White Σ",
 ];
-const SCOPE_SECONDS = 1;
+const DEFAULT_SCOPE_SECONDS = 0.01;
 
 const instrument = document.querySelector("[data-led-lab]");
 const startButton = document.querySelector("#start-stop");
@@ -20,6 +21,7 @@ const rateOutput = document.querySelector("#led-rate-output");
 const channelRateOutput = document.querySelector("#channel-rate-output");
 const pwmFrequencyOutput = document.querySelector("#pwm-frequency-output");
 const sourceInputs = [...document.querySelectorAll('[name="monitor-source"]')];
+const scopeTimebaseInputs = [...document.querySelectorAll('[name="scope-timebase"]')];
 const pulseInput = document.querySelector("#pulse-width");
 const pulseOutput = document.querySelector("#pulse-width-output");
 const targetInput = document.querySelector("#target-current");
@@ -48,6 +50,8 @@ const currentCanvas = document.querySelector("#current-scope");
 const audioCanvas = document.querySelector("#audio-scope");
 const scopeSourceOutput = document.querySelector("#scope-source-output");
 const audioSourceOutput = document.querySelector("#audio-source-output");
+const currentWindowOutput = document.querySelector("#current-window-output");
+const audioWindowOutput = document.querySelector("#audio-window-output");
 
 let audioContext = null;
 let workletNode = null;
@@ -57,6 +61,25 @@ let lastMonitorSource = "poisson";
 
 function selectedSource() {
   return sourceInputs.find(input => input.checked)?.value ?? "poisson";
+}
+
+function selectedScopeSeconds() {
+  return Number(scopeTimebaseInputs.find(input => input.checked)?.value)
+    || DEFAULT_SCOPE_SECONDS;
+}
+
+function formatTimebase(seconds) {
+  return seconds >= 1 ? `${seconds.toFixed(0)} s` : `${Math.round(seconds * 1_000)} ms`;
+}
+
+function monitorGainFromControl() {
+  return 10 ** Number(volumeInput.value);
+}
+
+function formatMonitorGain(gain) {
+  if (gain < 0.1) return `${gain.toFixed(2)}×`;
+  if (gain < 10) return `${gain.toFixed(gain < 1 ? 2 : 1).replace(/\.0$/, "")}×`;
+  return `${Math.round(gain)}×`;
 }
 
 function rateFromControl() {
@@ -90,11 +113,12 @@ function updateControlLabels() {
   pulseOutput.value = values.pulseWidthMs < 1
     ? `${values.pulseWidthMs.toFixed(2)} ms`
     : `${values.pulseWidthMs.toFixed(values.pulseWidthMs < 10 ? 1 : 0)} ms`;
-  targetOutput.value = `${Math.round(values.targetCurrent * 100)}%`;
-  volumeOutput.value = `${Math.round(Number(volumeInput.value) * 100)}%`;
+  const targetPercent = Number(targetInput.value);
+  targetOutput.value = `${Number.isInteger(targetPercent) ? targetPercent : targetPercent.toFixed(1)}%`;
+  volumeOutput.value = formatMonitorGain(monitorGainFromControl());
   const sourceName = selectedSource() === "pwm" ? "PWM" : "Poisson";
   scopeSourceOutput.textContent = `${sourceName} · min/max-preserving`;
-  audioSourceOutput.textContent = `${sourceName} · post-DC · before Output Level`;
+  audioSourceOutput.textContent = `${sourceName} · target-centered · before Monitor Gain`;
 }
 
 function configureRunningEngine() {
@@ -111,7 +135,7 @@ function configureRunningEngine() {
     statusOutput.value = `Both running · monitoring ${selectedSource() === "pwm" ? "PWM" : "Poisson"}`;
   }
   if (monitorGain && audioContext) {
-    const level = soundInput.checked ? Number(volumeInput.value) : 0;
+    const level = soundInput.checked ? monitorGainFromControl() : 0;
     monitorGain.gain.setTargetAtTime(level, audioContext.currentTime, 0.01);
   }
 }
@@ -134,15 +158,22 @@ function clearLeds() {
   arrivalOutput.value = "0/s";
 }
 
-function createScope(canvas, { minimum, maximum, color, center = null }) {
+function createScope(canvas, {
+  minimum,
+  maximum,
+  color,
+  center = null,
+  windowSeconds = DEFAULT_SCOPE_SECONDS,
+}) {
   const context = canvas.getContext("2d");
-  let ring = new Float32Array(48_000);
+  let selectedWindowSeconds = windowSeconds;
+  let ring = new Float32Array(Math.round(48_000 * selectedWindowSeconds));
   let write = 0;
   let filled = 0;
 
   function append(samples, sampleRate) {
-    if (ring.length !== Math.round(sampleRate * SCOPE_SECONDS)) {
-      ring = new Float32Array(Math.round(sampleRate * SCOPE_SECONDS));
+    if (ring.length !== Math.round(sampleRate * selectedWindowSeconds)) {
+      ring = new Float32Array(Math.max(1, Math.round(sampleRate * selectedWindowSeconds)));
       write = 0;
       filled = 0;
     }
@@ -156,6 +187,14 @@ function createScope(canvas, { minimum, maximum, color, center = null }) {
   function valueAt(index) {
     const start = (write - filled + ring.length) % ring.length;
     return ring[(start + index) % ring.length];
+  }
+
+  function orderedSamples() {
+    const ordered = new Float32Array(filled);
+    for (let index = 0; index < filled; index += 1) {
+      ordered[index] = valueAt(index);
+    }
+    return ordered;
   }
 
   function draw() {
@@ -195,26 +234,43 @@ function createScope(canvas, { minimum, maximum, color, center = null }) {
     }
 
     if (filled === 0) return;
+    const envelope = prepareScopeEnvelope(orderedSamples(), width);
+    const plotInset = Math.max(2, ratio * 2);
+    const yAt = value => {
+      const bounded = Math.min(maximum, Math.max(minimum, value));
+      const fraction = (bounded - minimum) / (maximum - minimum);
+      return height - plotInset - fraction * (height - plotInset * 2);
+    };
+
+    context.fillStyle = color;
+    context.globalAlpha = 0.1;
+    context.beginPath();
+    for (let pixel = 0; pixel < envelope.maximums.length; pixel += 1) {
+      const x = pixel + 0.5;
+      const y = yAt(envelope.maximums[pixel]);
+      if (pixel === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    for (let pixel = envelope.minimums.length - 1; pixel >= 0; pixel -= 1) {
+      context.lineTo(pixel + 0.5, yAt(envelope.minimums[pixel]));
+    }
+    context.closePath();
+    context.fill();
+
+    context.globalAlpha = 0.94;
     context.strokeStyle = color;
     context.lineWidth = Math.max(1, ratio);
-    context.beginPath();
-    for (let pixel = 0; pixel < width; pixel += 1) {
-      const start = Math.floor(pixel * filled / width);
-      const end = Math.max(start + 1, Math.floor((pixel + 1) * filled / width));
-      let localMinimum = Infinity;
-      let localMaximum = -Infinity;
-      for (let sample = start; sample < end; sample += 1) {
-        const value = valueAt(sample);
-        localMinimum = Math.min(localMinimum, value);
-        localMaximum = Math.max(localMaximum, value);
+    for (const values of [envelope.maximums, envelope.minimums]) {
+      context.beginPath();
+      for (let pixel = 0; pixel < values.length; pixel += 1) {
+        const x = pixel + 0.5;
+        const y = yAt(values[pixel]);
+        if (pixel === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
       }
-      const x = pixel + 0.5;
-      const yMaximum = height - (localMaximum - minimum) / (maximum - minimum) * height;
-      const yMinimum = height - (localMinimum - minimum) / (maximum - minimum) * height;
-      context.moveTo(x, yMaximum);
-      context.lineTo(x, yMinimum);
+      context.stroke();
     }
-    context.stroke();
+    context.globalAlpha = 1;
   }
 
   function clear() {
@@ -223,7 +279,16 @@ function createScope(canvas, { minimum, maximum, color, center = null }) {
     filled = 0;
   }
 
-  return Object.freeze({ append, clear, draw });
+  function setWindowSeconds(seconds) {
+    const next = Math.max(0.001, Math.min(1, Number(seconds) || DEFAULT_SCOPE_SECONDS));
+    if (next === selectedWindowSeconds) return;
+    selectedWindowSeconds = next;
+    ring = new Float32Array(Math.max(1, Math.round(48_000 * selectedWindowSeconds)));
+    write = 0;
+    filled = 0;
+  }
+
+  return Object.freeze({ append, clear, draw, setWindowSeconds });
 }
 
 const currentScope = createScope(currentCanvas, {
@@ -237,6 +302,18 @@ const audioScope = createScope(audioCanvas, {
   center: 0,
   color: "#69e5dc",
 });
+
+function updateScopeTimebase() {
+  const seconds = selectedScopeSeconds();
+  currentScope.setWindowSeconds(seconds);
+  audioScope.setWindowSeconds(seconds);
+  const label = formatTimebase(seconds);
+  currentWindowOutput.value = label;
+  audioWindowOutput.value = label;
+  currentCanvas.setAttribute("aria-label", `${label} Aggregate White current waveform`);
+  audioCanvas.setAttribute("aria-label", `${label} target-centered audio waveform`);
+  scopeRenderLoop.wake();
+}
 
 const scopeRenderLoop = createRenderLoop({
   draw: () => {
@@ -287,7 +364,7 @@ async function start() {
     processorOptions: settings(),
   });
   monitorGain = audioContext.createGain();
-  monitorGain.gain.value = soundInput.checked ? Number(volumeInput.value) : 0;
+  monitorGain.gain.value = soundInput.checked ? monitorGainFromControl() : 0;
   workletNode.port.onmessage = ({ data }) => {
     if (data?.type === "current-frame" && running) renderCurrentFrame(data);
   };
@@ -344,12 +421,17 @@ for (const input of [
   input.addEventListener("change", configureRunningEngine);
 }
 
+for (const input of scopeTimebaseInputs) {
+  input.addEventListener("change", updateScopeTimebase);
+}
+
 window.addEventListener("pagehide", () => {
   if (running) stop();
 });
 
 updateControlLabels();
 clearLeds();
+updateScopeTimebase();
 scopeRenderLoop.wake();
 
 for (const [name, bank] of Object.entries(ledBanks)) {
