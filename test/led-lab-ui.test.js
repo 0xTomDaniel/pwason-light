@@ -44,7 +44,8 @@ test("the LED display has one fixed frame-mean rule and separate diagnostics", a
   assert.match(html, /id="rms-modulation"/);
   assert.match(html, /id="peak-current"/);
   assert.match(html, /id="limit-proximity"/);
-  assert.match(html, /id="current-scope"/);
+  assert.match(html, /id="poisson-current-scope"/);
+  assert.match(html, /id="pwm-current-scope"/);
 });
 
 test("the lab exposes PWM as a matched scientific control condition", async () => {
@@ -80,11 +81,14 @@ test("PWM exposes derived on-time and silence as read-only timing evidence", asy
   assert.match(html, /on-time and silence are derived readouts, not independent controls/i);
 });
 
-test("the lab exposes separate fixed-scale current and audio oscilloscopes", async () => {
+test("the lab exposes simultaneous fixed-scale condition scopes and one selected audio scope", async () => {
   const html = await readFile(specificationUrl, "utf8");
 
-  assert.match(html, /id="current-scope"/);
+  assert.match(html, /id="poisson-current-scope"/);
+  assert.match(html, /id="pwm-current-scope"/);
   assert.match(html, /id="audio-scope"/);
+  assert.match(html, /Simultaneous aggregate currents/i);
+  assert.match(html, /both current scopes remain visible and retain history when Monitor Source changes/i);
   assert.match(html, /target-centered waveform/i);
   assert.match(html, /fixed −1 to \+1 current units/i);
   assert.match(html, /no visual normalization/i);
@@ -114,8 +118,10 @@ test("the AC Current Monitor exposes manual logarithmic gain without automatic p
   assert.match(html, /<span>Monitor gain<\/span>/i);
   assert.match(html, /id="output-level"[^>]+min="-2"[^>]+max="0\.3010299956639812"/);
   assert.match(html, /id="output-level"[^>]+step="any"[^>]+value="0\.3010299956639812"/);
-  assert.match(html, /id="monitor-gain-maximum">2× safe max<\/output>/i);
+  assert.match(html, /id="output-level-output">2× effective<\/output>/i);
+  assert.match(html, /id="monitor-gain-maximum">2× base safe max<\/output>/i);
   assert.match(html, /Gsafe = 1 ÷ max\(Ī, 1 − Ī\)/);
   assert.match(html, /clamps immediately when Target Mean Current changes/i);
+  assert.match(html, /PWM monitoring applies a fixed ¼× source attenuation/i);
   assert.match(html, /no automatic gain, limiter, or compressor/i);
 });

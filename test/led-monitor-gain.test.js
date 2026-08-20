@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { maximumSafeMonitorGain } from "../src/led-monitor-gain.js";
+import {
+  effectiveMonitorGain,
+  maximumSafeMonitorGain,
+} from "../src/led-monitor-gain.js";
 
 test("Monitor Gain is bounded by every target-centered waveform's exact peak", () => {
   assert.equal(maximumSafeMonitorGain(0.5), 2);
@@ -14,4 +17,10 @@ test("Monitor Gain safely bounds invalid Target Mean Current input", () => {
   assert.equal(maximumSafeMonitorGain(-1), 1);
   assert.equal(maximumSafeMonitorGain(2), 1);
   assert.equal(maximumSafeMonitorGain(Number.NaN), 2);
+});
+
+test("PWM monitoring is one quarter the Poisson monitor gain", () => {
+  assert.equal(effectiveMonitorGain(2, "poisson"), 2);
+  assert.equal(effectiveMonitorGain(2, "pwm"), 0.5);
+  assert.equal(effectiveMonitorGain(0.01, "pwm"), 0.0025);
 });

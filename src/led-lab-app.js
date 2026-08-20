@@ -1,6 +1,9 @@
 import { createRenderLoop } from "./render-loop.js";
 import { derivePwmTiming } from "./led-current-engine.js";
-import { maximumSafeMonitorGain } from "./led-monitor-gain.js";
+import {
+  effectiveMonitorGain,
+  maximumSafeMonitorGain,
+} from "./led-monitor-gain.js";
 import { prepareScopeEnvelope } from "./led-scope-visualizer.js";
 
 const CHANNEL_NAMES = [
@@ -55,9 +58,12 @@ const ledBanks = Object.fromEntries(
   ]),
 );
 const leds = Object.values(ledBanks).flatMap(bank => bank.leds);
-const currentCanvas = document.querySelector("#current-scope");
+const currentCanvases = Object.freeze({
+  poisson: document.querySelector("#poisson-current-scope"),
+  pwm: document.querySelector("#pwm-current-scope"),
+});
 const audioCanvas = document.querySelector("#audio-scope");
-const scopeSourceOutput = document.querySelector("#scope-source-output");
+const metricsSourceOutput = document.querySelector("#metrics-source-output");
 const audioSourceOutput = document.querySelector("#audio-source-output");
 const currentWindowOutput = document.querySelector("#current-window-output");
 const audioWindowOutput = document.querySelector("#audio-window-output");
@@ -82,10 +88,11 @@ function formatTimebase(seconds) {
 }
 
 function monitorGainFromControl() {
-  return Math.min(
+  const manualGain = Math.min(
     10 ** Number(volumeInput.value),
     maximumSafeMonitorGain(Number(targetInput.value) / 100),
   );
+  return effectiveMonitorGain(manualGain, selectedSource());
 }
 
 function formatMonitorGain(gain) {
@@ -162,10 +169,10 @@ function updateControlLabels() {
   pwmOnTimeOutput.value = formatDuration(pwmTiming.onTimeSeconds);
   pwmSilenceOutput.value = formatDuration(pwmTiming.silenceSeconds);
   pwmTargetOutput.value = `${targetOutput.value} mean · ${pwmPulseOutput.value} pulse · ${pwmDutyOutput.value}`;
-  volumeOutput.value = formatMonitorGain(monitorGainFromControl());
-  monitorGainMaximumOutput.value = `${formatMonitorGain(safeMonitorGain)} safe max`;
+  volumeOutput.value = `${formatMonitorGain(monitorGainFromControl())} effective`;
+  monitorGainMaximumOutput.value = `${formatMonitorGain(safeMonitorGain)} base safe max`;
   const sourceName = selectedSource() === "pwm" ? "PWM" : "Poisson";
-  scopeSourceOutput.textContent = `${sourceName} · min/max-preserving`;
+  metricsSourceOutput.textContent = sourceName;
   audioSourceOutput.textContent = `${sourceName} · target-centered · before Monitor Gain`;
 }
 
@@ -175,7 +182,6 @@ function configureRunningEngine() {
   updateControlLabels();
   workletNode?.port.postMessage({ type: "configure", settings: settings() });
   if (monitorChanged) {
-    currentScope.clear();
     audioScope.clear();
     scopeRenderLoop.wake();
   }
@@ -340,10 +346,17 @@ function createScope(canvas, {
   return Object.freeze({ append, clear, draw, setWindowSeconds });
 }
 
-const currentScope = createScope(currentCanvas, {
-  minimum: 0,
-  maximum: 1,
-  color: "#d7ff73",
+const currentScopes = Object.freeze({
+  poisson: createScope(currentCanvases.poisson, {
+    minimum: 0,
+    maximum: 1,
+    color: "#d7ff73",
+  }),
+  pwm: createScope(currentCanvases.pwm, {
+    minimum: 0,
+    maximum: 1,
+    color: "#69e5dc",
+  }),
 });
 const audioScope = createScope(audioCanvas, {
   minimum: -1,
@@ -354,19 +367,20 @@ const audioScope = createScope(audioCanvas, {
 
 function updateScopeTimebase() {
   const seconds = selectedScopeSeconds();
-  currentScope.setWindowSeconds(seconds);
+  for (const scope of Object.values(currentScopes)) scope.setWindowSeconds(seconds);
   audioScope.setWindowSeconds(seconds);
   const label = formatTimebase(seconds);
   currentWindowOutput.value = label;
   audioWindowOutput.value = label;
-  currentCanvas.setAttribute("aria-label", `${label} Aggregate White current waveform`);
+  currentCanvases.poisson.setAttribute("aria-label", `${label} Poisson Aggregate White current waveform`);
+  currentCanvases.pwm.setAttribute("aria-label", `${label} PWM Aggregate White current waveform`);
   audioCanvas.setAttribute("aria-label", `${label} target-centered audio waveform`);
   scopeRenderLoop.wake();
 }
 
 const scopeRenderLoop = createRenderLoop({
   draw: () => {
-    currentScope.draw();
+    for (const scope of Object.values(currentScopes)) scope.draw();
     audioScope.draw();
   },
   isActive: () => false,
@@ -387,10 +401,11 @@ function renderBank(name, condition) {
 function renderCurrentFrame(message) {
   for (const [name, condition] of Object.entries(message.conditions)) {
     renderBank(name, condition);
+    const conditionEngine = message.engine.conditions[name];
+    currentScopes[name]?.append(condition.scope, conditionEngine.sampleRate);
   }
   const monitored = message.conditions[message.monitorSource];
   const engine = message.engine.conditions[message.monitorSource];
-  currentScope.append(monitored.scope, engine.sampleRate);
   audioScope.append(monitored.audioScope, engine.sampleRate);
   scopeRenderLoop.wake();
   const aggregate = 8;
@@ -439,7 +454,7 @@ async function stop() {
   const contextToClose = audioContext;
   audioContext = null;
   await contextToClose?.close();
-  currentScope.clear();
+  for (const scope of Object.values(currentScopes)) scope.clear();
   audioScope.clear();
   clearLeds();
   scopeRenderLoop.wake();

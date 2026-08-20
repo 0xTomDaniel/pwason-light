@@ -13,11 +13,11 @@ One of eight separately observable light signals. A Channel's LED wavelength ide
 _Avoid_: Color process, audio voice, spectral band
 
 **Poisson LED Lab Engine**:
-The standalone current-first comparison Module that owns simultaneous Steady Poisson Process and PWM Control condition engines, their shared controls, two eight-Channel current banks, two Aggregate White signals, and the monitor selection. Its Interface advances both deterministic sample blocks together; Monitor Source exposes either already-running condition to diagnostics and the direct AC Current Monitor without resetting either or calling the Generated Rain Renderer.
+The standalone current-first comparison Module that owns simultaneous Steady Poisson Process and PWM Control condition engines, their shared controls, two eight-Channel current banks, two Aggregate White signals, two fixed-scale Current Oscilloscopes, and the monitor selection. Its Interface advances both deterministic sample blocks together; Monitor Source exposes either already-running condition to selected metrics, the Audio Oscilloscope, and the direct AC Current Monitor without resetting either condition, clearing either Current Oscilloscope, or calling the Generated Rain Renderer.
 _Avoid_: Rain renderer, audio-to-light adapter, mixed acoustic source
 
 **PWM Control**:
-The deterministic scientific control condition that runs continuously beside Poisson in the LED lab. Every Channel receives the same phase-aligned waveform at frequency `Λ/8`, so eight cycle counts sum to the selected total event budget `Λ`. PWM Pulse Current sets its positive on-state current and duty is derived as `Target Mean Current / PWM Pulse Current`, preserving the shared commanded mean. At the pulse-current minimum, duty is 100% and the output becomes continuous reduced current; at exactly 100% Target Mean Current it is full DC. Phase and cycle accounting continue in both cases. Current Fall Time is ignored. The bank exposes commanded mean, pulse current, and duty separately from each LED's Frame-Mean Current. A separate nine-LED bank always displays it; Monitor Source only chooses whether its Aggregate White feeds diagnostics, commanded-mean subtraction, Monitor Gain, and both oscilloscopes.
+The deterministic scientific control condition that runs continuously beside Poisson in the LED lab. Every Channel receives the same phase-aligned waveform at frequency `Λ/8`, so eight cycle counts sum to the selected total event budget `Λ`. PWM Pulse Current sets its positive on-state current and duty is derived as `Target Mean Current / PWM Pulse Current`, preserving the shared commanded mean. At the pulse-current minimum, duty is 100% and the output becomes continuous reduced current; at exactly 100% Target Mean Current it is full DC. Phase and cycle accounting continue in both cases. Current Fall Time is ignored. The bank exposes commanded mean, pulse current, and duty separately from each LED's Frame-Mean Current. A separate nine-LED bank and fixed-scale current scope always display it; Monitor Source only chooses which condition feeds selected metrics, commanded-mean subtraction, Monitor Gain, and the Audio Oscilloscope.
 _Avoid_: Poisson approximation, audio oscillator, staggered aggregate smoothing
 
 **PWM Pulse Current**:
@@ -37,19 +37,23 @@ The continuously selectable 1–100% high-overlap mean-current target used to sc
 _Avoid_: Brightness normalization, current measurement, limiter threshold
 
 **AC Current Monitor**:
-The mono audible signal obtained by subtracting commanded Target Mean Current directly from every Aggregate White sample, then applying explicit Monitor Gain. The subtraction only translates the current waveform's vertical origin; it has no filter state, decay, or frequency shaping. Sparse bounded Poisson current can retain a small residual offset when its actual mean differs from its target. A fixed-scale Audio Oscilloscope displays the exact target-centered samples before Monitor Gain.
+The mono audible signal obtained by subtracting commanded Target Mean Current directly from every Aggregate White sample, applying the fixed Monitor Source Gain, then applying explicit Monitor Gain. The subtraction only translates the current waveform's vertical origin; it has no filter state, decay, or frequency shaping. Sparse bounded Poisson current can retain a small residual offset when its actual mean differs from its target. A fixed-scale Audio Oscilloscope displays the exact target-centered samples before either gain stage.
 _Avoid_: Audio synthesizer, acoustic response, loudness matching
 
 **Monitor Gain**:
-The explicit fixed scalar applied after DC conversion solely for listening. Its logarithmic control begins at 0.01× and is bounded by `1 / max(Ī, 1 - Ī)`, the exact largest gain that keeps every possible target-centered current sample inside browser audio full scale. The bound is 2× at a 50% target, about 1.33× at 25% or 75%, and 1× at full DC. Changing Target Mean Current updates the slider maximum and clamps its current value immediately. It cannot affect either current engine, either LED bank, or the pre-gain Audio Oscilloscope and performs no automatic normalization, compression, limiting, or feedback.
+The explicit manual base scalar applied after DC conversion solely for listening. Its logarithmic control begins at 0.01× and is bounded by `1 / max(Ī, 1 - Ī)`, the exact largest base gain that keeps every possible target-centered current sample inside browser audio full scale. The bound is 2× at a 50% target, about 1.33× at 25% or 75%, and 1× at full DC. Effective gain additionally includes Monitor Source Gain. Changing Target Mean Current updates the slider maximum and clamps its current value immediately. It cannot affect either current engine, either LED bank, or the pre-gain Audio Oscilloscope and performs no automatic normalization, compression, limiting, or feedback.
 _Avoid_: Automatic gain, loudness matching, optical gain
 
+**Monitor Source Gain**:
+The fixed post-worklet listening-only factor applied after selecting a continuously running condition: `1×` for Poisson and `0.25×` for PWM. It exists because the PWM monitor is perceptually too loud at equal base gain. It changes immediately with Monitor Source but cannot alter current samples, LEDs, diagnostics, either Current Oscilloscope, the pre-gain Audio Oscilloscope, or the shared base-gain slider.
+_Avoid_: Automatic loudness matching, current scaling, source-dependent optical gain
+
 **Frame-Mean Current**:
-The single virtual-LED display rule in the standalone LED lab: the arithmetic mean of every worklet-rate current sample in one display interval. Other reported statistics are diagnostics rather than selectable drive modes. Separate fixed-scale Current and Audio Oscilloscopes retain within-frame excursions without visual normalization.
+The single virtual-LED display rule in the standalone LED lab: the arithmetic mean of every worklet-rate current sample in one display interval. Other reported statistics are diagnostics rather than selectable drive modes. Two simultaneous fixed-scale Current Oscilloscopes and one selected-source Audio Oscilloscope retain within-frame excursions without visual normalization.
 _Avoid_: Downsampled event, peak brightness mode, physical flicker proof
 
 **Scope Timebase**:
-The shared diagnostic window for the standalone LED lab's Current and Audio Oscilloscopes, selectable as 1 s, 100 ms, 10 ms, or 1 ms and defaulting to 10 ms. It changes only retained and displayed history. Connected per-pixel minimum and maximum envelopes preserve sustained same-sign plateaus as visible horizontal traces and preserve unresolved excursions as a bounded band without modifying, normalizing, or feeding back into either condition.
+The shared diagnostic window for the standalone LED lab's two Current Oscilloscopes and selected-source Audio Oscilloscope, selectable as 1 s, 100 ms, 10 ms, or 1 ms and defaulting to 10 ms. It changes only retained and displayed history. Connected per-pixel minimum and maximum envelopes preserve sustained same-sign plateaus as visible horizontal traces and preserve unresolved excursions as a bounded band without modifying, normalizing, or feeding back into either condition.
 _Avoid_: Signal rate, PWM duty, waveform resampling, display gain
 
 **Optical Drive Signal**:

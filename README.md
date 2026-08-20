@@ -43,16 +43,19 @@ readouts expose the resulting morphology without becoming additional controls.
 Current Fall Time applies only to Poisson.
 Target Mean Current travels continuously from 1–100%; exactly 100% is a shared
 full-DC endpoint while both underlying clocks continue. A Monitor
-Source selector chooses which continuously running
-condition feeds the metrics, fixed-scale oscilloscopes, and mono sound monitor;
-it never starts, stops, or resets either condition. A shared Scope Timebase
+Source selector chooses which continuously running condition feeds selected
+metrics, the fixed-scale audio oscilloscope, and mono sound monitor. Both
+fixed-scale current oscilloscopes remain simultaneously visible and retain
+their histories; the selector never starts, stops, or resets either condition. A shared Scope Timebase
 selects a 1 s, 100 ms, 10 ms, or 1 ms window, defaulting to 10 ms so sustained
 PWM plateaus remain visible. Connected minimum and maximum envelopes preserve
 both flat plateaus and unresolved excursions without normalizing the signal.
 Each ninth Aggregate White signal is the instantaneous eight-Channel mean. The
 sound monitor subtracts commanded Target Mean Current directly from Aggregate
 White, then applies logarithmic manual Monitor Gain capped by the exact
-target-dependent no-clipping bound (2× at the default 50% target). This
+target-dependent no-clipping bound (2× at the default 50% target). The selected
+PWM monitor is then heard at a fixed one-quarter level relative to Poisson, so
+the default 2× base gain is 2× effective for Poisson and 0.5× for PWM. This
 standalone page does not call or modify the existing rain renderer.
 
 ## Controls
