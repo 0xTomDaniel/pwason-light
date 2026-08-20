@@ -19,6 +19,7 @@ class RainBlockRendererProcessor extends AudioWorkletProcessor {
     this.denseAccumulator = null;
     this.opticalDrive = null;
     this.opticalSensitivity = options.processorOptions?.opticalSensitivity ?? 32;
+    this.opticalMode = options.processorOptions?.opticalMode ?? "additive";
     this.opticalFramesSincePost = 0;
     this.field = null;
     this.port.onmessage = event => this.receive(event.data);
@@ -47,6 +48,7 @@ class RainBlockRendererProcessor extends AudioWorkletProcessor {
 
     if (message?.type === "start") {
       this.opticalSensitivity = message.opticalSensitivity ?? this.opticalSensitivity;
+      this.opticalMode = message.opticalMode ?? this.opticalMode;
       const engine = createPoissonEngine(message.settings);
       this.field = {
         engine,
@@ -56,6 +58,7 @@ class RainBlockRendererProcessor extends AudioWorkletProcessor {
       };
       this.opticalDrive = createOpticalDriveRenderer({
         sensitivity: this.opticalSensitivity,
+        mode: this.opticalMode,
       });
       this.opticalFramesSincePost = 0;
       return;
@@ -63,9 +66,11 @@ class RainBlockRendererProcessor extends AudioWorkletProcessor {
 
     if (message?.type === "configure-optical-drive") {
       this.opticalSensitivity = message.sensitivity ?? this.opticalSensitivity;
+      this.opticalMode = message.mode ?? this.opticalMode;
       if (this.field) {
         this.opticalDrive = createOpticalDriveRenderer({
           sensitivity: this.opticalSensitivity,
+          mode: this.opticalMode,
         });
         this.opticalFramesSincePost = 0;
       }

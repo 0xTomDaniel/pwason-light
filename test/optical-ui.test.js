@@ -29,5 +29,12 @@ test("the prototype exposes one fixed optical current sensitivity control", asyn
 
   assert.match(html, /id="optical-sensitivity"[^>]+min="0"[^>]+max="8"[^>]+value="5"/);
   assert.match(html, /id="optical-sensitivity-output"[^>]*>32×</);
-  assert.match(html, /Silence → dark/);
+  assert.match(html, /<div class="range-ends"><span>1×<\/span><span>256×<\/span><\/div>/);
+});
+
+test("the prototype exposes an additive and subtractive optical mode switch", async () => {
+  const html = await readFile(specificationUrl, "utf8");
+
+  assert.match(html, /id="optical-subtractive"[^>]+type="checkbox"[^>]+role="switch"/);
+  assert.match(html, /id="optical-mode-output"[^>]*>Additive · silence dark</);
 });

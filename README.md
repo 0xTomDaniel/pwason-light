@@ -68,17 +68,20 @@ total Arrival rate = Λ
 
 The optical experiment uses the exact same Arrivals and generated responses as
 the audio renderer. Before stereo panning, each Arrival is routed into its eight
-Channel contributions. Each completed signed Channel bus is full-wave rectified
-and converted to positive current by `I = G|x| / (1 + G|x|)`. Silence is dark;
-both pressure polarities contribute current; and the smooth limiter approaches
-full drive without a hard clipping threshold. One explicit logarithmic Current
-Sensitivity control selects the fixed `G` from 1×–256×, defaulting to 32×. It
-never follows Speed or signal level. There is no optical rate compensation,
-smoothing, envelope follower, or automatic normalization. The ninth white LED
-is the arithmetic mean of the eight drives, not a ninth Channel or an independent
-Arrival stream. The browser reports frame-mean current and raw current RMS while
-the worklet evaluates the transform at audio sample rate. This read-only tap does
-not alter the blessed stereo rain output or use Rain Reference samples.
+Channel contributions. Each completed signed Channel bus is full-wave rectified.
+Additive mode converts it to positive current by `Iadd = G|x| / (1 + G|x|)`,
+making running silence dark. Subtractive mode is the exact complement
+`Isub = 1 − Iadd = 1 / (1 + G|x|)`, making running silence peak-bright and
+the same waveform magnitude subtract current. Stop remains dark in both modes.
+Both pressure polarities contribute current, and the smooth limiter has no hard
+clipping threshold. One explicit logarithmic Current Sensitivity control selects
+the fixed `G` from 1×–256×, defaulting to 32×. It never follows Speed or signal
+level. There is no optical rate compensation, smoothing, envelope follower, or
+automatic normalization. The ninth white LED is the arithmetic mean of the eight
+drives, not a ninth Channel or an independent Arrival stream. The browser reports
+frame-mean current and raw current RMS while the worklet evaluates the transform
+at audio sample rate. This read-only tap does not alter the blessed stereo rain
+output or use Rain Reference samples.
 
 Each Arrival receives an independent position within a circular Listening
 Field. Field Depth sets its radius, Distance Loss controls relative pressure,

@@ -13,8 +13,12 @@ One of eight separately observable light signals. A Channel's LED wavelength ide
 _Avoid_: Color process, audio voice, spectral band
 
 **Optical Drive Signal**:
-One of eight positive current-like signals obtained from its matching signed, pre-stereo generated-audio Channel bus by full-wave rectification, one manually selected fixed Current Sensitivity, and the smooth limiter `I = G|x| / (1 + G|x|)`. Silence is darkness; both pressure polarities contribute current without becoming new Arrivals. The signal has no light-specific rate compensation, smoothing, envelope, or automatic normalization and does not change the blessed generated rain audio, Poisson timing, or Channel routing.
+One of eight positive current-like signals obtained from its matching signed, pre-stereo generated-audio Channel bus by full-wave rectification, one manually selected fixed Current Sensitivity, a smooth current limiter, and the selected Optical Current Mode. Both pressure polarities contribute current without becoming new Arrivals. The signal has no light-specific rate compensation, smoothing, envelope, or automatic normalization and does not change the blessed generated rain audio, Poisson timing, or Channel routing.
 _Avoid_: Audio output, PWM, spectral timbre
+
+**Optical Current Mode**:
+The explicit choice between Additive current `Iadd = G|x| / (1 + G|x|)`, where running silence is dark, and its exact Subtractive complement `Isub = 1 − Iadd = 1 / (1 + G|x|)`, where running silence is peak-bright. Stop forces darkness in both modes. Switching modes changes only the optical transformation and never restarts or modifies the Steady Poisson Process or blessed audio.
+_Avoid_: Second optical source, polarity event, inverted Poisson process
 
 **Current Sensitivity**:
 The fixed multiplier `G` applied to the magnitude of every Optical Drive Signal before its smooth current limiter. The prototype exposes one logarithmic 1×–256× manual control, defaulting to 32×. Once selected, it is identical across Channels and independent of Speed, time, signal statistics, and Rain References.

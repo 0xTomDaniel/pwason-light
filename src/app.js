@@ -69,6 +69,7 @@ const dropPopulationInput = document.querySelector("#drop-population");
 const speedPopulationLinkInput = document.querySelector("#speed-population-link");
 const couplingInput = document.querySelector("#coupling");
 const opticalSensitivityInput = document.querySelector("#optical-sensitivity");
+const opticalSubtractiveInput = document.querySelector("#optical-subtractive");
 const volumeInput = document.querySelector("#output-level");
 const sourceMixInput = document.querySelector("#source-mix");
 const soundInput = document.querySelector("#sound-enabled");
@@ -77,6 +78,7 @@ const rateRenderNote = document.querySelector("#rate-render-note");
 const dropPopulationOutput = document.querySelector("#drop-population-output");
 const couplingOutput = document.querySelector("#coupling-output");
 const opticalSensitivityOutput = document.querySelector("#optical-sensitivity-output");
+const opticalModeOutput = document.querySelector("#optical-mode-output");
 const volumeOutput = document.querySelector("#output-level-output");
 const sourceMixOutput = document.querySelector("#source-mix-output");
 const referenceProfileSelect = document.querySelector("#reference-profile");
@@ -469,6 +471,10 @@ function selectedOpticalSensitivity() {
   return 2 ** Number(opticalSensitivityInput.value);
 }
 
+function selectedOpticalMode() {
+  return opticalSubtractiveInput.checked ? "subtractive" : "additive";
+}
+
 function formatRate(rateHz) {
   if (rateHz < 10) return rateHz.toFixed(2);
   if (rateHz < 100) return rateHz.toFixed(1);
@@ -510,6 +516,10 @@ function updateControlReadouts() {
     "aria-valuetext",
     `${opticalSensitivity.toFixed(opticalSensitivity < 10 ? 1 : 0)} times current sensitivity`,
   );
+  const opticalMode = selectedOpticalMode();
+  opticalModeOutput.value = opticalMode === "subtractive"
+    ? "Subtractive · silence bright"
+    : "Additive · silence dark";
   const populationPercent = Math.round(controls.dropPopulation * 100);
   dropPopulationOutput.value = controls.dropPopulation < 0.34
     ? `Fine · ${populationPercent}%`
@@ -668,6 +678,7 @@ function startRainWorklet() {
     type: "start",
     settings: settings(),
     opticalSensitivity: selectedOpticalSensitivity(),
+    opticalMode: selectedOpticalMode(),
   });
   rainWorkletActive = true;
 }
@@ -1624,11 +1635,12 @@ function reseed() {
   restartEngine();
 }
 
-function updateOpticalSensitivity() {
+function updateOpticalDriveSettings() {
   updateControlReadouts();
   rainWorkletNode?.port.postMessage({
     type: "configure-optical-drive",
     sensitivity: selectedOpticalSensitivity(),
+    mode: selectedOpticalMode(),
   });
 }
 
@@ -1638,7 +1650,8 @@ rateInput.addEventListener("input", updateRate);
 dropPopulationInput.addEventListener("input", updateDropPopulation);
 speedPopulationLinkInput.addEventListener("change", updateSpeedPopulationLink);
 couplingInput.addEventListener("input", updateControlReadouts);
-opticalSensitivityInput.addEventListener("input", updateOpticalSensitivity);
+opticalSensitivityInput.addEventListener("input", updateOpticalDriveSettings);
+opticalSubtractiveInput.addEventListener("change", updateOpticalDriveSettings);
 volumeInput.addEventListener("input", updateOutputLevel);
 sourceMixInput.addEventListener("input", updateSourceMix);
 soundInput.addEventListener("change", async () => {

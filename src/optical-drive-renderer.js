@@ -1,5 +1,6 @@
 const DEFAULT_CHANNEL_COUNT = 8;
 const DEFAULT_CURRENT_SENSITIVITY = 32;
+const OPTICAL_CURRENT_MODES = new Set(["additive", "subtractive"]);
 
 function finite(value, fallback) {
   const number = Number(value);
@@ -14,9 +15,13 @@ function smoothCurrentLimit(value) {
 export function createOpticalDriveRenderer({
   channelCount = DEFAULT_CHANNEL_COUNT,
   sensitivity = DEFAULT_CURRENT_SENSITIVITY,
+  mode = "additive",
 } = {}) {
   const channels = Math.max(1, Math.floor(finite(channelCount, DEFAULT_CHANNEL_COUNT)));
   const fixedSensitivity = Math.max(0, finite(sensitivity, DEFAULT_CURRENT_SENSITIVITY));
+  if (!OPTICAL_CURRENT_MODES.has(mode)) {
+    throw new TypeError(`Unknown optical current mode: ${mode}`);
+  }
   let currentSum = new Float64Array(channels + 1);
   let currentEnergy = new Float64Array(channels + 1);
   let diagnosticFrames = 0;
@@ -34,7 +39,12 @@ export function createOpticalDriveRenderer({
       let aggregateCurrent = 0;
       for (let channel = 0; channel < channels; channel += 1) {
         const signed = finite(signedChannels[channel][sampleIndex], 0);
-        const current = smoothCurrentLimit(fixedSensitivity * Math.abs(signed));
+        const additiveCurrent = smoothCurrentLimit(
+          fixedSensitivity * Math.abs(signed),
+        );
+        const current = mode === "subtractive"
+          ? 1 - additiveCurrent
+          : additiveCurrent;
         currentSum[channel] += current;
         currentEnergy[channel] += current * current;
         aggregateCurrent += current;
@@ -56,6 +66,7 @@ export function createOpticalDriveRenderer({
         Array.from(currentEnergy, energy => Math.sqrt(energy / divisor)),
       ),
       sensitivity: fixedSensitivity,
+      mode,
       sampleCount: diagnosticFrames,
     });
     if (resetDiagnostics) {

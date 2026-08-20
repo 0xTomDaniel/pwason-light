@@ -49,6 +49,25 @@ test("optical drive gives both pressure polarities equal current and silence no 
   assert.deepEqual(silent.snapshot().levels, Array(9).fill(0));
 });
 
+test("subtractive optical mode removes the same current from peak drive", () => {
+  const renderer = createOpticalDriveRenderer({
+    sensitivity: 1,
+    mode: "subtractive",
+  });
+
+  renderer.process(constantChannels([-1, -0.5, 0, 0.5, 1, 0, 0, 0]));
+  const snapshot = renderer.snapshot();
+
+  const expected = [0.5, 2 / 3, 1, 2 / 3, 0.5, 1, 1, 1];
+  assert.equal(
+    snapshot.levels.slice(0, 8).every(
+      (level, index) => Math.abs(level - expected[index]) < 1e-12,
+    ),
+    true,
+  );
+  assert.equal(snapshot.mode, "subtractive");
+});
+
 test("raw-current diagnostics are invariant across block partitions", () => {
   function render(partitions) {
     const renderer = createOpticalDriveRenderer();
