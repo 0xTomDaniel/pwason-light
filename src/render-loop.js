@@ -16,11 +16,12 @@ export function createRenderLoop({
 
   function render(now) {
     framePending = false;
-    if (lastDrawAt === null || now - lastDrawAt >= frameInterval) {
+    const drew = lastDrawAt === null || now - lastDrawAt >= frameInterval;
+    if (drew) {
       lastDrawAt = now;
       draw(now);
     }
-    if (isActive()) wake();
+    if (isActive() || !drew) wake();
   }
 
   return Object.freeze({ wake });

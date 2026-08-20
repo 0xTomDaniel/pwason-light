@@ -19,6 +19,13 @@ function createVoice(startFrame, plan, sampleRate) {
     filterB: 0,
     leftGain: Math.cos(panAngle),
     rightGain: Math.sin(panAngle),
+    channelWeights: Float64Array.from(
+      Array.from({ length: 8 }, (_, index) => (
+        Number.isFinite(Number(plan.channelWeights?.[index]))
+          ? Number(plan.channelWeights[index])
+          : 0
+      )),
+    ),
   };
 }
 
@@ -45,9 +52,12 @@ export function createRainBlockAccumulator({
     }
   }
 
-  function render(frameCount) {
+  function renderBlock(frameCount, includeOptical) {
     const length = finiteInteger(frameCount);
     const output = Array.from({ length: channels }, () => new Float32Array(length));
+    const optical = includeOptical
+      ? Array.from({ length: 8 }, () => new Float32Array(length))
+      : null;
 
     for (let blockIndex = 0; blockIndex < length; blockIndex += 1) {
       while (pending[0]?.startFrame <= frame) {
@@ -72,6 +82,11 @@ export function createRainBlockAccumulator({
           left += sample * voice.leftGain;
           right += sample * voice.rightGain;
         }
+        if (optical) {
+          for (let channel = 0; channel < optical.length; channel += 1) {
+            optical[channel][blockIndex] += sample * voice.channelWeights[channel];
+          }
+        }
         if (responseIndex + 1 < voice.response.length) {
           active[survivorCount] = voice;
           survivorCount += 1;
@@ -87,7 +102,15 @@ export function createRainBlockAccumulator({
       frame += 1;
     }
 
-    return output;
+    return includeOptical ? { audio: output, optical } : output;
+  }
+
+  function render(frameCount) {
+    return renderBlock(frameCount, false);
+  }
+
+  function renderWithOptical(frameCount) {
+    return renderBlock(frameCount, true);
   }
 
   function reset(nextFrame = frame) {
@@ -99,6 +122,7 @@ export function createRainBlockAccumulator({
   return Object.freeze({
     schedule,
     render,
+    renderWithOptical,
     reset,
     get currentFrame() { return frame; },
   });

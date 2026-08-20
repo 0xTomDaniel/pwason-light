@@ -1,5 +1,6 @@
 const MINIMUM_SPEED_LOG = 2;
-const MAXIMUM_SPEED_LOG = 4;
+const MAXIMUM_RATE_HZ = 48_000;
+const MAXIMUM_SPEED_LOG = Math.log10(MAXIMUM_RATE_HZ);
 const SPEED_LOG_SPAN = MAXIMUM_SPEED_LOG - MINIMUM_SPEED_LOG;
 
 function finiteBounded(value, fallback, minimum = 0, maximum = 1) {
@@ -30,7 +31,7 @@ export function createRainControls({
   function snapshot() {
     return Object.freeze({
       speedLog: currentSpeedLog,
-      rateHz: 10 ** currentSpeedLog,
+      rateHz: Math.min(MAXIMUM_RATE_HZ, 10 ** currentSpeedLog),
       dropPopulation: currentDropPopulation,
       linked: currentlyLinked,
     });

@@ -2,7 +2,8 @@
 
 Pwason Light is an interactive HTML specification for an eight-Channel light
 instrument driven by a steady Poisson process. The same Arrivals produce a
-procedurally generated, spatial rain texture and eight virtual LED responses.
+procedurally generated, spatial rain texture, eight virtual LED responses, and
+a ninth white LED that displays their normalized aggregate.
 
 LED wavelength is output metadata only: it does not influence Arrival timing,
 audio pitch, or timbre. The eight Channels matter because they are separately
@@ -27,7 +28,7 @@ never begins automatically.
 
 | Control | Behavior |
 | --- | --- |
-| Speed | Continuously selects the total lamp Arrival rate from 100 to 10,000 events/s across three logarithmic ticks; 1,000 events/s remains the default. This exact-rendering trial precedes a planned 100,000/s extension. |
+| Speed | Continuously selects the total lamp Arrival rate from 100 to 48,000 events/s across four logarithmic ticks; 1,000 events/s remains the default. |
 | Drop Population | Moves the audio Rain Mark distribution from fine-dominant through mixed to large-drop-rich without changing the Arrival rate. |
 | Link Speed + Drop Population | Bidirectionally aligns both normalized slider positions; switching it off preserves their current values. |
 | Channel Coupling | Moves a fixed total Arrival rate between private Channel events and events shared by all eight Channels. |
@@ -51,8 +52,8 @@ Low Texture, 20% Mid Texture, 98% Band Independence, 92% Spectral Sparsity,
 45% Wet Microtexture, 70% Distance Loss, 45% Distance Air Damping, Wood Surface
 on at 20%, and Compression off. These controls never alter Reference Playback.
 
-At 100% Reference, the simulator continues producing light Arrivals but skips
-generated-audio scheduling.
+At 100% Reference, the simulator keeps the generated worklet running only to
+drive the optical experiment; its generated-audio gain remains silent.
 
 ## Rain model
 
@@ -65,18 +66,36 @@ private rate       = (1 − C)Λ / 8 per Channel
 total Arrival rate = Λ
 ```
 
+The optical experiment uses the exact same Arrivals and generated responses as
+the audio renderer. Before stereo panning, each Arrival is routed into its eight
+Channel contributions. Each completed signed Channel bus is full-wave rectified
+and converted to positive current by `I = G|x| / (1 + G|x|)`. Silence is dark;
+both pressure polarities contribute current; and the smooth limiter approaches
+full drive without a hard clipping threshold. One explicit logarithmic Current
+Sensitivity control selects the fixed `G` from 1×–256×, defaulting to 32×. It
+never follows Speed or signal level. There is no optical rate compensation,
+smoothing, envelope follower, or automatic normalization. The ninth white LED
+is the arithmetic mean of the eight drives, not a ninth Channel or an independent
+Arrival stream. The browser reports frame-mean current and raw current RMS while
+the worklet evaluates the transform at audio sample rate. This read-only tap does
+not alter the blessed stereo rain output or use Rain Reference samples.
+
 Each Arrival receives an independent position within a circular Listening
 Field. Field Depth sets its radius, Distance Loss controls relative pressure,
 Distance Air Damping softens remote high frequencies, and Stereo Spread controls
 continuous left-right placement. The default field extends to about 44.6 m.
 At the accepted 70% setting, its distance curve is the ordinary free-field h/d
 pressure law, leaving many remote Arrivals at a very low but nonzero propagated
-level while rare near Arrivals retain contrast. The current browser trial
-renders every selected Arrival exactly through 10,000/s. There is no explicit
-rate cap inside playback, weighted representative, super-drop, stationary
-noise bed, or second clock. Density Compensation lowers individual-contact
-level as overlap rises; the increasingly noise-like texture is therefore the
-Dense Shot Limit of the same event population rather than a substituted sound.
+level while rare near Arrivals retain contrast. The browser renders complete
+generated Rain Impact Waveforms through 10,000/s. Above 10,000/s, every exact
+Poisson Arrival instead injects its generated eight-region response signature,
+gain, pan, and distance damping into shared continuous linear filter state.
+This Continuous Rain Response Field makes the 48,000/s trial feasible without
+dropping or weighting Arrivals and without a generated-noise source,
+super-drop, stationary bed, loop, or second clock. Density Compensation lowers
+individual-contact level as overlap rises; the increasingly noise-like texture
+is therefore the Dense Shot Limit of the same event population rather than a
+substituted sound.
 
 Each Arrival receives an audio-only Rain Mark. Drop Population changes the
 probability distribution over drop diameter; the same mark coherently derives a
@@ -137,15 +156,15 @@ x(t) = Σ h(t − tᵢ; Mᵢ)
 The Generated Rain Renderer and live AudioWorklet share one Rain Arrival
 Rendering Module for response choice, gain, position, and distance filtering.
 The worklet runs the seeded Poisson Engine on the audio render thread and sums
-every resulting plan in continuous blocks, preserving response and filter state
-across boundaries instead of depending on browser timers or constructing
-thousands of short-lived nodes. Tests prove the offline output is identical
-across different block partitions. Poisson timing remains outside the renderer. The
-eight-second synchronous diagnostics remain explicitly fixed at no more than
-1,000 exact Arrivals/s while live playback experiments at 10,000/s; this keeps
-the UI responsive without placing substitutes in the audible path. Moving
-those diagnostics off the UI thread is required before they can follow the
-full experimental rate.
+every resulting plan in continuous blocks, preserving complete-waveform or
+shared-filter state across boundaries instead of depending on browser timers
+or constructing thousands of short-lived nodes. Tests prove both accumulation
+paths are invariant across block partitions. Poisson timing remains outside
+the renderer. The eight-second synchronous diagnostics remain explicitly fixed
+at no more than 1,000 complete-waveform Arrivals/s while live playback reaches
+48,000/s; this keeps the UI responsive without placing substitutes in the
+audible path. Moving those diagnostics off the UI thread is required before
+they can follow the full experimental rate.
 
 The model is seeded, nonperiodic, and independent of light-channel wavelength.
 Rain recordings provide visible and optional audible evaluation references only;
@@ -288,8 +307,8 @@ Requires a current Node.js runtime. The project has no package dependencies.
 npm test
 ```
 
-The tests cover the exact 100–10,000 Speed trial, the engine's 100,000/s
-headroom, seeded Poisson behavior, the absence of weighted super-drops,
+The tests cover the continuous 100–48,000 Speed range, exact 48,000/s
+Poisson headroom, seeded behavior, the absence of weighted super-drops,
 total-rate coupling, linked and unlinked
 Drop Population controls, coherent Rain Marks, spatial propagation, Acoustic
 Factor normalization and bypass behavior, LED envelopes, compact-window peak
@@ -297,7 +316,9 @@ and cumulative-energy waveform behavior, rounded temporal-energy shape,
 per-impact spectral occupancy, high-passed Wet Microtexture contrast and full
 bypass, broad non-extreme leaf/litter signatures, the
 nine- and thirteen-band Redwood tonal targets, independent texture-region
-decay, response-bank identity, exact block-partition invariance, the shared
+decay, response-bank and dense-signature identity, complete-waveform and
+Continuous Rain Response Field linearity, tail continuity, reset,
+block-partition invariance, the shared
 live/offline Generated Rain Renderer, multiscale temporal texture, all three
 reference-file manifests, fixed analysis-interval preparation, normalized
 spectral-distance analysis, bounded aligned-onset population summaries,

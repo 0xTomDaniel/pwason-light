@@ -1,5 +1,6 @@
 import { normalizeAcousticFactors } from "./acoustic-factors.js";
 import { createRainBlockAccumulator } from "./rain-block-accumulator.js";
+import { createRainDenseSignatures } from "./rain-dense-accumulator.js";
 import { createRainArrivalRendering } from "./rain-arrival-rendering.js";
 import { createRainImpact, createRainMark } from "./rain-impact.js";
 
@@ -50,6 +51,10 @@ export function createGeneratedRainRenderer({
       });
     },
   );
+  const denseSignatures = createRainDenseSignatures(
+    variants.map(variant => variant.response),
+    { sampleRate: rate },
+  );
 
   function prepareArrival(arrival) {
     const id = Math.max(0, Math.floor(finiteNumber(arrival?.id, 0)));
@@ -68,6 +73,10 @@ export function createGeneratedRainRenderer({
 
   function exportResponseBank() {
     return Object.freeze(variants.map(variant => variant.response));
+  }
+
+  function exportDenseShotBank() {
+    return denseSignatures;
   }
 
   function renderProfile({
@@ -99,5 +108,10 @@ export function createGeneratedRainRenderer({
     return samples;
   }
 
-  return Object.freeze({ prepareArrival, renderProfile, exportResponseBank });
+  return Object.freeze({
+    prepareArrival,
+    renderProfile,
+    exportResponseBank,
+    exportDenseShotBank,
+  });
 }

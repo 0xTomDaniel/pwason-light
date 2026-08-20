@@ -1,6 +1,6 @@
 import { createPoissonEngine } from "./poisson-engine.js";
 import { createRainControls } from "./rain-controls.js";
-import { sampleLedOutput } from "./led-renderer.js";
+import { selectRainAudioRendering } from "./rain-rendering-policy.js";
 import { createGeneratedRainRenderer } from "./rain-texture.js";
 import { prepareImpactAudition } from "./impact-playback.js";
 import { prepareMicroscopeScaling } from "./microscope-scaling.js";
@@ -51,7 +51,7 @@ const CHANNELS = [
 ];
 const SCHEDULER_TICK_MS = 16;
 const AUDIO_LOOKAHEAD_MS = 50;
-const MAX_EVENTS_PER_TICK = 2500;
+const MAX_EVENTS_PER_TICK = 10_000;
 const MAX_EVENT_MARKS_PER_SECOND = 30;
 const MAX_GENERATED_DIAGNOSTIC_RATE_HZ = 1_000;
 const MAX_LISTENING_FIELD_RADIUS_METERS = 100;
@@ -61,12 +61,14 @@ const GENERATED_PROFILE_SECONDS = 8;
 const REFERENCE_FILE_LIMIT_BYTES = 25 * 1024 * 1024;
 
 const leds = [...document.querySelectorAll("[data-led]")];
+const ledModulationOutputs = [...document.querySelectorAll("[data-led-modulation]")];
 const startButton = document.querySelector("#start-stop");
 const reseedButton = document.querySelector("#reseed");
 const rateInput = document.querySelector("#rate");
 const dropPopulationInput = document.querySelector("#drop-population");
 const speedPopulationLinkInput = document.querySelector("#speed-population-link");
 const couplingInput = document.querySelector("#coupling");
+const opticalSensitivityInput = document.querySelector("#optical-sensitivity");
 const volumeInput = document.querySelector("#output-level");
 const sourceMixInput = document.querySelector("#source-mix");
 const soundInput = document.querySelector("#sound-enabled");
@@ -74,6 +76,7 @@ const rateOutput = document.querySelector("#rate-output");
 const rateRenderNote = document.querySelector("#rate-render-note");
 const dropPopulationOutput = document.querySelector("#drop-population-output");
 const couplingOutput = document.querySelector("#coupling-output");
+const opticalSensitivityOutput = document.querySelector("#optical-sensitivity-output");
 const volumeOutput = document.querySelector("#output-level-output");
 const sourceMixOutput = document.querySelector("#source-mix-output");
 const referenceProfileSelect = document.querySelector("#reference-profile");
@@ -186,7 +189,6 @@ let audioTimelineStartedAt = 0;
 let nextScheduledEvent = null;
 let scheduledArrivals = [];
 let eventCount = 0;
-let activePulses = [];
 let audioContext = null;
 let masterGain = null;
 let referenceGain = null;
@@ -198,6 +200,7 @@ let liveRainRenderer = null;
 let rainAudioBufferCache = new WeakMap();
 let rainWorkletNode = null;
 let rainWorkletActive = false;
+let opticalFrame = null;
 let activeImpactAuditionSource = null;
 let activeImpactAuditionButton = null;
 let microscopeScalingMode = microscopeScalingInputs.find(input => input.checked)?.value
@@ -253,9 +256,7 @@ let acousticWaveformRebuildPending = false;
 let referenceLoadRequest = 0;
 const renderLoop = createRenderLoop({
   draw: renderFrame,
-  isActive: () => (
-    running || scheduledArrivals.length > 0 || activePulses.length > 0
-  ),
+  isActive: () => running || scheduledArrivals.length > 0,
   requestFrame: callback => requestAnimationFrame(callback),
   framesPerSecond: 30,
 });
@@ -431,6 +432,7 @@ function regenerateAcousticAssets(rebuildRenderer) {
     rainWorkletNode?.port.postMessage({
       type: "configure",
       responses: liveRainRenderer.exportResponseBank(),
+      denseSignatures: liveRainRenderer.exportDenseShotBank(),
       factors: acousticFactors,
       earHeightMeters: EAR_HEIGHT_METERS,
     });
@@ -463,6 +465,10 @@ function selectedRateHz() {
   return rainControls.snapshot().rateHz;
 }
 
+function selectedOpticalSensitivity() {
+  return 2 ** Number(opticalSensitivityInput.value);
+}
+
 function formatRate(rateHz) {
   if (rateHz < 10) return rateHz.toFixed(2);
   if (rateHz < 100) return rateHz.toFixed(1);
@@ -475,6 +481,7 @@ function restartEngine() {
   simulationStartedAt = performance.now();
   audioTimelineStartedAt = audioContext?.currentTime ?? 0;
   scheduledArrivals = [];
+  opticalFrame = null;
   clearTimeout(timer);
   restartRainWorklet();
   if (running) scheduleNext();
@@ -489,9 +496,20 @@ function updateControlReadouts() {
   speedPopulationLinkInput.checked = controls.linked;
   rateOutput.value = `${formatRate(rateHz)} events/s`;
   rateInput.setAttribute("aria-valuetext", `${formatRate(rateHz)} events per second`);
-  rateRenderNote.textContent = `Exact Poisson shot synthesis · ${formatRate(rateHz)} Arrivals/s`;
-  rateRenderNote.dataset.mode = "exact";
+  const rendering = selectRainAudioRendering(rateHz);
+  rateRenderNote.textContent = rendering === "dense-response-field"
+    ? `Exact Poisson arrivals · continuous response field · ${formatRate(rateHz)} Arrivals/s`
+    : `Exact Poisson shot synthesis · ${formatRate(rateHz)} Arrivals/s`;
+  rateRenderNote.dataset.mode = rendering;
   couplingOutput.value = `${Math.round(Number(couplingInput.value) * 100)}%`;
+  const opticalSensitivity = selectedOpticalSensitivity();
+  opticalSensitivityOutput.value = `${opticalSensitivity.toFixed(
+    opticalSensitivity < 10 ? 1 : 0,
+  )}×`;
+  opticalSensitivityInput.setAttribute(
+    "aria-valuetext",
+    `${opticalSensitivity.toFixed(opticalSensitivity < 10 ? 1 : 0)} times current sensitivity`,
+  );
   const populationPercent = Math.round(controls.dropPopulation * 100);
   dropPopulationOutput.value = controls.dropPopulation < 0.34
     ? `Fine · ${populationPercent}%`
@@ -634,10 +652,8 @@ function updateSourceMix() {
   syncRainWorkletState();
 }
 
-function shouldRenderGeneratedAudio() {
-  return running
-    && soundInput.checked
-    && Number(sourceMixInput.value) < 1;
+function shouldRunRainWorklet() {
+  return running;
 }
 
 function stopRainWorklet() {
@@ -647,16 +663,17 @@ function stopRainWorklet() {
 }
 
 function startRainWorklet() {
-  if (!rainWorkletNode || !shouldRenderGeneratedAudio()) return;
+  if (!rainWorkletNode || !shouldRunRainWorklet()) return;
   rainWorkletNode.port.postMessage({
     type: "start",
     settings: settings(),
+    opticalSensitivity: selectedOpticalSensitivity(),
   });
   rainWorkletActive = true;
 }
 
 function syncRainWorkletState() {
-  if (shouldRenderGeneratedAudio()) {
+  if (shouldRunRainWorklet()) {
     if (!rainWorkletActive) startRainWorklet();
   } else {
     stopRainWorklet();
@@ -1341,13 +1358,34 @@ function renderFrame(now) {
     activateArrival(scheduled.event, scheduled.startedAt);
   }
 
-  const output = sampleLedOutput(activePulses, now, CHANNELS.length);
-  activePulses = output.activePulses;
+  const hasWorkletOpticalFrame = running
+    && opticalFrame?.levels?.length === CHANNELS.length + 1;
+  let output;
+  if (hasWorkletOpticalFrame) {
+    output = opticalFrame;
+    eventCountOutput.textContent = String(eventCount).padStart(4, "0");
+    liveRateOutput.textContent = formatRate(selectedRateHz());
+  } else {
+    output = {
+      levels: Array(CHANNELS.length + 1).fill(0),
+      currentRms: Array(CHANNELS.length + 1).fill(0),
+    };
+  }
 
+  const fallbackAggregate = output.levels
+    .slice(0, CHANNELS.length)
+    .reduce((sum, level) => sum + level, 0) / CHANNELS.length;
   leds.forEach((led, index) => {
-    const level = Math.min(1, output.levels[index]);
+    const rawLevel = output.levels[index] ?? fallbackAggregate;
+    const level = running ? Math.max(0, Math.min(1, rawLevel)) : 0;
     led.style.setProperty("--level", level.toFixed(3));
     led.setAttribute("aria-valuenow", Math.round(level * 100));
+    const currentRms = opticalFrame?.currentRms?.[index];
+    if (ledModulationOutputs[index]) {
+      ledModulationOutputs[index].value = running && Number.isFinite(currentRms)
+        ? `${(currentRms * 100).toFixed(currentRms < 0.001 ? 3 : 2)}% RMS`
+        : "— RMS";
+    }
   });
 
   renderWaveform();
@@ -1402,10 +1440,20 @@ async function ensureAudio() {
         outputChannelCount: [2],
         processorOptions: {
           responses: liveRainRenderer.exportResponseBank(),
+          denseSignatures: liveRainRenderer.exportDenseShotBank(),
           factors: acousticFactors,
           earHeightMeters: EAR_HEIGHT_METERS,
         },
       });
+      rainWorkletNode.port.onmessage = event => {
+        if (event.data?.type === "optical-drive") {
+          opticalFrame = event.data;
+          renderLoop.wake();
+        } else if (event.data?.type === "optical-drive-stopped") {
+          opticalFrame = null;
+          renderLoop.wake();
+        }
+      };
       rainWorkletNode.connect(masterGain);
     } catch (error) {
       rainWorkletNode = null;
@@ -1505,14 +1553,15 @@ function activateArrival(event, startedAt) {
   eventCount += 1;
   eventCountOutput.textContent = String(eventCount).padStart(4, "0");
   liveRateOutput.textContent = formatRate(event.rateHz);
-  activePulses.push({ ...event, startedAt });
   renderEventMark(event);
 }
 
 function scheduleNext() {
   if (!running) return;
+  const denseVisual = selectRainAudioRendering(selectedRateHz())
+    === "dense-response-field";
   const elapsedSeconds = (
-    performance.now() - simulationStartedAt + AUDIO_LOOKAHEAD_MS
+    performance.now() - simulationStartedAt + (denseVisual ? 0 : AUDIO_LOOKAHEAD_MS)
   ) / 1000;
   let emittedThisTick = 0;
   const audioBatch = [];
@@ -1521,12 +1570,17 @@ function scheduleNext() {
     nextScheduledEvent.at <= elapsedSeconds &&
     emittedThisTick < MAX_EVENTS_PER_TICK
   ) {
-    const startedAt = simulationStartedAt + nextScheduledEvent.at * 1000;
-    scheduledArrivals.push({ event: nextScheduledEvent, startedAt });
-    audioBatch.push({
-      event: nextScheduledEvent,
-      scheduledAt: audioTimelineStartedAt + nextScheduledEvent.at,
-    });
+    if (denseVisual) {
+      eventCount += 1;
+      renderEventMark(nextScheduledEvent);
+    } else {
+      const startedAt = simulationStartedAt + nextScheduledEvent.at * 1000;
+      scheduledArrivals.push({ event: nextScheduledEvent, startedAt });
+      audioBatch.push({
+        event: nextScheduledEvent,
+        scheduledAt: audioTimelineStartedAt + nextScheduledEvent.at,
+      });
+    }
     nextScheduledEvent = engine.next();
     emittedThisTick += 1;
   }
@@ -1552,6 +1606,7 @@ async function toggleRunning() {
 
   running = false;
   scheduledArrivals = [];
+  opticalFrame = null;
   simulator.dataset.running = "false";
   startButton.textContent = "Start process";
   startButton.setAttribute("aria-pressed", "false");
@@ -1566,8 +1621,15 @@ function reseed() {
   seedOutput.textContent = seed;
   eventCount = 0;
   eventCountOutput.textContent = "0000";
-  activePulses = [];
   restartEngine();
+}
+
+function updateOpticalSensitivity() {
+  updateControlReadouts();
+  rainWorkletNode?.port.postMessage({
+    type: "configure-optical-drive",
+    sensitivity: selectedOpticalSensitivity(),
+  });
 }
 
 startButton.addEventListener("click", toggleRunning);
@@ -1576,6 +1638,7 @@ rateInput.addEventListener("input", updateRate);
 dropPopulationInput.addEventListener("input", updateDropPopulation);
 speedPopulationLinkInput.addEventListener("change", updateSpeedPopulationLink);
 couplingInput.addEventListener("input", updateControlReadouts);
+opticalSensitivityInput.addEventListener("input", updateOpticalSensitivity);
 volumeInput.addEventListener("input", updateOutputLevel);
 sourceMixInput.addEventListener("input", updateSourceMix);
 soundInput.addEventListener("change", async () => {

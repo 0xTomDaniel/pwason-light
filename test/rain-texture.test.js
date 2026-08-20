@@ -156,6 +156,12 @@ test("Generated Rain Renderer prepares one deterministic live Arrival plan", () 
   assert.equal(first.filter.q, 0.38);
   assert.equal(renderer.exportResponseBank()[first.variantIndex], first.response);
   assert.equal(renderer.exportResponseBank().length, 192);
+  assert.equal(renderer.exportDenseShotBank().length, 192);
+  assert.equal(renderer.exportDenseShotBank()[first.variantIndex].length, 8);
+  assert.ok(
+    renderer.exportDenseShotBank()[first.variantIndex]
+      .some(value => value !== 0),
+  );
 });
 
 test("Generated Rain Renderer requires caller-owned Arrivals for an offline profile", () => {

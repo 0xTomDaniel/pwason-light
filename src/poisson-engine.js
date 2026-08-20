@@ -1,6 +1,6 @@
 const CHANNEL_COUNT = 8;
 const MINIMUM_RATE_HZ = 1;
-const MAXIMUM_RATE_HZ = 100_000;
+const MAXIMUM_RATE_HZ = 48_000;
 const DEFAULT_FIELD_RADIUS_METERS = 20;
 
 function hashSeed(value) {

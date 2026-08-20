@@ -1,6 +1,6 @@
 # Pwason Light
 
-Pwason Light turns a steady stochastic event process into eight coordinated light-channel signals and one combined rain-like audio signal.
+Pwason Light turns a steady stochastic event process into eight coordinated light-channel signals, one normalized white aggregate, and one combined rain-like audio signal.
 
 ## Language
 
@@ -11,6 +11,18 @@ _Avoid_: Drop, pulse, spectral event
 **Channel**:
 One of eight separately observable light signals. A Channel's LED wavelength identifies its physical output but does not alter the primary process or sound.
 _Avoid_: Color process, audio voice, spectral band
+
+**Optical Drive Signal**:
+One of eight positive current-like signals obtained from its matching signed, pre-stereo generated-audio Channel bus by full-wave rectification, one manually selected fixed Current Sensitivity, and the smooth limiter `I = G|x| / (1 + G|x|)`. Silence is darkness; both pressure polarities contribute current without becoming new Arrivals. The signal has no light-specific rate compensation, smoothing, envelope, or automatic normalization and does not change the blessed generated rain audio, Poisson timing, or Channel routing.
+_Avoid_: Audio output, PWM, spectral timbre
+
+**Current Sensitivity**:
+The fixed multiplier `G` applied to the magnitude of every Optical Drive Signal before its smooth current limiter. The prototype exposes one logarithmic 1×–256× manual control, defaulting to 32×. Once selected, it is identical across Channels and independent of Speed, time, signal statistics, and Rain References.
+_Avoid_: Automatic gain, brightness normalization, rate compensation
+
+**Aggregate White**:
+The ninth virtual LED signal equal to the arithmetic mean of the eight Optical Drive Signals. It is a monitor of their combined current, not a ninth Channel and not a source of independent Arrivals.
+_Avoid_: Ninth Channel, white Arrival stream, eightfold sum
 
 **Channel Coupling**:
 The fraction of Arrivals shared across all Channels. Remaining Arrivals are assigned privately and uniformly across the eight Channels.
@@ -57,11 +69,15 @@ The Acoustic Factor that controls how many of the eight candidate audio-frequenc
 _Avoid_: LED spectrum, Channel Coupling, audio Channel
 
 **Poisson Shot Synthesis**:
-The exact sample-wise superposition of generated Rain Impact Waveforms at Steady Poisson arrival times. Dense rain becomes noise-like through overlap without a stationary background recording or a second event process.
+The linear superposition of generated responses at Steady Poisson Arrival times. Through 10,000 Arrivals/s, every Arrival contributes its complete Rain Impact Waveform. Above that threshold, every Arrival contributes once to the Continuous Rain Response Field. Dense rain becomes noise-like without a generated-noise source, stationary background recording, weighted representative, or second event process.
 _Avoid_: Ambient loop, generic noise bed, granular playback
 
+**Continuous Rain Response Field**:
+The pure-synthesis realization used above 10,000 Arrivals/s. Every exact Poisson Arrival keeps its generated response-variant identity, gain, continuous pan, and distance damping, then injects its compact eight-region signature into shared linear broad-band filter state. The shared state carries unresolved acoustic tails efficiently; it does not merge, weight, quantize to a control clock, or discard Arrivals, and it contains no generated-noise input, recording, loop, repeated block, or per-block reset.
+_Avoid_: High-density mode, statistical noise bed, representative event, digital marker
+
 **Dense Shot Limit**:
-The noise-like texture that emerges when the exact Rain Impact Waveforms of a sufficiently dense Steady Poisson Process overlap. Every Arrival remains present; Density Compensation controls total level without replacing Arrivals with weighted representatives, a stationary bed, a loop, or a second event process.
+The noise-like texture that emerges as sufficiently dense exact Steady Poisson Arrivals drive either complete Rain Impact Waveforms or the Continuous Rain Response Field. Every Arrival remains present; Density Compensation controls total level without replacing Arrivals with generated noise, weighted representatives, a stationary bed, a loop, or a second event process.
 _Avoid_: High-density mode, super-drop, stationary noise bed
 
 **Pure Synthesis**:
