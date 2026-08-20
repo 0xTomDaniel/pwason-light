@@ -24,6 +24,23 @@ Open:
 Press **Start process** to enable audio and begin generating Arrivals. Audio
 never begins automatically.
 
+### Standalone Poisson LED lab
+
+The current-first optical experiment is isolated from the generated-audio
+model at:
+
+<http://127.0.0.1:7160/docs/specs/poisson-led-lab.spec.html>
+
+It runs one exact total-lamp Poisson field from 1–48,000 Arrivals/s, assigns
+each Arrival uniformly to one of eight Channels, and displays a ninth Aggregate
+White signal equal to their instantaneous mean. Each Arrival injects only a
+positive exponential Current Response. Event charge scales inversely with rate
+so selected mean current stays comparable while stochastic modulation is free
+to converge. Its mono sound monitor is derived from Aggregate White by one 2 Hz
+DC blocker and manual Output Level; it has no independent source model or
+automatic gain. This standalone page does not call or modify the existing rain
+renderer.
+
 ## Controls
 
 | Control | Behavior |

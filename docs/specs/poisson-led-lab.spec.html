@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive specification for a current-first, eight-channel Poisson LED experiment with a fused white monitor.">
+  <title>Poisson LED Lab — Current-First Specification</title>
+  <script defer src="./.viz/runtime.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #edf4e8;
+      --muted: #8d9a90;
+      --paper: #050807;
+      --surface: #0b1110;
+      --surface-raised: #111918;
+      --line: #283632;
+      --line-bright: #4f665f;
+      --signal: #d1f66f;
+      --cyan: #69e5dc;
+      --warning: #f2a55f;
+      --display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+      --mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+      --body: "Avenir Next", Avenir, "Gill Sans", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; background: var(--paper); }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 78% -12%, rgba(89, 216, 201, .13), transparent 32rem),
+        linear-gradient(rgba(126, 172, 162, .025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(126, 172, 162, .025) 1px, transparent 1px),
+        var(--paper);
+      background-size: auto, 24px 24px, 24px 24px, auto;
+      font: 16px/1.6 var(--body);
+    }
+    body::after {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      pointer-events: none;
+      content: "";
+      opacity: .15;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.86' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.12'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+    }
+    button, input, output { font: inherit; }
+    a { color: var(--signal); text-underline-offset: 4px; }
+    code { color: #d7e3d5; font: .9em var(--mono); }
+    main { width: min(1320px, calc(100% - 32px)); margin: 0 auto; padding: 26px 0 88px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1, h2 { font-family: var(--display); font-weight: 400; }
+    h1 { max-width: 900px; margin: 0; font-size: clamp(4.2rem, 11vw, 9.2rem); line-height: .78; letter-spacing: -.07em; }
+    h2 { margin-bottom: 14px; font-size: clamp(2.2rem, 5vw, 4.1rem); line-height: .96; letter-spacing: -.045em; }
+    h3 { margin-bottom: 7px; font-size: 1rem; }
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font: 700 .68rem/1.3 var(--mono);
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+    .hero { display: grid; grid-template-columns: 1.35fr .65fr; gap: 50px; align-items: end; padding: 74px 0 56px; }
+    .hero-copy { max-width: 430px; justify-self: end; }
+    .eyebrow { color: var(--signal); font: 700 .72rem var(--mono); letter-spacing: .15em; text-transform: uppercase; }
+    .hero-copy p:last-child { margin: 0; color: #acb8af; font-size: 1.06rem; }
+    nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+    nav a { padding: 7px 10px; border: 1px solid var(--line); color: var(--muted); font: 700 .64rem var(--mono); letter-spacing: .08em; text-decoration: none; text-transform: uppercase; }
+    nav a:hover, nav a:focus-visible { border-color: var(--signal); color: var(--ink); }
+
+    .instrument {
+      overflow: hidden;
+      border: 1px solid var(--line-bright);
+      border-radius: 3px;
+      background: linear-gradient(145deg, #101816, #070b0a 65%);
+      box-shadow: 0 42px 100px rgba(0,0,0,.52), inset 0 1px rgba(255,255,255,.055);
+    }
+    .instrument-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: center;
+      padding: 13px 17px;
+      border-bottom: 1px solid var(--line);
+      color: #a2b0a6;
+      font: 700 .65rem var(--mono);
+      letter-spacing: .11em;
+      text-transform: uppercase;
+    }
+    .status { display: inline-flex; align-items: center; gap: 9px; }
+    .status::before { width: 7px; height: 7px; border-radius: 50%; background: #47524d; content: ""; }
+    [data-running="true"] .status::before { background: var(--signal); box-shadow: 0 0 13px var(--signal); }
+    #engine-status { color: #87958a; }
+    [data-running="true"] #engine-status { color: #c7daa8; }
+    .bench { display: grid; grid-template-columns: minmax(0, 1fr) 330px; }
+    .display-deck { min-width: 0; padding: clamp(26px, 4vw, 48px); }
+    .signal-path {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px 18px;
+      margin-bottom: 34px;
+      padding: 10px 12px;
+      border: 1px solid #26342f;
+      color: #788980;
+      background: #080d0b;
+      font: .59rem/1.45 var(--mono);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .signal-path strong { color: #b6c7be; font-weight: 600; }
+    .led-bank { display: grid; grid-template-columns: repeat(9, minmax(54px, 1fr)); gap: clamp(6px, 1vw, 13px); }
+    .channel { min-width: 0; text-align: center; }
+    .led-shell {
+      position: relative;
+      width: min(100%, 88px);
+      aspect-ratio: 1;
+      margin: 0 auto 15px;
+      padding: 10%;
+      border: 1px solid #34433e;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #2c3935, #060907 66%);
+      box-shadow: inset 0 3px 11px #000, 0 1px rgba(255,255,255,.06);
+    }
+    .led {
+      --level: 0;
+      width: 100%;
+      height: 100%;
+      border: 1px solid color-mix(in srgb, var(--led-color) 36%, #28322e);
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 36% 27%, rgba(255,255,255,calc(.06 + var(--level) * .84)), transparent 19%),
+        radial-gradient(circle, color-mix(in srgb, var(--led-color) calc(9% + var(--level) * 88%), #040605), #040605 73%);
+      box-shadow:
+        0 0 calc(var(--level) * 36px) color-mix(in srgb, var(--led-color) calc(var(--level) * 94%), transparent),
+        0 0 calc(var(--level) * 76px) color-mix(in srgb, var(--led-color) calc(var(--level) * 55%), transparent),
+        inset 0 0 calc(8px + var(--level) * 22px) rgba(255,255,255,calc(var(--level) * .38));
+      transition: background 32ms linear, box-shadow 32ms linear;
+    }
+    .channel strong { display: block; overflow: hidden; margin-bottom: 2px; font: 700 clamp(.54rem, .9vw, .67rem) var(--mono); letter-spacing: .05em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+    .channel > span { color: #69776f; font: .58rem var(--mono); }
+    .channel output { display: block; min-height: 1em; margin-top: 5px; color: #829188; font: 700 .48rem var(--mono); }
+    .aggregate .led-shell { border-color: #7b8b82; }
+    .aggregate strong { color: #f6f8f1; }
+    .scope-panel { margin-top: 38px; border: 1px solid #34463f; background: #070b0a; }
+    .scope-head { display: flex; justify-content: space-between; gap: 18px; align-items: baseline; padding: 11px 13px; border-bottom: 1px solid #26342f; }
+    .scope-head strong { font: 700 .64rem var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    .scope-head span { color: #6d7c73; font: .55rem var(--mono); }
+    .scope-screen { position: relative; height: 225px; }
+    .scope-screen canvas { display: block; width: 100%; height: 100%; }
+    .scope-label { position: absolute; right: 8px; top: 7px; padding: 3px 5px; color: #798981; background: rgba(5,8,7,.82); font: 700 .5rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1px; border-top: 1px solid #26342f; background: #26342f; }
+    .metric { min-width: 0; padding: 10px 11px; background: #090e0c; }
+    .metric span { display: block; color: #69786f; font: 700 .49rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .metric output { display: block; overflow: hidden; margin-top: 3px; color: #c9e19a; font: .69rem var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+    .controls { display: flex; flex-direction: column; gap: 24px; padding: 28px 23px; border-left: 1px solid var(--line); background: rgba(3,7,6,.5); }
+    .control label, .switch-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 9px; color: #b8c5bc; font: 700 .64rem var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+    .control output { color: var(--signal); text-align: right; }
+    input[type="range"] { width: 100%; height: 4px; appearance: none; border-radius: 0; background: #35433e; accent-color: var(--signal); }
+    input[type="range"]::-webkit-slider-thumb { width: 14px; height: 22px; appearance: none; border: 1px solid #e0e9d9; border-radius: 1px; background: #839985; box-shadow: 0 2px 10px #000; }
+    .range-ends { display: flex; justify-content: space-between; margin-top: 7px; color: #65736b; font: .55rem var(--mono); text-transform: uppercase; }
+    .log-ticks { position: relative; height: 23px; margin-top: 6px; color: #6a7870; font: .52rem var(--mono); }
+    .log-ticks span { position: absolute; left: var(--tick); padding-top: 7px; transform: translateX(-50%); }
+    .log-ticks span::before { position: absolute; top: 0; left: 50%; width: 1px; height: 4px; background: #64746b; content: ""; }
+    .log-ticks span:first-child { transform: none; }
+    .log-ticks span:first-child::before { left: 0; }
+    .log-ticks span:last-child { transform: translateX(-100%); }
+    .log-ticks span:last-child::before { right: 0; left: auto; }
+    #channel-rate-output { display: block; margin-top: 8px; color: #7d9185; font: .56rem var(--mono); }
+    .switch-label { align-items: center; margin: 0; cursor: pointer; }
+    .switch-label input { width: 36px; height: 20px; accent-color: var(--signal); }
+    .audio-note { margin: -12px 0 0; color: #6c7b72; font: .58rem/1.48 var(--mono); }
+    .button-stack { display: grid; gap: 10px; margin-top: auto; }
+    button { min-height: 47px; border: 1px solid #698077; border-radius: 2px; color: #071008; background: var(--signal); cursor: pointer; font: 800 .68rem var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    button:hover, button:focus-visible { border-color: #efffbc; box-shadow: 0 0 0 2px rgba(209,246,111,.14); outline: 0; }
+    [data-running="true"] button { color: #ffece3; background: #7c4136; border-color: #bb6a57; }
+    button:disabled { cursor: wait; opacity: .55; }
+
+    .spec-section { margin-top: 86px; padding-top: 28px; border-top: 1px solid var(--line); }
+    .section-head { display: grid; grid-template-columns: .34fr 1fr; gap: 32px; margin-bottom: 34px; }
+    .section-number { color: var(--signal); font: 700 .65rem var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+    .section-lede { max-width: 760px; margin: 0; color: #9fac9f; }
+    .card-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card { padding: 22px; border: 1px solid var(--line); background: rgba(9,14,12,.74); }
+    .card h3 { color: #dbe8dc; font: 700 .68rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+    .card p, .card li { color: #8d9b92; font-size: .89rem; }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .card ul { padding-left: 18px; }
+    .story-list { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; padding: 1px; background: var(--line); list-style: none; counter-reset: stories; }
+    .story-list li { position: relative; min-height: 108px; padding: 20px 20px 20px 58px; color: #9daaa1; background: #090e0c; counter-increment: stories; }
+    .story-list li::before { position: absolute; left: 20px; top: 20px; color: var(--signal); content: counter(stories, decimal-leading-zero); font: 700 .62rem var(--mono); }
+    .equation { overflow-x: auto; padding: 18px; border-left: 2px solid var(--signal); color: #dcebd2; background: #09100d; font: .84rem/1.7 var(--mono); }
+    footer { display: flex; justify-content: space-between; gap: 20px; margin-top: 88px; padding-top: 18px; border-top: 1px solid var(--line); color: #69776f; font: .58rem var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+    @media (max-width: 980px) {
+      .hero, .section-head { grid-template-columns: 1fr; }
+      .hero-copy { max-width: 620px; justify-self: start; }
+      .bench { grid-template-columns: 1fr; }
+      .controls { border-top: 1px solid var(--line); border-left: 0; }
+      .led-bank { grid-template-columns: repeat(5, 1fr); row-gap: 22px; }
+      .card-grid { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 650px) {
+      main { width: min(100% - 20px, 1320px); }
+      h1 { font-size: clamp(3.5rem, 23vw, 6rem); }
+      .hero { padding-top: 48px; }
+      .display-deck { padding: 22px 12px; }
+      .led-bank { grid-template-columns: repeat(3, 1fr); }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .card-grid, .story-list { grid-template-columns: 1fr; }
+      .scope-screen { height: 185px; }
+      footer { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="topline"><span>Pwason Light · Experimental branch</span><span>Current-first / Draft 0.1</span></div>
+
+    <header class="hero">
+      <div>
+        <p class="eyebrow">LED current laboratory · no acoustic source model</p>
+        <h1>Watch the current converge.</h1>
+      </div>
+      <div class="hero-copy">
+        <p>This isolated bench asks one question: when a steady Poisson field drives bounded positive current, how quickly does stochastic modulation become perceptually continuous?</p>
+      </div>
+    </header>
+
+    <nav aria-label="Specification sections">
+      <a href="#experiment">Experiment</a>
+      <a href="#problem">Problem</a>
+      <a href="#solution">Solution</a>
+      <a href="#stories">User stories</a>
+      <a href="#decisions">Decisions</a>
+      <a href="#testing">Testing</a>
+      <a href="#scope">Scope</a>
+    </nav>
+
+    <section id="experiment" class="instrument" data-led-lab data-running="false" aria-label="Interactive Poisson LED current laboratory">
+      <div class="instrument-head">
+        <span class="status">Poisson current field</span>
+        <output id="engine-status">Stopped · zero current</output>
+      </div>
+      <div class="bench">
+        <div class="display-deck">
+          <div class="signal-path">
+            <strong>Optical: Poisson Arrivals → positive current → virtual LEDs</strong>
+            <span>Monitor: current → DC blocker → output level → mono speakers</span>
+          </div>
+
+          <div class="led-bank" aria-label="Eight current Channels and Aggregate White">
+            <div class="channel">
+              <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#9867ff"></div></div>
+              <strong>Violet</strong><span>400–420 nm</span><output data-current-value>0.0% mean</output>
+            </div>
+            <div class="channel">
+              <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#2e66ff"></div></div>
+              <strong>Royal Blue</strong><span>~455 nm</span><output data-current-value>0.0% mean</output>
+            </div>
+            <div class="channel">
+              <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#28e5ed"></div></div>
+              <strong>Cyan</strong><span>~502 nm</span><output data-current-value>0.0% mean</output>
+            </div>
+            <div class="channel">
+              <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#38e66d"></div></div>
+              <strong>Green</strong><span>~525 nm</span><output data-current-value>0.0% mean</output>
+            </div>
+            <div class="channel">
+              <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#b8ef53"></div></div>
+              <strong>PC Lime</strong><span>phosphor</span><output data-current-value>0.0% mean</output>
+            </div>
+            <div class="channel">
+              <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#ffac43"></div></div>
+              <strong>PC Amber</strong><span>phosphor</span><output data-current-value>0.0% mean</output>
+            </div>
+            <div class="channel">
+              <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#ff4037"></div></div>
+              <strong>Red</strong><span>~625 nm</span><output data-current-value>0.0% mean</output>
+            </div>
+            <div class="channel">
+              <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#bd111d"></div></div>
+              <strong>Deep Red</strong><span>~660 nm</span><output data-current-value>0.0% mean</output>
+            </div>
+            <div class="channel aggregate">
+              <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#f6fff0"></div></div>
+              <strong>White Σ</strong><span>normalized mean of eight Channels</span><output data-current-value>0.0% mean</output>
+            </div>
+          </div>
+
+          <div class="scope-panel">
+            <div class="scope-head"><strong>Aggregate current · one-second rolling window</strong><span>min/max-preserving display</span></div>
+            <div class="scope-screen">
+              <canvas id="current-scope" aria-label="One-second Aggregate White current waveform"></canvas>
+              <span class="scope-label">0–100% current · all 48 kHz samples</span>
+            </div>
+            <div class="metrics">
+              <div class="metric"><span>Mean current</span><output id="mean-current">0.0%</output></div>
+              <div class="metric"><span>RMS modulation</span><output id="rms-modulation">0.0%</output></div>
+              <div class="metric"><span>Peak current</span><output id="peak-current">0.0%</output></div>
+              <div class="metric"><span>Near limit</span><output id="limit-proximity">0.00%</output></div>
+              <div class="metric"><span>Observed arrivals</span><output id="observed-rate">0/s</output></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="controls" aria-label="Experiment controls">
+          <div class="control">
+            <label for="led-rate"><span>Total arrival rate</span><output id="led-rate-output">1,000 Arrivals/s</output></label>
+            <input id="led-rate" type="range" min="0" max="4.681241237375588" step="any" value="3">
+            <div class="log-ticks" aria-hidden="true">
+              <span style="--tick:0%">1</span><span style="--tick:21.36%">10</span><span style="--tick:42.72%">100</span><span style="--tick:64.09%">1k</span><span style="--tick:85.45%">10k</span><span style="--tick:100%">48k</span>
+            </div>
+            <output id="channel-rate-output">125 Hz expected per Channel</output>
+          </div>
+
+          <div class="control">
+            <label for="pulse-width"><span>Current fall time</span><output id="pulse-width-output">4.0 ms</output></label>
+            <input id="pulse-width" type="range" min="-1.3010299956639813" max="2" step="0.001" value="0.6020599913279624">
+            <div class="range-ends"><span>0.05 ms</span><span>100 ms</span></div>
+          </div>
+
+          <div class="control">
+            <label for="target-current"><span>Target mean current</span><output id="target-current-output">50%</output></label>
+            <input id="target-current" type="range" min="1" max="90" step="1" value="50">
+            <div class="range-ends"><span>1%</span><span>90%</span></div>
+          </div>
+
+          <label class="switch-label" for="sound-enabled"><span>AC current monitor</span><input id="sound-enabled" type="checkbox" role="switch" checked></label>
+
+          <div class="control">
+            <label for="output-level"><span>Output level</span><output id="output-level-output">35%</output></label>
+            <input id="output-level" type="range" min="0" max="1" step="0.01" value="0.35">
+          </div>
+          <p class="audio-note">The monitor receives Aggregate White after one 2 Hz DC blocker. It has no tone shaping, dynamics, automatic gain, event response, or spatial stage.</p>
+
+          <div class="button-stack"><button id="start-stop" type="button">Start field</button></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="problem" class="spec-section">
+      <div class="section-head">
+        <span class="section-number">01 · Problem statement</span>
+        <div><h2>The optical hypothesis needs its own clean bench.</h2><p class="section-lede">The existing prototype begins with an acoustic waveform and derives light from it. That makes the LED result inseparable from decisions made for sound. This experiment instead needs to reveal what a bounded, positive, steady Poisson current field does before any acoustic interpretation exists.</p></div>
+      </div>
+      <div class="card-grid">
+        <article class="card"><h3>Current lacks authority</h3><p>An audio-first path allows an acoustic decision to change the LED waveform. The optical experiment cannot then distinguish Poisson behavior from source-model behavior.</p></article>
+        <article class="card"><h3>Rate is easily misread</h3><p>Speed must continue to mean one total lamp rate. At the maximum, 48,000 Arrivals/s total becomes an expected 6,000 Arrivals/s per Channel—not 48 kHz on every Channel.</p></article>
+        <article class="card"><h3>A monitor can hide convergence</h3><p>Automatic level matching would keep high-density modulation loud even as the current becomes steadier. The monitor must preserve the current’s changing AC magnitude.</p></article>
+      </div>
+    </section>
+
+    <section id="solution" class="spec-section">
+      <div class="section-head">
+        <span class="section-number">02 · Solution</span>
+        <div><h2>Generate positive current, then listen to what remains after DC.</h2><p class="section-lede">One homogeneous Poisson clock emits exact Arrivals. Uniform marking splits them into eight independent Channel streams. Each Arrival injects the same nonnegative current response; higher density reduces charge per Arrival so selected mean current stays comparable. Aggregate White is the normalized fused monitor.</p></div>
+      </div>
+      <div class="equation">λᵢ = Λ / 8<br>Iᵢ(t) = smooth-limit(Σⱼ q(Λ, τ, Ī) · exp(−(t − tᵢⱼ)/τ))<br>Iwhite(t) = (1/8) Σᵢ Iᵢ(t)<br>audio(t) = DCBlock₂Hz(Iwhite(t))</div>
+    </section>
+
+    <section id="stories" class="spec-section">
+      <div class="section-head">
+        <span class="section-number">03 · User stories</span>
+        <div><h2>The lab should make the hypothesis falsifiable.</h2><p class="section-lede">Every control and measurement exists to reveal current behavior, not to decorate it.</p></div>
+      </div>
+      <ol class="story-list">
+        <li>As an experimenter, I want to sweep one logarithmic total rate from 1 through 48 kHz, so that sparse flashes and dense convergence occupy one continuous control.</li>
+        <li>As an experimenter, I want every Arrival assigned uniformly to exactly one of eight Channels, so that Channel count does not multiply the lamp’s selected event rate.</li>
+        <li>As an experimenter, I want a ninth white monitor formed from all eight currents, so that I can inspect the complete field without inventing a ninth stream.</li>
+        <li>As an experimenter, I want average current held approximately constant as Speed changes, so that increasing brightness or saturation cannot masquerade as convergence.</li>
+        <li>As an experimenter, I want to change current fall time, so that I can study how response bandwidth changes overlap and fluctuation.</li>
+        <li>As an experimenter, I want to hear only the AC portion of fused current, so that audible modulation corresponds directly to optical modulation.</li>
+        <li>As an experimenter, I want fixed monitor gain, so that genuinely diminishing modulation is allowed to become quiet.</li>
+        <li>As an experimenter, I want each virtual LED to show the arithmetic mean of every current sample in its display interval, so that no Arrival is silently discarded.</li>
+        <li>As an experimenter, I want a one-second min/max-preserving scope, so that sub-frame current structure remains visible even though the DOM LEDs update at monitor refresh rate.</li>
+        <li>As an experimenter, I want mean, RMS modulation, peak, limiter proximity, and observed rate together, so that I can distinguish convergence from clipping or missed events.</li>
+        <li>As an experimenter, I want Stop to force zero sound and zero current immediately, so that stopped state is unambiguous.</li>
+        <li>As a future hardware designer, I want the browser’s display-refresh limitation stated plainly, so that this page is not mistaken for a physical flicker-perception test.</li>
+      </ol>
+    </section>
+
+    <section id="decisions" class="spec-section">
+      <div class="section-head">
+        <span class="section-number">04 · Implementation decisions</span>
+        <div><h2>One deep Module owns the complete signal contract.</h2><p class="section-lede">The Poisson LED Lab Engine Interface is the sole behavioral seam. The worklet adapts rendered blocks to audio and diagnostic messages; the page adapts those messages to pixels and controls.</p></div>
+      </div>
+      <div class="card-grid">
+        <article class="card"><h3>Exact timing</h3><p>Inter-arrival gaps are exponentially distributed. Multiple Arrivals may occur inside one 48 kHz sample interval and each contributes independently; sample coincidence never merges event identity or energy.</p></article>
+        <article class="card"><h3>Uniform routing</h3><p>Every Arrival receives one uniform Channel mark. Poisson splitting gives eight independent streams with expected rate Λ/8 and preserves Λ as the total lamp rate.</p></article>
+        <article class="card"><h3>Positive response</h3><p>An Arrival injects a positive exponential current response with selectable fall time τ. There are no spectral, spatial, acoustic, or event-morphology marks.</p></article>
+        <article class="card"><h3>Mean-held charge</h3><p>Event charge varies inversely with expected Channel rate and response duration. At high overlap, the smooth limiter’s expected output approaches Target Mean Current. Sparse bounded pulses cannot always reach that target and must report their actual mean honestly.</p></article>
+        <article class="card"><h3>Smooth limit</h3><p>Raw positive shot current maps through u/(1+u). The current remains continuous in value, nonnegative, and below 100%, without a hard clipping plateau.</p></article>
+        <article class="card"><h3>White fusion</h3><p>Aggregate White equals the arithmetic mean of the eight instantaneous Channel currents. It has no Arrivals, response state, or independent gain of its own.</p></article>
+        <article class="card"><h3>Direct sound monitor</h3><p>A standard first-order 2 Hz DC blocker converts fused current to a signed AC signal. The only later operation is the explicit user-controlled output level. The signal is copied equally to both speakers.</p></article>
+        <article class="card"><h3>Frame integration</h3><p>Every worklet sample contributes to the arithmetic mean displayed by each DOM LED. Measurements are diagnostic views, not selectable rendering modes. The scope uses per-pixel minima and maxima to retain excursions.</p></article>
+        <article class="card"><h3>Isolation</h3><p>This standalone file and its Modules do not call, configure, or revise the existing generated-audio path. The two experiments share only durable domain definitions for Arrival, Channel, Speed, and Aggregate White.</p></article>
+      </div>
+    </section>
+
+    <section id="testing" class="spec-section">
+      <div class="section-head">
+        <span class="section-number">05 · Testing decisions</span>
+        <div><h2>Prove behavior at the public Interface.</h2><p class="section-lede">Tests exercise the owned Poisson LED Lab Engine rather than reproducing its internals in a fake. Browser validation verifies the AudioWorklet adapter and rendered controls.</p></div>
+      </div>
+      <div class="card-grid">
+        <article class="card"><h3>Arrival evidence</h3><p>A long seeded run must reproduce exactly, approach the requested total rate, distribute counts near Λ/8, and preserve the sum of Channel counts as total Arrivals.</p></article>
+        <article class="card"><h3>Signal evidence</h3><p>Every Channel sample remains in [0,1), Aggregate White equals the exact sample mean, and the audio output satisfies the declared DC-block recurrence with no hidden transformation.</p></article>
+        <article class="card"><h3>Continuity evidence</h3><p>One render and arbitrarily partitioned renders must return identical Channel current, fused current, and audio samples for the same seed and settings.</p></article>
+        <article class="card"><h3>Rate evidence</h3><p>The maximum clamps to 48,000 total Arrivals/s and reports 6,000 expected Arrivals/s per Channel. Dense current must show lower RMS modulation than a tenfold slower field at the same target and fall time.</p></article>
+        <article class="card"><h3>Display evidence</h3><p>The page exposes nine accessible meters, exact total/per-Channel language, the fixed frame-mean rule, the current diagnostics, and one explicit sound-monitor switch.</p></article>
+        <article class="card"><h3>Browser evidence</h3><p>Start must produce changing current, rate changes must not restart the page, sound disable must leave LEDs running, Stop must darken all meters, and the console and worklet must remain error-free at 48 kHz.</p></article>
+      </div>
+    </section>
+
+    <section id="scope" class="spec-section">
+      <div class="section-head">
+        <span class="section-number">06 · Out of scope</span>
+        <div><h2>This is a stochastic-current instrument, not yet a driver.</h2><p class="section-lede">The page measures a mathematical and perceptual direction before circuit topology is selected.</p></div>
+      </div>
+      <div class="card-grid">
+        <article class="card"><h3>Excluded source behavior</h3><ul><li>Recorded or generated environmental sound</li><li>Per-event amplitude or response-family marks</li><li>Distance, propagation, stereo position, material, or wavelength-driven timbre</li><li>Shared Channel coupling or a ninth event stream</li></ul></article>
+        <article class="card"><h3>Excluded optical claims</h3><ul><li>Calibrated luminance, radiometry, or chromaticity</li><li>Retinal persistence or human flicker thresholds</li><li>Proof of 48 kHz optical perception on a 60 Hz display</li><li>Thermal behavior or LED efficiency</li></ul></article>
+        <article class="card"><h3>Deferred hardware</h3><ul><li>DAC resolution and reconstruction filtering</li><li>Constant-current topology and feedback bandwidth</li><li>MCU event scheduling and interrupt load</li><li>PCB, power, thermal, and safety requirements</li></ul></article>
+      </div>
+    </section>
+
+    <section class="spec-section">
+      <div class="section-head">
+        <span class="section-number">07 · Further notes</span>
+        <div><h2>The virtual LEDs integrate; the scope remembers.</h2><p class="section-lede">A typical display cannot emit the worklet’s 48 kHz optical waveform. Its LED circles therefore report one honest exposure-like frame mean. The adjacent current scope and statistics carry the evidence lost to refresh-rate integration. A future physical build must repeat the experiment with a measured current driver and photodiode before any claim about imperceptible modulation is accepted.</p></div>
+      </div>
+    </section>
+
+    <footer><span>Poisson LED Lab · Standalone interactive specification</span><span>Draft 0.1 · 20 August 2026</span></footer>
+  </main>
+  <script type="module" src="../../src/led-lab-app.js"></script>
+</body>
+</html>

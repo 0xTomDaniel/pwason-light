@@ -12,6 +12,26 @@ _Avoid_: Drop, pulse, spectral event
 One of eight separately observable light signals. A Channel's LED wavelength identifies its physical output but does not alter the primary process or sound.
 _Avoid_: Color process, audio voice, spectral band
 
+**Poisson LED Lab Engine**:
+The standalone current-first Module that owns one exact Steady Poisson Process, uniform private routing across eight Channels, positive exponential Current Responses, mean-held event-charge scaling, smooth current limiting, Aggregate White fusion, and the direct AC Current Monitor. Its Interface renders deterministic sample blocks and exposes configuration and diagnostics without calling or modifying the Generated Rain Renderer.
+_Avoid_: Rain renderer, audio-to-light adapter, PWM emulator
+
+**Current Response**:
+The positive exponential current injected into one Channel by one Arrival in the standalone LED lab. Its selectable fall time controls overlap. Its charge varies inversely with total Arrival rate and response duration so high-density comparisons approach the selected Target Mean Current without using automatic signal normalization or a hard clipping plateau.
+_Avoid_: Rain Impact Waveform, audio envelope, LED flash animation
+
+**Target Mean Current**:
+The high-overlap mean-current target used to scale Current Response charge as Speed changes. Sparse bounded responses may not physically attain it and must report their actual mean. It is not feedback, automatic gain applied to observed samples, or a guarantee at every rate.
+_Avoid_: Brightness normalization, current measurement, limiter threshold
+
+**AC Current Monitor**:
+The mono audible signal obtained only by passing Aggregate White through one first-order 2 Hz DC blocker and the explicit Output Level. It preserves all remaining modulation, uses no tone shaping or automatic gain, and becomes quiet when the current becomes steady.
+_Avoid_: Audio synthesizer, acoustic response, loudness matching
+
+**Frame-Mean Current**:
+The single virtual-LED display rule in the standalone LED lab: the arithmetic mean of every worklet-rate current sample in one display interval. Other reported statistics are diagnostics rather than selectable drive modes. A min/max-preserving scope retains within-frame excursions that a monitor-refresh-rate LED cannot display.
+_Avoid_: Downsampled event, peak brightness mode, physical flicker proof
+
 **Optical Drive Signal**:
 One of eight positive current-like signals obtained from its matching signed, pre-stereo generated-audio Channel bus by full-wave rectification, one manually selected fixed Current Sensitivity, a smooth current limiter, and the selected Optical Current Mode. Both pressure polarities contribute current without becoming new Arrivals. The signal has no light-specific rate compensation, smoothing, envelope, or automatic normalization and does not change the blessed generated rain audio, Poisson timing, or Channel routing.
 _Avoid_: Audio output, PWM, spectral timbre
