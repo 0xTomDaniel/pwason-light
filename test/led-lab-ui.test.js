@@ -54,9 +54,30 @@ test("the lab exposes PWM as a matched scientific control condition", async () =
   assert.match(html, /name="monitor-source"[^>]+value="pwm"/);
   assert.match(html, /id="pwm-frequency-output"/);
   assert.match(html, /PWM frequency = total event rate ÷ eight/i);
-  assert.match(html, /Target Mean Current becomes PWM duty cycle/i);
+  assert.match(html, /duty is derived as Target Mean Current ÷ PWM Pulse Current/i);
+  assert.match(html, /data-condition-target="pwm"/i);
+  assert.match(html, /commanded mean/i);
+  assert.match(html, /frame mean/i);
   assert.match(html, /data-poisson-only/);
   assert.match(html, /Both conditions run continuously/i);
+});
+
+test("PWM exposes pulse current separately while deriving duty from the shared mean", async () => {
+  const html = await readFile(specificationUrl, "utf8");
+
+  assert.match(html, /id="pwm-pulse-current"[^>]+min="50"[^>]+max="100"[^>]+step="0\.1"[^>]+value="100"/);
+  assert.match(html, /id="pwm-pulse-current-output">100%<\/output>/);
+  assert.match(html, /id="pwm-duty-output">50% duty<\/output>/);
+  assert.match(html, /duty = Target Mean Current ÷ PWM Pulse Current/i);
+  assert.match(html, /pulse-current minimum follows Target Mean Current/i);
+});
+
+test("PWM exposes derived on-time and silence as read-only timing evidence", async () => {
+  const html = await readFile(specificationUrl, "utf8");
+
+  assert.match(html, /<span>PWM on time<\/span><output id="pwm-on-time-output">4\.00 ms<\/output>/i);
+  assert.match(html, /<span>PWM silence<\/span><output id="pwm-silence-output">4\.00 ms<\/output>/i);
+  assert.match(html, /on-time and silence are derived readouts, not independent controls/i);
 });
 
 test("the lab exposes separate fixed-scale current and audio oscilloscopes", async () => {
@@ -91,8 +112,10 @@ test("the AC Current Monitor exposes manual logarithmic gain without automatic p
   const html = await readFile(specificationUrl, "utf8");
 
   assert.match(html, /<span>Monitor gain<\/span>/i);
-  assert.match(html, /id="output-level"[^>]+min="-2"[^>]+max="1\.505149978319906"/);
+  assert.match(html, /id="output-level"[^>]+min="-2"[^>]+max="0\.3010299956639812"/);
   assert.match(html, /id="output-level"[^>]+step="any"[^>]+value="0\.3010299956639812"/);
-  assert.match(html, /<span>0\.01×<\/span><span>32×<\/span>/);
+  assert.match(html, /id="monitor-gain-maximum">2× safe max<\/output>/i);
+  assert.match(html, /Gsafe = 1 ÷ max\(Ī, 1 − Ī\)/);
+  assert.match(html, /clamps immediately when Target Mean Current changes/i);
   assert.match(html, /no automatic gain, limiter, or compressor/i);
 });

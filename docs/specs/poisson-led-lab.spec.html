@@ -170,6 +170,10 @@
     .control output { color: var(--signal); text-align: right; }
     .control[data-enabled="false"] { opacity: .42; }
     .control[data-enabled="false"] input { cursor: not-allowed; }
+    .pwm-timing-readouts { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin-top: 11px; background: #26342f; }
+    .pwm-timing-readouts div { min-width: 0; padding: 8px 9px; background: #090e0c; }
+    .pwm-timing-readouts span { display: block; color: #708078; font: 700 .48rem var(--mono); letter-spacing: .07em; text-transform: uppercase; }
+    .pwm-timing-readouts output { display: block; margin-top: 2px; color: var(--cyan); font: 700 .62rem var(--mono); text-align: left; }
     .source-control { padding: 0; border: 0; margin: 0; }
     .source-control legend { margin-bottom: 9px; color: #b8c5bc; font: 700 .64rem var(--mono); letter-spacing: .07em; text-transform: uppercase; }
     .source-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; padding: 1px; background: #40514a; }
@@ -279,81 +283,81 @@
             <div class="led-bank" aria-label="Poisson eight current Channels and Aggregate White">
             <div class="channel">
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#9867ff"></div></div>
-              <strong>Violet</strong><span>400–420 nm</span><output data-current-value>0.0% mean</output>
+              <strong>Violet</strong><span>400–420 nm</span><output data-current-value>0.0% frame mean</output>
             </div>
             <div class="channel">
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#2e66ff"></div></div>
-              <strong>Royal Blue</strong><span>~455 nm</span><output data-current-value>0.0% mean</output>
+              <strong>Royal Blue</strong><span>~455 nm</span><output data-current-value>0.0% frame mean</output>
             </div>
             <div class="channel">
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#28e5ed"></div></div>
-              <strong>Cyan</strong><span>~502 nm</span><output data-current-value>0.0% mean</output>
+              <strong>Cyan</strong><span>~502 nm</span><output data-current-value>0.0% frame mean</output>
             </div>
             <div class="channel">
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#38e66d"></div></div>
-              <strong>Green</strong><span>~525 nm</span><output data-current-value>0.0% mean</output>
+              <strong>Green</strong><span>~525 nm</span><output data-current-value>0.0% frame mean</output>
             </div>
             <div class="channel">
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#b8ef53"></div></div>
-              <strong>PC Lime</strong><span>phosphor</span><output data-current-value>0.0% mean</output>
+              <strong>PC Lime</strong><span>phosphor</span><output data-current-value>0.0% frame mean</output>
             </div>
             <div class="channel">
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#ffac43"></div></div>
-              <strong>PC Amber</strong><span>phosphor</span><output data-current-value>0.0% mean</output>
+              <strong>PC Amber</strong><span>phosphor</span><output data-current-value>0.0% frame mean</output>
             </div>
             <div class="channel">
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#ff4037"></div></div>
-              <strong>Red</strong><span>~625 nm</span><output data-current-value>0.0% mean</output>
+              <strong>Red</strong><span>~625 nm</span><output data-current-value>0.0% frame mean</output>
             </div>
             <div class="channel">
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#bd111d"></div></div>
-              <strong>Deep Red</strong><span>~660 nm</span><output data-current-value>0.0% mean</output>
+              <strong>Deep Red</strong><span>~660 nm</span><output data-current-value>0.0% frame mean</output>
             </div>
             <div class="channel aggregate">
               <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#f6fff0"></div></div>
-              <strong>White Σ</strong><span>normalized mean of eight Channels</span><output data-current-value>0.0% mean</output>
+              <strong>White Σ</strong><span>normalized mean of eight Channels</span><output data-current-value>0.0% frame mean</output>
             </div>
             </div>
           </div>
 
           <div class="condition-bank" data-condition-bank="pwm">
-            <div class="condition-head"><strong>PWM control</strong><span>periodic · binary current · phase aligned</span></div>
+            <div class="condition-head"><strong>PWM control</strong><span>periodic · phase aligned · <output data-condition-target="pwm">50% mean · 100% pulse · 50% duty</output></span></div>
             <div class="led-bank" aria-label="PWM eight current Channels and Aggregate White">
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#9867ff"></div></div>
-                <strong>Violet</strong><span>400–420 nm</span><output data-current-value>0.0% mean</output>
+                <strong>Violet</strong><span>400–420 nm</span><output data-current-value>0.0% frame mean</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#2e66ff"></div></div>
-                <strong>Royal Blue</strong><span>~455 nm</span><output data-current-value>0.0% mean</output>
+                <strong>Royal Blue</strong><span>~455 nm</span><output data-current-value>0.0% frame mean</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#28e5ed"></div></div>
-                <strong>Cyan</strong><span>~502 nm</span><output data-current-value>0.0% mean</output>
+                <strong>Cyan</strong><span>~502 nm</span><output data-current-value>0.0% frame mean</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#38e66d"></div></div>
-                <strong>Green</strong><span>~525 nm</span><output data-current-value>0.0% mean</output>
+                <strong>Green</strong><span>~525 nm</span><output data-current-value>0.0% frame mean</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#b8ef53"></div></div>
-                <strong>PC Lime</strong><span>phosphor</span><output data-current-value>0.0% mean</output>
+                <strong>PC Lime</strong><span>phosphor</span><output data-current-value>0.0% frame mean</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#ffac43"></div></div>
-                <strong>PC Amber</strong><span>phosphor</span><output data-current-value>0.0% mean</output>
+                <strong>PC Amber</strong><span>phosphor</span><output data-current-value>0.0% frame mean</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#ff4037"></div></div>
-                <strong>Red</strong><span>~625 nm</span><output data-current-value>0.0% mean</output>
+                <strong>Red</strong><span>~625 nm</span><output data-current-value>0.0% frame mean</output>
               </div>
               <div class="channel">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#bd111d"></div></div>
-                <strong>Deep Red</strong><span>~660 nm</span><output data-current-value>0.0% mean</output>
+                <strong>Deep Red</strong><span>~660 nm</span><output data-current-value>0.0% frame mean</output>
               </div>
               <div class="channel aggregate">
                 <div class="led-shell"><div class="led" data-current-led role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="--led-color:#f6fff0"></div></div>
-                <strong>White Σ</strong><span>normalized mean of eight Channels</span><output data-current-value>0.0% mean</output>
+                <strong>White Σ</strong><span>normalized mean of eight Channels</span><output data-current-value>0.0% frame mean</output>
               </div>
             </div>
           </div>
@@ -424,17 +428,28 @@
             <label for="target-current"><span>Target mean current</span><output id="target-current-output">50%</output></label>
             <input id="target-current" type="range" min="1" max="100" step="0.1" value="50">
             <div class="range-ends"><span>1%</span><span>100%</span></div>
-            <p class="control-note">Target Mean Current becomes PWM duty cycle. Exactly 100% is full DC for both conditions; their underlying clocks continue.</p>
+            <p class="control-note">Shared long-run mean for both conditions. Exactly 100% is full DC; their underlying clocks continue.</p>
+          </div>
+
+          <div class="control" data-pwm-only>
+            <label for="pwm-pulse-current"><span>PWM pulse current</span><output id="pwm-pulse-current-output">100%</output></label>
+            <input id="pwm-pulse-current" type="range" min="50" max="100" step="0.1" value="100">
+            <div class="range-ends"><span>Target mean</span><output id="pwm-duty-output">50% duty</output></div>
+            <div class="pwm-timing-readouts" aria-label="Derived PWM timing">
+              <div><span>PWM on time</span><output id="pwm-on-time-output">4.00 ms</output></div>
+              <div><span>PWM silence</span><output id="pwm-silence-output">4.00 ms</output></div>
+            </div>
+            <p class="control-note">PWM only. Duty = Target Mean Current ÷ PWM Pulse Current. The pulse-current minimum follows Target Mean Current, preserving the commanded mean without allowing duty above 100%. On-time and silence are derived readouts, not independent controls.</p>
           </div>
 
           <label class="switch-label" for="sound-enabled"><span>AC current monitor</span><input id="sound-enabled" type="checkbox" role="switch" checked></label>
 
           <div class="control">
             <label for="output-level"><span>Monitor gain</span><output id="output-level-output">2×</output></label>
-            <input id="output-level" type="range" min="-2" max="1.505149978319906" step="any" value="0.3010299956639812">
-            <div class="range-ends"><span>0.01×</span><span>32×</span></div>
+            <input id="output-level" type="range" min="-2" max="0.3010299956639812" step="any" value="0.3010299956639812">
+            <div class="range-ends"><span>0.01×</span><output id="monitor-gain-maximum">2× safe max</output></div>
           </div>
-          <p class="audio-note">The monitor subtracts Target Mean Current directly from every Aggregate White sample, then applies this fixed manual scalar. It has no filter state and no automatic gain, limiter, or compressor; settings above unity may clip the browser output.</p>
+          <p class="audio-note">The monitor subtracts Target Mean Current directly from every Aggregate White sample, then applies this fixed manual scalar. Its safe maximum clamps immediately when Target Mean Current changes. It has no filter state and no automatic gain, limiter, or compressor.</p>
 
           <div class="button-stack"><button id="start-stop" type="button">Start field</button></div>
         </aside>
@@ -457,7 +472,7 @@
     <section id="solution" class="spec-section">
       <div class="section-head">
         <span class="section-number">02 · Solution</span>
-        <div><h2>Run stochastic current beside a periodic control, then choose what to monitor.</h2><p class="section-lede">Poisson emits exact Arrivals and uniformly marks one of eight Channels. PWM drives all eight Channels in phase at Λ/8 cycles/s. Both conditions advance continuously from the same Total Event Budget and Target Mean Current. Separate LED banks remain visible while Monitor Source selects only the diagnostics, scopes, and direct AC Current Monitor.</p></div>
+        <div><h2>Run stochastic current beside a periodic control, then choose what to monitor.</h2><p class="section-lede">Poisson emits exact Arrivals and uniformly marks one of eight Channels. PWM drives all eight Channels in phase at Λ/8 cycles/s. Both conditions advance continuously from the same Total Event Budget and Target Mean Current; PWM Pulse Current trades pulse height against automatically derived duty without changing that mean. Separate LED banks remain visible while Monitor Source selects only the diagnostics, scopes, and direct AC Current Monitor.</p></div>
       </div>
       <div class="equation">Poisson: λᵢ = Λ / 8; Iᵢ(t) = smooth-limit(Σⱼ q(Λ, τ, Ī) · exp(−(t − tᵢⱼ)/τ))<br>PWM control: fPWM = Λ / 8; duty = Ī; I₁(t) = … = I₈(t) ∈ {0, 1}<br>Both: Iwhite(t) = (1/8) Σᵢ Iᵢ(t); audio(t) = Iwhite(t) − Ī</div>
     </section>
@@ -479,9 +494,10 @@
         <li>As an experimenter, I want to change current fall time, so that I can study how response bandwidth changes overlap and fluctuation.</li>
         <li>As an experimenter, I want to hear only the AC portion of fused current, so that audible modulation corresponds directly to optical modulation.</li>
         <li>As an experimenter, I want fixed monitor gain, so that genuinely diminishing modulation is allowed to become quiet.</li>
-        <li>As an experimenter, I want manual logarithmic monitor gain through 32×, so that quiet converged modulation can be auditioned without changing the optical experiment or introducing automatic normalization.</li>
+        <li>As an experimenter, I want manual logarithmic Monitor Gain up to the exact target-dependent no-clipping bound, so that quiet modulation can be auditioned without changing the optical experiment or allowing browser clipping.</li>
         <li>As an experimenter, I want each virtual LED to show the arithmetic mean of every current sample in its display interval, so that no Arrival is silently discarded.</li>
         <li>As an experimenter, I want a shared 1 s, 100 ms, 10 ms, or 1 ms scope timebase, so that I can move between convergence and individual PWM pulse morphology.</li>
+        <li>As an experimenter, I want to vary PWM Pulse Current while holding the commanded mean fixed, so that I can compare tall narrow pulses, shorter wider pulses, and continuous reduced current fairly.</li>
         <li>As an experimenter, I want connected minimum and maximum envelopes, so that a sustained positive or negative plateau remains visible instead of collapsing into zero-length vertical marks.</li>
         <li>As an experimenter, I want a separate fixed-scale audio oscilloscope, so that I can inspect the exact DC-to-AC conversion without normalization disguising its magnitude.</li>
         <li>As an experimenter, I want mean, RMS modulation, peak, limiter proximity, and observed rate together, so that I can distinguish convergence from clipping or missed events.</li>
@@ -497,7 +513,7 @@
       </div>
       <div class="card-grid">
         <article class="card"><h3>Exact timing</h3><p>Inter-arrival gaps are exponentially distributed. Multiple Arrivals may occur inside one 48 kHz sample interval and each contributes independently; sample coincidence never merges event identity or energy.</p></article>
-        <article class="card"><h3>Matched PWM control</h3><p>Every PWM Channel uses one shared phase, binary 0/100% current, frequency Λ/8, and duty equal to Target Mean Current. The eight rising-edge counts therefore sum to Λ. It advances beside Poisson and ignores Current Fall Time because that control belongs only to Poisson Current Responses.</p></article>
+        <article class="card"><h3>Matched PWM control</h3><p>Every PWM Channel uses one shared phase and frequency Λ/8. PWM Pulse Current selects the on-state current from the commanded Target Mean Current through 100%; duty is derived as Target Mean Current ÷ PWM Pulse Current, so their product always preserves the shared mean. On-time is duty ÷ frequency and silence is (1 − duty) ÷ frequency; both remain read-only evidence because independently controlling them would redefine frequency and duty. At the lower pulse-current endpoint duty reaches 100% and the output becomes continuous reduced current. The eight cycle counts still sum to Λ. The bank header displays commanded mean, pulse current, and duty separately from each LED's short Frame-Mean Current. PWM advances beside Poisson and ignores Current Fall Time because that control belongs only to Poisson Current Responses.</p></article>
         <article class="card"><h3>Monitor, not switch</h3><p>Monitor Source selects which completed condition block feeds the scopes, metrics, and audio output. It does not start, stop, reset, or reconfigure either condition.</p></article>
         <article class="card"><h3>Uniform routing</h3><p>Every Arrival receives one uniform Channel mark. Poisson splitting gives eight independent streams with expected rate Λ/8 and preserves Λ as the total lamp rate.</p></article>
         <article class="card"><h3>Positive response</h3><p>An Arrival injects a positive exponential current response with selectable fall time τ. There are no spectral, spatial, acoustic, or event-morphology marks.</p></article>
@@ -505,7 +521,7 @@
         <article class="card"><h3>Full-DC limit</h3><p>Below 100%, Poisson uses finite mean-held event charge and PWM uses the selected duty cycle. Exactly 100% is the explicit limit of both models: every Channel outputs continuous unit current while Poisson Arrivals and PWM phase continue advancing. Direct subtraction of the 100% target makes the Current Monitor exactly and immediately silent.</p></article>
         <article class="card"><h3>Smooth limit</h3><p>Raw positive shot current maps through u/(1+u). The current remains continuous in value, nonnegative, and below 100%, without a hard clipping plateau.</p></article>
         <article class="card"><h3>White fusion</h3><p>Aggregate White equals the arithmetic mean of the eight instantaneous Channel currents. It has no Arrivals, response state, or independent gain of its own.</p></article>
-        <article class="card"><h3>Direct sound monitor</h3><p>Every fused-current sample is translated vertically by subtracting the commanded Target Mean Current. This preserves the waveform point for point without a DC filter, history, decay, or frequency shaping. The only later operation is the explicit logarithmic 0.01×–32× manual Monitor Gain, defaulting to 2×. The signal is copied equally to both speakers. No automatic normalization, limiting, or compression is inserted, so excessive manual gain may clip at the browser output. Because sparse bounded Poisson current may not attain its target exactly, it may retain a small inaudible residual offset rather than altering the waveform to force a measured zero mean.</p></article>
+        <article class="card"><h3>Direct sound monitor</h3><p>Every fused-current sample is translated vertically by subtracting the commanded Target Mean Current. This preserves the waveform point for point without a DC filter, history, decay, or frequency shaping. The only later operation is explicit logarithmic manual Monitor Gain, defaulting to the 2× safe maximum at a 50% target. Its target-dependent bound is Gsafe = 1 ÷ max(Ī, 1 − Ī), so no possible bounded current sample can exceed browser full scale. Changing Target Mean Current updates the slider maximum and clamps its value immediately. The signal is copied equally to both speakers with no automatic normalization, limiting, or compression. Because sparse bounded Poisson current may not attain its target exactly, it may retain a small inaudible residual offset rather than altering the waveform to force a measured zero mean.</p></article>
         <article class="card"><h3>Dual oscilloscopes</h3><p>The Current Oscilloscope uses a fixed 0–100% scale. The Audio Oscilloscope plots the exact target-centered, pre-gain samples on a fixed −1 to +1 current-unit scale with a zero line. A shared timebase selects 1 s, 100 ms, 10 ms, or 1 ms. Both draw connected per-pixel minimum and maximum envelopes, retain unresolved excursions, preserve same-sign plateaus, and perform no visual normalization.</p></article>
         <article class="card"><h3>Frame integration</h3><p>Every worklet sample contributes to the arithmetic mean displayed by each DOM LED. Measurements and oscilloscopes are diagnostic views, not selectable rendering modes.</p></article>
         <article class="card"><h3>Isolation</h3><p>This standalone file and its Modules do not call, configure, or revise the existing generated-audio path. The two experiments share only durable domain definitions for Arrival, Channel, Speed, and Aggregate White.</p></article>
@@ -520,10 +536,11 @@
       <div class="card-grid">
         <article class="card"><h3>Arrival evidence</h3><p>A long seeded run must reproduce exactly, approach the requested total rate, distribute counts near Λ/8, and preserve the sum of Channel counts as total Arrivals.</p></article>
         <article class="card"><h3>Signal evidence</h3><p>Every Channel sample remains in [0,1), Aggregate White equals the exact sample mean, and every pre-gain audio sample equals Aggregate White minus Target Mean Current with no hidden transformation or state.</p></article>
-        <article class="card"><h3>Gain evidence</h3><p>The Monitor Gain slider must map equal travel to equal gain ratios from 0.01× through 32× and default to 2×. Changing it may alter only the browser GainNode; LED currents, event timing, worklet diagnostics, and the pre-gain Audio Oscilloscope must remain identical.</p></article>
+        <article class="card"><h3>Gain evidence</h3><p>The Monitor Gain slider must map equal travel to equal gain ratios from 0.01× through the exact target-dependent no-clipping bound. A 50% target permits 2×; 25% or 75% permits 1.33×; 100% permits 1×. Changing Target Mean Current must update and enforce the bound immediately. Gain may alter only the browser GainNode; LED currents, event timing, worklet diagnostics, and the pre-gain Audio Oscilloscope must remain identical.</p></article>
         <article class="card"><h3>Continuity evidence</h3><p>One render and arbitrarily partitioned renders must return identical Channel current, fused current, and audio samples for the same seed and settings.</p></article>
         <article class="card"><h3>Rate evidence</h3><p>The maximum clamps to 48,000 total Arrivals/s and reports 6,000 expected Arrivals/s per Channel. Dense current must show lower RMS modulation than a tenfold slower field at the same target and fall time.</p></article>
-        <article class="card"><h3>PWM evidence</h3><p>At an 8,000/s total event budget and 25% target, every Channel must produce the same binary 1 kHz waveform, exactly 1,000 rising edges/s, 25% mean current, and 8,000 combined edges/s. Both conditions must satisfy the same direct commanded-mean subtraction rule.</p></article>
+        <article class="card"><h3>PWM evidence</h3><p>At an 8,000/s total event budget, 25% target, and 100% Pulse Current, every Channel must produce the same binary 1 kHz waveform, exactly 1,000 rising edges/s, 25% mean current, and 8,000 combined edges/s. At 50% Pulse Current, its only current values must be 0% and 50%, derived duty must be 50%, and mean current must remain 25%. Pulse Current may never fall below Target Mean Current. Both conditions must satisfy the same direct commanded-mean subtraction rule.</p></article>
+        <article class="card"><h3>PWM timing evidence</h3><p>At 1 kHz per Channel, a 25% target with 100% Pulse Current must report 0.25 ms on and 0.75 ms silent. Reducing Pulse Current to 50% must report 0.50 ms on and 0.50 ms silent while preserving the same 25% commanded mean.</p></article>
         <article class="card"><h3>Full-DC evidence</h3><p>At a 100% target, both conditions must emit exact unit current on all eight Channels and Aggregate White while their underlying event counts continue. Direct subtraction of the commanded unit mean must make every audio-monitor sample exactly zero without NaN, infinity, clipping logic, filter state, or a stopped clock.</p></article>
         <article class="card"><h3>Display evidence</h3><p>The page exposes eighteen accessible meters in two labeled condition banks, one accessible monitor selector, one shared scope timebase, exact total/per-Channel language, the fixed frame-mean rule, both fixed-scale oscilloscopes, current diagnostics, and one explicit sound-monitor switch.</p></article>
         <article class="card"><h3>Scope evidence</h3><p>A known PWM pulse train must retain zero and one plateaus after display reduction. When multiple excursions fall inside one column, the same Interface must retain their true minimum and maximum without normalization or invented zero crossings.</p></article>

@@ -34,10 +34,15 @@ model at:
 It runs one exact total-lamp Poisson field and one matched PWM Control in
 parallel from 1–48,000 total events/s, with a separate nine-LED bank for each.
 Poisson assigns each Arrival uniformly to one of eight Channels. PWM drives all
-eight Channels in phase at `Λ/8`, so their combined rising-edge budget remains
-`Λ`; Target Mean Current becomes its duty cycle. Current Fall Time applies only
-to Poisson. Target Mean Current travels continuously from 1–100%; exactly 100%
-is a shared full-DC endpoint while both underlying clocks continue. A Monitor
+eight Channels in phase at `Λ/8`, so their combined cycle budget remains `Λ`.
+Its independent PWM Pulse Current selects the on-state current from the shared
+Target Mean Current through 100%, while duty is derived as `target ÷ pulse` to
+hold the mean fixed. At the pulse-current minimum, duty reaches 100% and PWM
+becomes continuous reduced current. Derived PWM On Time and PWM Silence
+readouts expose the resulting morphology without becoming additional controls.
+Current Fall Time applies only to Poisson.
+Target Mean Current travels continuously from 1–100%; exactly 100% is a shared
+full-DC endpoint while both underlying clocks continue. A Monitor
 Source selector chooses which continuously running
 condition feeds the metrics, fixed-scale oscilloscopes, and mono sound monitor;
 it never starts, stops, or resets either condition. A shared Scope Timebase
@@ -46,7 +51,8 @@ PWM plateaus remain visible. Connected minimum and maximum envelopes preserve
 both flat plateaus and unresolved excursions without normalizing the signal.
 Each ninth Aggregate White signal is the instantaneous eight-Channel mean. The
 sound monitor subtracts commanded Target Mean Current directly from Aggregate
-White, then applies a logarithmic 0.01×–32× manual Monitor Gain (2× by default). This
+White, then applies logarithmic manual Monitor Gain capped by the exact
+target-dependent no-clipping bound (2× at the default 50% target). This
 standalone page does not call or modify the existing rain renderer.
 
 ## Controls

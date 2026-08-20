@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createPoissonLedLabEngine } from "../src/led-current-engine.js";
+import {
+  createPoissonLedLabEngine,
+  derivePwmTiming,
+} from "../src/led-current-engine.js";
 import { createLedLabComparisonEngine } from "../src/led-lab-comparison-engine.js";
 
 function concatenate(blocks, key) {
@@ -157,6 +160,75 @@ test("PWM is a matched periodic control with the same total event budget", () =>
   assert.ok(block.currentChannels.slice(1).every(channel => (
     channel.every((current, sample) => current === block.currentChannels[0][sample])
   )));
+});
+
+test("PWM pulse current trades pulse height for duty while preserving commanded mean", () => {
+  const engine = createPoissonLedLabEngine({
+    source: "pwm",
+    sampleRate: 48_000,
+    rateHz: 8_000,
+    targetCurrent: 0.25,
+    pwmPulseCurrent: 0.5,
+  });
+  const block = engine.render(48_000);
+  const snapshot = engine.snapshot();
+  const mean = block.fusedCurrent.reduce((sum, value) => sum + value, 0) /
+    block.fusedCurrent.length;
+
+  assert.equal(snapshot.pwmPulseCurrent, 0.5);
+  assert.equal(snapshot.pwmDutyCycle, 0.5);
+  assert.ok(Math.abs(mean - 0.25) < 2e-5);
+  assert.ok(block.currentChannels.every(channel => (
+    channel.every(current => current === 0 || current === 0.5)
+  )));
+});
+
+test("PWM pulse current cannot imply a duty cycle above 100%", () => {
+  const engine = createPoissonLedLabEngine({
+    source: "pwm",
+    targetCurrent: 0.6,
+    pwmPulseCurrent: 0.4,
+  });
+
+  assert.equal(engine.snapshot().pwmPulseCurrent, 0.6);
+  assert.equal(engine.snapshot().pwmDutyCycle, 1);
+
+  const snapshot = engine.configure({
+    targetCurrent: 0.8,
+    pwmPulseCurrent: 0.7,
+  });
+  assert.equal(snapshot.pwmPulseCurrent, 0.8);
+  assert.equal(snapshot.pwmDutyCycle, 1);
+});
+
+test("PWM timing reports on-time and silence from frequency, mean, and pulse current", () => {
+  const fullPulse = derivePwmTiming({
+    totalRateHz: 8_000,
+    channelCount: 8,
+    targetCurrent: 0.25,
+    pwmPulseCurrent: 1,
+  });
+  const reducedPulse = derivePwmTiming({
+    totalRateHz: 8_000,
+    channelCount: 8,
+    targetCurrent: 0.25,
+    pwmPulseCurrent: 0.5,
+  });
+
+  assert.deepEqual(fullPulse, {
+    frequencyHz: 1_000,
+    periodSeconds: 0.001,
+    dutyCycle: 0.25,
+    onTimeSeconds: 0.00025,
+    silenceSeconds: 0.00075,
+  });
+  assert.deepEqual(reducedPulse, {
+    frequencyHz: 1_000,
+    periodSeconds: 0.001,
+    dutyCycle: 0.5,
+    onTimeSeconds: 0.0005,
+    silenceSeconds: 0.0005,
+  });
 });
 
 test("PWM uses the same direct current-to-AC monitor as Poisson current", () => {

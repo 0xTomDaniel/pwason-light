@@ -17,8 +17,16 @@ The standalone current-first comparison Module that owns simultaneous Steady Poi
 _Avoid_: Rain renderer, audio-to-light adapter, mixed acoustic source
 
 **PWM Control**:
-The deterministic scientific control condition that runs continuously beside Poisson in the LED lab. Below full DC, every Channel receives the same phase-aligned binary current at frequency `Λ/8`, so eight rising-edge counts sum to the selected total event budget `Λ`. Target Mean Current becomes duty cycle and Current Fall Time is ignored. At exactly 100%, current remains continuously on while PWM phase and cycle accounting continue. A separate nine-LED bank always displays it; Monitor Source only chooses whether its Aggregate White feeds diagnostics, commanded-mean subtraction, Monitor Gain, and both oscilloscopes.
+The deterministic scientific control condition that runs continuously beside Poisson in the LED lab. Every Channel receives the same phase-aligned waveform at frequency `Λ/8`, so eight cycle counts sum to the selected total event budget `Λ`. PWM Pulse Current sets its positive on-state current and duty is derived as `Target Mean Current / PWM Pulse Current`, preserving the shared commanded mean. At the pulse-current minimum, duty is 100% and the output becomes continuous reduced current; at exactly 100% Target Mean Current it is full DC. Phase and cycle accounting continue in both cases. Current Fall Time is ignored. The bank exposes commanded mean, pulse current, and duty separately from each LED's Frame-Mean Current. A separate nine-LED bank always displays it; Monitor Source only chooses whether its Aggregate White feeds diagnostics, commanded-mean subtraction, Monitor Gain, and both oscilloscopes.
 _Avoid_: Poisson approximation, audio oscillator, staggered aggregate smoothing
+
+**PWM Pulse Current**:
+The PWM Control's on-state current, continuously selectable from Target Mean Current through 100%. Its lower bound follows Target Mean Current because a smaller pulse could not reach the commanded mean without an impossible duty above 100%. Duty is always derived rather than independently controlled, so changing pulse height cannot invalidate the mean-matched experiment.
+_Avoid_: Second brightness target, unrestricted peak current, measured frame mean
+
+**PWM Timing**:
+The read-only morphology derived from PWM Control frequency and duty. Period is `1 / (Λ/8)`, On Time is `duty × period`, and Silence is `(1 − duty) × period`. On Time and Silence are not independent controls because selecting both would determine a new frequency and duty, breaking the Total Event Budget and Target Mean Current match.
+_Avoid_: Independent pulse-width control, independent dead time, Poisson Current Fall Time
 
 **Current Response**:
 The positive exponential current injected into one Channel by one Arrival in the standalone LED lab. Its selectable fall time controls overlap. Its charge varies inversely with total Arrival rate and response duration so high-density comparisons approach the selected Target Mean Current without using automatic signal normalization or a hard clipping plateau.
@@ -33,7 +41,7 @@ The mono audible signal obtained by subtracting commanded Target Mean Current di
 _Avoid_: Audio synthesizer, acoustic response, loudness matching
 
 **Monitor Gain**:
-The explicit fixed scalar applied after DC conversion solely for listening. Its logarithmic 0.01×–32× control defaults to 2× and cannot affect either current engine, either LED bank, or the pre-gain Audio Oscilloscope. It performs no normalization, compression, limiting, or feedback, so high settings may clip the browser audio output.
+The explicit fixed scalar applied after DC conversion solely for listening. Its logarithmic control begins at 0.01× and is bounded by `1 / max(Ī, 1 - Ī)`, the exact largest gain that keeps every possible target-centered current sample inside browser audio full scale. The bound is 2× at a 50% target, about 1.33× at 25% or 75%, and 1× at full DC. Changing Target Mean Current updates the slider maximum and clamps its current value immediately. It cannot affect either current engine, either LED bank, or the pre-gain Audio Oscilloscope and performs no automatic normalization, compression, limiting, or feedback.
 _Avoid_: Automatic gain, loudness matching, optical gain
 
 **Frame-Mean Current**:

@@ -1,4 +1,6 @@
 import { createRenderLoop } from "./render-loop.js";
+import { derivePwmTiming } from "./led-current-engine.js";
+import { maximumSafeMonitorGain } from "./led-monitor-gain.js";
 import { prepareScopeEnvelope } from "./led-scope-visualizer.js";
 
 const CHANNEL_NAMES = [
@@ -26,9 +28,16 @@ const pulseInput = document.querySelector("#pulse-width");
 const pulseOutput = document.querySelector("#pulse-width-output");
 const targetInput = document.querySelector("#target-current");
 const targetOutput = document.querySelector("#target-current-output");
+const pwmPulseInput = document.querySelector("#pwm-pulse-current");
+const pwmPulseOutput = document.querySelector("#pwm-pulse-current-output");
+const pwmDutyOutput = document.querySelector("#pwm-duty-output");
+const pwmOnTimeOutput = document.querySelector("#pwm-on-time-output");
+const pwmSilenceOutput = document.querySelector("#pwm-silence-output");
 const soundInput = document.querySelector("#sound-enabled");
 const volumeInput = document.querySelector("#output-level");
 const volumeOutput = document.querySelector("#output-level-output");
+const monitorGainMaximumOutput = document.querySelector("#monitor-gain-maximum");
+const pwmTargetOutput = document.querySelector('[data-condition-target="pwm"]');
 const statusOutput = document.querySelector("#engine-status");
 const meanOutput = document.querySelector("#mean-current");
 const rmsOutput = document.querySelector("#rms-modulation");
@@ -73,7 +82,10 @@ function formatTimebase(seconds) {
 }
 
 function monitorGainFromControl() {
-  return 10 ** Number(volumeInput.value);
+  return Math.min(
+    10 ** Number(volumeInput.value),
+    maximumSafeMonitorGain(Number(targetInput.value) / 100),
+  );
 }
 
 function formatMonitorGain(gain) {
@@ -96,26 +108,62 @@ function formatRate(rate) {
     : `${Math.round(rate).toLocaleString()} Hz`;
 }
 
+function formatDuration(seconds) {
+  if (seconds === 0) return "0 µs";
+  if (seconds >= 1) return `${seconds.toFixed(seconds < 10 ? 2 : 1)} s`;
+  if (seconds >= 0.001) {
+    const milliseconds = seconds * 1_000;
+    return `${milliseconds.toFixed(milliseconds < 10 ? 2 : 1)} ms`;
+  }
+  const microseconds = seconds * 1_000_000;
+  return `${microseconds.toFixed(microseconds < 100 ? 1 : 0)} µs`;
+}
+
 function settings() {
   return {
     monitorSource: selectedSource(),
     rateHz: rateFromControl(),
     pulseWidthMs: pulseWidthFromControl(),
     targetCurrent: Number(targetInput.value) / 100,
+    pwmPulseCurrent: Number(pwmPulseInput.value) / 100,
   };
 }
 
 function updateControlLabels() {
+  const targetPercent = Number(targetInput.value);
+  pwmPulseInput.min = String(targetPercent);
+  if (Number(pwmPulseInput.value) < targetPercent) {
+    pwmPulseInput.value = String(targetPercent);
+  }
   const values = settings();
+  const safeMonitorGain = maximumSafeMonitorGain(values.targetCurrent);
+  const safeMonitorExponent = Math.log10(safeMonitorGain);
+  volumeInput.max = String(safeMonitorExponent);
+  if (Number(volumeInput.value) > safeMonitorExponent) {
+    volumeInput.value = String(safeMonitorExponent);
+  }
   rateOutput.value = `${values.rateHz.toLocaleString()} events/s shared`;
   channelRateOutput.value = `${formatRate(values.rateHz / 8)} expected Poisson per Channel`;
   pwmFrequencyOutput.value = `${formatRate(values.rateHz / 8)} per Channel`;
   pulseOutput.value = values.pulseWidthMs < 1
     ? `${values.pulseWidthMs.toFixed(2)} ms`
     : `${values.pulseWidthMs.toFixed(values.pulseWidthMs < 10 ? 1 : 0)} ms`;
-  const targetPercent = Number(targetInput.value);
   targetOutput.value = `${Number.isInteger(targetPercent) ? targetPercent : targetPercent.toFixed(1)}%`;
+  const pwmPulsePercent = values.pwmPulseCurrent * 100;
+  const pwmTiming = derivePwmTiming({
+    totalRateHz: values.rateHz,
+    channelCount: 8,
+    targetCurrent: values.targetCurrent,
+    pwmPulseCurrent: values.pwmPulseCurrent,
+  });
+  const pwmDutyPercent = pwmTiming.dutyCycle * 100;
+  pwmPulseOutput.value = `${Number.isInteger(pwmPulsePercent) ? pwmPulsePercent : pwmPulsePercent.toFixed(1)}%`;
+  pwmDutyOutput.value = `${pwmDutyPercent.toFixed(1).replace(/\.0$/, "")}% duty`;
+  pwmOnTimeOutput.value = formatDuration(pwmTiming.onTimeSeconds);
+  pwmSilenceOutput.value = formatDuration(pwmTiming.silenceSeconds);
+  pwmTargetOutput.value = `${targetOutput.value} mean · ${pwmPulseOutput.value} pulse · ${pwmDutyOutput.value}`;
   volumeOutput.value = formatMonitorGain(monitorGainFromControl());
+  monitorGainMaximumOutput.value = `${formatMonitorGain(safeMonitorGain)} safe max`;
   const sourceName = selectedSource() === "pwm" ? "PWM" : "Poisson";
   scopeSourceOutput.textContent = `${sourceName} · min/max-preserving`;
   audioSourceOutput.textContent = `${sourceName} · target-centered · before Monitor Gain`;
@@ -136,7 +184,8 @@ function configureRunningEngine() {
   }
   if (monitorGain && audioContext) {
     const level = soundInput.checked ? monitorGainFromControl() : 0;
-    monitorGain.gain.setTargetAtTime(level, audioContext.currentTime, 0.01);
+    monitorGain.gain.cancelScheduledValues(audioContext.currentTime);
+    monitorGain.gain.setValueAtTime(level, audioContext.currentTime);
   }
 }
 
@@ -145,7 +194,7 @@ function clearLeds() {
     bank.leds.forEach((led, index) => {
       led.style.setProperty("--level", "0");
       led.setAttribute("aria-valuenow", "0");
-      if (bank.values[index]) bank.values[index].value = "0.0% mean";
+      if (bank.values[index]) bank.values[index].value = "0.0% frame mean";
     });
   }
   meanOutput.value = "0.0%";
@@ -331,7 +380,7 @@ function renderBank(name, condition) {
     const bounded = Math.min(1, Math.max(0, level));
     bank?.leds[index]?.style.setProperty("--level", bounded.toFixed(5));
     bank?.leds[index]?.setAttribute("aria-valuenow", String(Math.round(bounded * 100)));
-    if (bank?.values[index]) bank.values[index].value = `${(bounded * 100).toFixed(1)}% mean`;
+    if (bank?.values[index]) bank.values[index].value = `${(bounded * 100).toFixed(1)}% frame mean`;
   });
 }
 
@@ -414,6 +463,7 @@ for (const input of [
   rateInput,
   pulseInput,
   targetInput,
+  pwmPulseInput,
   soundInput,
   volumeInput,
 ]) {
